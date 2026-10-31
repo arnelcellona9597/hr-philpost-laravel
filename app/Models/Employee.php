@@ -1,0 +1,157 @@
+<?php
+
+namespace App\Models;
+
+use App\Enums\BloodType;
+use App\Enums\CivilStatus;
+use App\Enums\Classification;
+use App\Enums\EducationalAttainment;
+use App\Enums\EmploymentStatus;
+use App\Enums\Gender;
+use App\Enums\Region;
+use App\Support\HrDate;
+use App\Support\Names;
+use Database\Factories\EmployeeFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+#[Fillable(['employee_id', 'profile_picture_id', 'last_name', 'first_name', 'middle_name', 'extension', 'gender', 'date_of_birth', 'civil_status', 'religion', 'blood_type', 'professional_eligibility', 'contact_number', 'email', 'address', 'educational_attainment', 'courses', 'year_level_earned_units', 'academic_honors', 'classification', 'employment_status', 'station_id', 'region', 'position', 'nature_of_work', 'driver_license_number', 'date_hired', 'last_day_of_service', 'remarks', 'sss', 'pagibig', 'tin', 'philhealth', 'emergency_contact_name', 'emergency_relationship', 'emergency_contact_number', 'emergency_address'])]
+class Employee extends Model
+{
+    /** @use HasFactory<EmployeeFactory> */
+    use HasFactory;
+
+    /**
+     * Keep the stored "LAST, First M. Ext." copy used for sorting, searching and labels in step.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (Employee $employee): void {
+            $employee->full_name = Names::lastFirst($employee->last_name, $employee->first_name, $employee->middle_name, $employee->extension);
+        });
+    }
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'gender' => Gender::class,
+            'date_of_birth' => 'date:Y-m-d',
+            'civil_status' => CivilStatus::class,
+            'blood_type' => BloodType::class,
+            'educational_attainment' => EducationalAttainment::class,
+            'classification' => Classification::class,
+            'employment_status' => EmploymentStatus::class,
+            'region' => Region::class,
+            'date_hired' => 'date:Y-m-d',
+            'last_day_of_service' => 'date:Y-m-d',
+        ];
+    }
+
+    /**
+     * @return Attribute<int|null, never>
+     */
+    protected function age(): Attribute
+    {
+        return Attribute::get(fn (): ?int => $this->date_of_birth ? HrDate::ageOn($this->date_of_birth->toDateString()) : null);
+    }
+
+    /**
+     * @return Attribute<string, never>
+     */
+    protected function lengthOfService(): Attribute
+    {
+        return Attribute::get(fn (): string => HrDate::formatSpan(HrDate::lengthOfService(
+            $this->date_hired?->toDateString(),
+            $this->last_day_of_service?->toDateString(),
+        )));
+    }
+
+    /**
+     * @return BelongsTo<Branch, $this>
+     */
+    public function station(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class, 'station_id');
+    }
+
+    /**
+     * @return BelongsTo<Media, $this>
+     */
+    public function profilePicture(): BelongsTo
+    {
+        return $this->belongsTo(Media::class, 'profile_picture_id');
+    }
+
+    /**
+     * @return HasMany<WellnessLeave, $this>
+     */
+    public function wellnessLeaves(): HasMany
+    {
+        return $this->hasMany(WellnessLeave::class);
+    }
+
+    /**
+     * @return HasMany<ItrSubmission, $this>
+     */
+    public function itrSubmissions(): HasMany
+    {
+        return $this->hasMany(ItrSubmission::class);
+    }
+
+    /**
+     * @return HasMany<SwornDeclaration, $this>
+     */
+    public function swornDeclarations(): HasMany
+    {
+        return $this->hasMany(SwornDeclaration::class);
+    }
+
+    /**
+     * @return HasMany<PdsSubmission, $this>
+     */
+    public function pdsSubmissions(): HasMany
+    {
+        return $this->hasMany(PdsSubmission::class);
+    }
+
+    /**
+     * @return HasMany<IpcrRating, $this>
+     */
+    public function ipcrRatings(): HasMany
+    {
+        return $this->hasMany(IpcrRating::class);
+    }
+
+    /**
+     * @return HasMany<Payslip, $this>
+     */
+    public function payslips(): HasMany
+    {
+        return $this->hasMany(Payslip::class);
+    }
+
+    /**
+     * @return HasMany<Certificate, $this>
+     */
+    public function certificates(): HasMany
+    {
+        return $this->hasMany(Certificate::class);
+    }
+
+    /**
+     * @return HasMany<Application, $this>
+     */
+    public function applications(): HasMany
+    {
+        return $this->hasMany(Application::class);
+    }
+}

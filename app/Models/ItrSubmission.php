@@ -1,0 +1,16 @@
+<?php
+
+namespace App\Models;
+
+use Database\Factories\ItrSubmissionFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+#[Fillable(['employee_id', 'year', 'last_name', 'first_name', 'middle_name', 'date_submitted', 'date_received', 'remarks', 'extension'])]
+class ItrSubmission extends ComplianceRecord
+{
+    /** @use HasFactory<ItrSubmissionFactory> */
+    use HasFactory;
+
+    public const SLUG = 'itr-submissions';
+}
