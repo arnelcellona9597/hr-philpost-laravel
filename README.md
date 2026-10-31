@@ -21,7 +21,10 @@ Reference for deployment. No access details belong in this file, because this re
 | SSH shell CPU | AMD EPYC 9655P, 96 cores shown. This is the shared host, not a dedicated allocation |
 | `/` | Read-only system image, 1.4 GB. Showing 100% is normal |
 | `/tmp` | 128 MB |
-| `/home` | 16 MB |
+| Home and webspace | `/home/www`, on shared network storage (295 TB pool). The real quota is in the IONOS panel |
+| PHP | 5.6 to 8.6 installed. `php` is 8.3.36, so use `php8.5` explicitly (8.5.12, same as development) |
+| `php8.5` CLI | `memory_limit` 512M, `upload_max_filesize` 128M, `post_max_size` 1024M, with `fileinfo`, `pdo_mysql`, `mbstring`, `zip` and `gd` |
+| Tools | `git` yes, `composer` no, `crontab` no |
 
 **File limit: not a problem.** A production install is about 8,500 files and folders, or 3% of the limit:
 
@@ -37,19 +40,21 @@ Sessions, cache and the queue live in MySQL, so they add no files. Uploads add o
 **Deployment rules**
 
 - Never upload `node_modules` (8,515 files) or development packages. Node isn't needed on the server.
-- Build locally and upload the result, because `/home` is too small for Composer's cache: run `composer install --no-dev --optimize-autoloader` and `npm run build`, then upload a single archive and unpack it over SSH.
+- Build locally and upload the result, because the server has no Composer: run `composer install --no-dev --optimize-autoloader` and `npm run build`, then upload a single archive and unpack it over SSH.
+- Run every Artisan command as `php8.5 artisan ...`. Plain `php` is 8.3 and fails the app's PHP requirement.
+- Run `php8.5 artisan optimize` after each deploy, since network storage makes loading many small files slower.
 - Point the document root at `public/`.
 - Keep `.env` on the server only. `storage/` and `bootstrap/cache` must be writable.
-- No Redis or always-on workers. Use cron for `schedule:run`, which runs `queue:work --stop-when-empty`.
+- No Redis or always-on workers. `crontab` isn't available over SSH, so schedule `schedule:run` in the IONOS panel. If that isn't possible, use the keyed `/internal/queue` endpoint.
 - Keep backups off the server as well, and rotate the ones on it.
 
 **Still to confirm on the server before deploying**
 
-- PHP 8.5 CLI and web, which `composer.json` requires, with the `fileinfo`, `pdo_mysql`, `mbstring`, `zip` and `gd` extensions
-- Web `memory_limit` of at least 256 MB for Excel imports and PDFs
-- Disk quota of the webspace, which `df` doesn't show
+- The site's web PHP version is set to 8.5 in the IONOS panel
+- The web `memory_limit` is at least 256 MB (the CLI value is confirmed; web PHP can differ)
+- Webspace disk quota
 - MySQL version and database size limit
-- Cron availability and shortest interval
+- Cron jobs in the IONOS panel, and the shortest interval
 
 ## About Laravel
 
