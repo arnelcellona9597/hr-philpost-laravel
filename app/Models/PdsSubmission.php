@@ -13,4 +13,8 @@ class PdsSubmission extends ComplianceRecord
     use HasFactory;
 
     public const SLUG = 'pds-submissions';
+
+    public const SINGULAR = 'Personal Data Sheet';
+
+    public const SNAPSHOT = ['station', 'job_title'];
 }

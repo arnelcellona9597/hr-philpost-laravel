@@ -18,9 +18,9 @@ use Illuminate\Support\Facades\Route;
  */
 function page(string $blade): string
 {
-    Route::middleware('web')->get('/employees/5', fn () => Blade::render($blade));
+    Route::middleware('web')->get('/employees/preview', fn () => Blade::render($blade));
 
-    return '/employees/5';
+    return '/employees/preview';
 }
 
 it('renders the signed-in shell around a page', function () {
@@ -44,7 +44,7 @@ it('shows HR Accounts and SMTP only to System Admins', function () {
         ->assertDontSee('HR Accounts')
         ->assertDontSee('Email Server (SMTP)');
 
-    $this->actingAs(User::factory()->systemAdmin()->create())->get('/employees/5')
+    $this->actingAs(User::factory()->systemAdmin()->create())->get('/employees/preview')
         ->assertSee('HR Accounts')
         ->assertSee('Email Server (SMTP)');
 });

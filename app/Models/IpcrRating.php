@@ -16,11 +16,17 @@ class IpcrRating extends ComplianceRecord
 
     public const SLUG = 'ipcr-ratings';
 
+    public const SINGULAR = 'IPCR Rating';
+
+    public const SNAPSHOT = ['station', 'job_title'];
+
     /**
      * Round the rating the way IPCR forms report it and keep the adjectival rating in step.
      */
     protected static function booted(): void
     {
+        parent::booted();
+
         static::saving(function (IpcrRating $rating): void {
             $value = $rating->rating === null ? null : IpcrScale::round((float) $rating->rating);
 

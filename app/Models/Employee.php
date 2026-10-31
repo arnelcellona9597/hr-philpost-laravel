@@ -154,4 +154,25 @@ class Employee extends Model
     {
         return $this->hasMany(Application::class);
     }
+
+    /**
+     * Deleting would orphan history, so HR should change the status instead.
+     */
+    public function deleteBlocker(): ?string
+    {
+        $total = collect([
+            $this->wellnessLeaves(),
+            $this->itrSubmissions(),
+            $this->swornDeclarations(),
+            $this->pdsSubmissions(),
+            $this->ipcrRatings(),
+            $this->payslips(),
+            $this->certificates(),
+            $this->applications(),
+        ])->sum(fn (HasMany $records): int => $records->count());
+
+        return $total > 0
+            ? "This employee has {$total} linked record(s) such as leave, requirements, payslips, certificates or applications. Set the employment status to Resigned, Retired or Terminated instead of deleting."
+            : null;
+    }
 }

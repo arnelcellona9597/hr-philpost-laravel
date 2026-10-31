@@ -16,14 +16,17 @@ class DocumentSequence extends Model
      */
     public static function next(string $scope): int
     {
-        return DB::transaction(function () use ($scope): int {
+        // Created outside the transaction: an insert inside it takes gap locks that deadlock parallel requests.
+        if (! static::query()->where('scope', $scope)->exists()) {
             static::query()->insertOrIgnore(['scope' => $scope, 'last_number' => 0, 'created_at' => now(), 'updated_at' => now()]);
+        }
 
+        return DB::transaction(function () use ($scope): int {
             $sequence = static::query()->where('scope', $scope)->lockForUpdate()->firstOrFail();
             $sequence->increment('last_number');
 
             return $sequence->last_number;
-        });
+        }, 5);
     }
 
     /**

@@ -2,8 +2,7 @@
 @props([
     'fields',
     'values' => [],
-    'errors' => [],
-    'formError' => null,
+    'spoof' => null,
     'choices' => [],
     'suggestions' => [],
     'submitLabel' => 'Save',
@@ -14,12 +13,19 @@
 ])
 
 @php
+    $errorBag = request()->hasSession() ? session('errors')?->getBag('default') : null;
+    $fieldErrors = $errorBag ? array_map(fn (array $messages): string => $messages[0], $errorBag->messages()) : [];
+    $formError = $fieldErrors['form'] ?? ($fieldErrors === [] ? null : 'Please fix the highlighted fields.');
+    $values = array_merge($values, request()->hasSession() ? (array) request()->old() : []);
     $editable = collect($fields)->reject(fn (array $field): bool => $field['computed'] ?? false);
     $sections = $editable->groupBy(fn (array $field): string => $field['section'] ?? '');
 @endphp
 
 <form method="post" class="space-y-6" data-dirty-guard novalidate {{ $attributes }}>
     @csrf
+    @if ($spoof)
+        @method($spoof)
+    @endif
     @if ($formError)
         <div class="rounded-lg bg-danger-soft px-4 py-3 text-sm text-danger" role="alert">{{ $formError }}</div>
     @endif
@@ -34,7 +40,7 @@
                     <x-form-field
                         :field="$field"
                         :value="$values[$field['name']] ?? ''"
-                        :error="$errors[$field['name']] ?? null"
+                        :error="$fieldErrors[$field['name']] ?? null"
                         :choices="$choices[$field['name']] ?? []"
                         :suggestions="$suggestions[$field['name']] ?? []"
                         :disabled="in_array($field['name'], $locked, true)"

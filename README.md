@@ -7,6 +7,50 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## Live server (phlposthr.com)
+
+Reference for deployment. No access details belong in this file, because this repository may be public.
+
+**Measured or reported (November 2026)**
+
+| Item | Value |
+|---|---|
+| Hosting | IONOS webspace, SFTP and SSH on port 22 |
+| File limit | 262,144 files (5 used before deployment) |
+| SSH shell memory | 6 GB shown by `top` |
+| SSH shell CPU | AMD EPYC 9655P, 96 cores shown. This is the shared host, not a dedicated allocation |
+| `/` | Read-only system image, 1.4 GB. Showing 100% is normal |
+| `/tmp` | 128 MB |
+| `/home` | 16 MB |
+
+**File limit: not a problem.** A production install is about 8,500 files and folders, or 3% of the limit:
+
+| Part | Files |
+|---|---|
+| `vendor/` from `composer install --no-dev` | 6,904 (plus 1,027 folders, 57 MB) |
+| App code and config | 273 |
+| Built assets in `public/build` | 11 |
+| Compiled Blade views | About 210 |
+
+Sessions, cache and the queue live in MySQL, so they add no files. Uploads add one file each, and PDFs and Excel exports are generated on demand, so normal use leaves over 250,000 files of room.
+
+**Deployment rules**
+
+- Never upload `node_modules` (8,515 files) or development packages. Node isn't needed on the server.
+- Build locally and upload the result, because `/home` is too small for Composer's cache: run `composer install --no-dev --optimize-autoloader` and `npm run build`, then upload a single archive and unpack it over SSH.
+- Point the document root at `public/`.
+- Keep `.env` on the server only. `storage/` and `bootstrap/cache` must be writable.
+- No Redis or always-on workers. Use cron for `schedule:run`, which runs `queue:work --stop-when-empty`.
+- Keep backups off the server as well, and rotate the ones on it.
+
+**Still to confirm on the server before deploying**
+
+- PHP 8.5 CLI and web, which `composer.json` requires, with the `fileinfo`, `pdo_mysql`, `mbstring`, `zip` and `gd` extensions
+- Web `memory_limit` of at least 256 MB for Excel imports and PDFs
+- Disk quota of the webspace, which `df` doesn't show
+- MySQL version and database size limit
+- Cron availability and shortest interval
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

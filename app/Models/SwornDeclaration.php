@@ -13,4 +13,8 @@ class SwornDeclaration extends ComplianceRecord
     use HasFactory;
 
     public const SLUG = 'sworn-declarations';
+
+    public const SINGULAR = 'Sworn Declaration';
+
+    public const SNAPSHOT = ['station', 'job_title', 'tin'];
 }

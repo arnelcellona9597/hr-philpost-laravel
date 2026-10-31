@@ -42,4 +42,17 @@ class Branch extends Model
     {
         return $this->hasMany(Application::class, 'station_id');
     }
+
+    /**
+     * Why this branch can't be deleted yet, if anything still uses it.
+     */
+    public function deleteBlocker(): ?string
+    {
+        $employees = $this->employees()->count();
+        $applications = $this->applications()->count();
+
+        return $employees + $applications > 0
+            ? "This branch still has {$employees} employee(s) and {$applications} application(s). Reassign them first."
+            : null;
+    }
 }

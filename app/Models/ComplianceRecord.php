@@ -14,6 +14,37 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 abstract class ComplianceRecord extends Model
 {
     /**
+     * Details copied from the employee, beyond their name.
+     *
+     * @var list<string>
+     */
+    public const SNAPSHOT = [];
+
+    /**
+     * Fill blank snapshot details from the employee, and replace them when the employee changes.
+     */
+    protected static function booted(): void
+    {
+        static::saving(fn (ComplianceRecord $record) => $record->copyEmployeeDetails());
+    }
+
+    /**
+     * The model behind a requirement's URL segment.
+     *
+     * @return class-string<ComplianceRecord>
+     */
+    public static function modelFor(string $route): string
+    {
+        return match ($route) {
+            'itr' => ItrSubmission::class,
+            'sworn-declaration' => SwornDeclaration::class,
+            'pds' => PdsSubmission::class,
+            'ipcr' => IpcrRating::class,
+            default => abort(404),
+        };
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -62,5 +93,31 @@ abstract class ComplianceRecord extends Model
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    private function copyEmployeeDetails(): void
+    {
+        $employee = Employee::query()->with('station')->find($this->employee_id);
+
+        if ($employee === null) {
+            return;
+        }
+
+        $replace = $this->exists && $this->isDirty('employee_id');
+        $source = [
+            'last_name' => $employee->last_name,
+            'first_name' => $employee->first_name,
+            'middle_name' => $employee->middle_name,
+            'extension' => $employee->extension,
+            'station' => $employee->station?->name,
+            'job_title' => $employee->position,
+            'tin' => $employee->tin,
+        ];
+
+        foreach (['last_name', 'first_name', 'middle_name', ...static::SNAPSHOT] as $key) {
+            if ($replace || blank($this->getAttribute($key))) {
+                $this->setAttribute($key, $source[$key]);
+            }
+        }
     }
 }

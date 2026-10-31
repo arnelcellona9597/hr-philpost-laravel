@@ -117,3 +117,59 @@ if (avatarForm) {
     save.disabled = false
   })
 }
+
+// Whole table rows that open a record.
+document.querySelectorAll('tr[data-href]').forEach((row) => {
+  row.addEventListener('click', (e) => {
+    if (e.target.closest('a, button, input, select')) return
+    location.href = row.dataset.href
+  })
+})
+
+// Filters that apply as soon as they change.
+document.querySelectorAll('form[data-autosubmit] select, select[data-autosubmit]').forEach((select) => {
+  select.addEventListener('change', () => select.form?.requestSubmit())
+})
+
+// Close a deadline popover with Escape.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return
+  document.querySelectorAll('[data-deadline-banner] details[open]').forEach((details) => {
+    details.open = false
+    details.querySelector('summary')?.focus()
+  })
+})
+
+// Inline onboarding requirements: saves immediately and rolls back on error.
+const REQUIREMENT_TONES = { Pending: 'badge-warning', Submitted: 'badge-primary', Verified: 'badge-success', 'N/A': 'badge-neutral' }
+document.querySelectorAll('select[data-req]').forEach((select) => {
+  let previous = select.value
+  select.addEventListener('change', async () => {
+    const row = select.closest('tr[data-app]')
+    select.disabled = true
+    try {
+      const res = await fetch(`/onboarding/${row.dataset.app}/requirement`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+        },
+        body: JSON.stringify({ key: select.dataset.req, value: select.value }),
+      })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.message ?? 'Could not save')
+      previous = select.value
+      Object.values(REQUIREMENT_TONES).forEach((tone) => select.classList.remove(tone))
+      select.classList.add(REQUIREMENT_TONES[select.value])
+      const fds = row.querySelector('[data-fds] span')
+      fds.className = body.requirementsStatus === 'Complete' ? 'badge-success' : 'badge-warning'
+      fds.textContent = body.requirementsStatus === 'Complete' ? 'Complete' : `${body.requirementsMissing} missing`
+    } catch (err) {
+      select.value = previous
+      alert(err.message)
+    } finally {
+      select.disabled = false
+    }
+  })
+})

@@ -13,4 +13,8 @@ class ItrSubmission extends ComplianceRecord
     use HasFactory;
 
     public const SLUG = 'itr-submissions';
+
+    public const SINGULAR = 'Annual Income Tax Return';
+
+    public const SNAPSHOT = ['extension'];
 }
