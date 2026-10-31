@@ -4,8 +4,6 @@
     'description' => null,
     'back' => null,
     'actions' => null,
-    'mailWarning' => null,
-    'sessionExpiresAt' => null,
 ])
 
 @php

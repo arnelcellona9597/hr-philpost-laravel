@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Middleware\RequireActiveSession;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -17,3 +19,11 @@ use Tests\TestCase;
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
     ->in('Feature');
+
+/**
+ * Act as a user with a live session, as the sign-in flow leaves it.
+ */
+function signIn(User $user): TestCase
+{
+    return test()->actingAs($user)->withSession([RequireActiveSession::EXPIRES_AT_KEY => now()->addHours(12)->getTimestamp()]);
+}

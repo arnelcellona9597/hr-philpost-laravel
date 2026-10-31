@@ -1,5 +1,5 @@
 <?php
 
-it('returns a successful response', function () {
-    $this->get('/')->assertSuccessful();
+it('sends visitors to the sign-in page', function () {
+    $this->get('/')->assertRedirect('/login');
 });

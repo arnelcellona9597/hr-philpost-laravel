@@ -88,3 +88,32 @@ if (preview && previewForm) {
   })
   update()
 }
+
+// Show the chosen profile picture before saving, and catch files that are too large without a round trip.
+const avatarForm = document.querySelector('[data-avatar-form]')
+if (avatarForm) {
+  const input = avatarForm.querySelector('[data-avatar-input]')
+  const save = avatarForm.querySelector('[data-avatar-save]')
+  const nameEl = avatarForm.querySelector('[data-avatar-name]')
+  const preview = document.querySelector('[data-avatar-preview]')
+  const current = document.querySelector('[data-avatar-current]')
+  const maxBytes = Number(avatarForm.dataset.maxBytes)
+  let url = null
+  input.addEventListener('change', () => {
+    const file = input.files && input.files[0]
+    if (url) URL.revokeObjectURL(url)
+    if (!file) return
+    if (file.size > maxBytes) {
+      nameEl.textContent = `That file is larger than ${maxBytes / 1024 / 1024} MB.`
+      save.disabled = true
+      input.value = ''
+      return
+    }
+    url = URL.createObjectURL(file)
+    preview.src = url
+    preview.classList.remove('hidden')
+    current.classList.add('hidden')
+    nameEl.textContent = file.name
+    save.disabled = false
+  })
+}
