@@ -39,6 +39,7 @@ class ApplicationController extends Controller
         'positionApplied' => 'position_applied',
         'dateApplied' => 'date_applied',
         'startOjt' => 'start_ojt',
+        'fdsDate' => 'fds_date',
         'applicationStatus' => 'application_status',
         'requirementsStatus' => 'requirements_status',
         'dateSubmitted' => 'date_submitted',
@@ -52,6 +53,9 @@ class ApplicationController extends Controller
         $statuses = array_values(array_intersect(Arr::wrap($request->query('status')), array_column(ApplicationStatus::cases(), 'value')));
         $requirements = RequirementsCompletion::tryFrom((string) $request->query('requirements'));
         $station = $request->integer('station') ?: null;
+        $position = Str::limit(trim((string) $request->query('position')), 150, '');
+        $fdsFrom = HrDate::isValid((string) $request->query('fdsFrom')) ? (string) $request->query('fdsFrom') : null;
+        $fdsTo = HrDate::isValid((string) $request->query('fdsTo')) ? (string) $request->query('fdsTo') : null;
         $sortRaw = (string) $request->query('sort', '-dateApplied');
         $sort = isset(self::SORTS[ltrim($sortRaw, '-')]) ? $sortRaw : '-dateApplied';
         $today = HrDate::today();
@@ -71,6 +75,9 @@ class ApplicationController extends Controller
             ->when($statuses !== [], fn (Builder $query) => $query->whereIn('application_status', $statuses))
             ->when($requirements, fn (Builder $query) => $query->where('requirements_status', $requirements))
             ->when($station, fn (Builder $query) => $query->where('station_id', $station))
+            ->when($position !== '', fn (Builder $query) => $query->where('position_applied', $position))
+            ->when($fdsFrom, fn (Builder $query) => $query->where('fds_date', '>=', $fdsFrom))
+            ->when($fdsTo, fn (Builder $query) => $query->where('fds_date', '<=', $fdsTo))
             ->orderBy(self::SORTS[ltrim($sort, '-')], str_starts_with($sort, '-') ? 'desc' : 'asc')
             ->orderBy('id')
             ->paginate(25)
@@ -92,6 +99,10 @@ class ApplicationController extends Controller
             'statuses' => $statuses,
             'requirements' => $requirements,
             'station' => $station,
+            'position' => $position,
+            'positions' => Application::query()->whereNotNull('position_applied')->distinct()->orderBy('position_applied')->pluck('position_applied'),
+            'fdsFrom' => $fdsFrom,
+            'fdsTo' => $fdsTo,
             'year' => $year,
             'branches' => Branch::query()->orderBy('name')->get(['id', 'name']),
             'statusCounts' => Application::query()->toBase()->selectRaw('application_status, COUNT(*) AS total')->groupBy('application_status')->pluck('total', 'application_status'),

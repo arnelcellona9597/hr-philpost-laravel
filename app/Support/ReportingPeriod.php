@@ -21,15 +21,26 @@ class ReportingPeriod
 
     public const DEFAULT = 'this-year';
 
+    public const CUSTOM = 'custom';
+
+    public const MAX_CUSTOM_DAYS = 3660;
+
     private const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
     /**
+     * A chosen range wins over the preset: both dates must be real, in order, and at most ten years apart.
+     *
      * @return Period
      */
-    public static function resolve(?string $key = null, ?string $today = null): array
+    public static function resolve(?string $key = null, ?string $today = null, ?string $from = null, ?string $to = null): array
     {
-        $key = isset(self::OPTIONS[$key]) ? $key : self::DEFAULT;
         $today ??= HrDate::today();
+
+        if (self::validRange($from, $to)) {
+            return self::custom($from, $to);
+        }
+
+        $key = isset(self::OPTIONS[$key]) ? $key : self::DEFAULT;
         $year = (int) substr($today, 0, 4);
         $monthStart = substr($today, 0, 7).'-01';
 
@@ -65,6 +76,32 @@ class ReportingPeriod
             'prevTo' => $range[3],
             'prevLabel' => $range[4],
             'bucket' => $range[5],
+        ];
+    }
+
+    public static function validRange(?string $from, ?string $to): bool
+    {
+        return $from !== null && $to !== null && HrDate::isValid($from) && HrDate::isValid($to)
+            && $from <= $to && HrDate::daysBetween($from, $to) < self::MAX_CUSTOM_DAYS;
+    }
+
+    /**
+     * @return Period
+     */
+    private static function custom(string $from, string $to): array
+    {
+        $days = HrDate::daysBetween($from, $to) + 1;
+        $prevTo = HrDate::addDays($from, -1);
+
+        return [
+            'key' => self::CUSTOM,
+            'label' => HrDate::format($from).' – '.HrDate::format($to),
+            'from' => $from,
+            'to' => $to,
+            'prevFrom' => HrDate::addDays($prevTo, -($days - 1)),
+            'prevTo' => $prevTo,
+            'prevLabel' => "vs the previous {$days} ".($days === 1 ? 'day' : 'days'),
+            'bucket' => $days <= 45 ? 'day' : ($days <= 400 ? 'week' : ($days <= 3000 ? 'month' : 'year')),
         ];
     }
 

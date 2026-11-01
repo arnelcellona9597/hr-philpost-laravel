@@ -204,3 +204,38 @@ it('deletes an application', function () {
 
     expect($application->fresh())->toBeNull();
 });
+
+it('keeps the FDS date apart from the requirements status', function () {
+    Application::factory()->create(['applicant_name' => 'Ana Reyes', 'fds_date' => '2026-07-15']);
+
+    $this->get('/onboarding')->assertSuccessful()->assertSeeInOrder(['>FDS', 'Requirements'], false)->assertDontSee('FDS Status')->assertSee('Jul 15, 2026');
+});
+
+it('saves the FDS date and checks it against the date applied', function () {
+    $this->post('/onboarding', applicantForm(['fds_date' => '2026-07-01']))->assertRedirect('/onboarding');
+
+    expect(Application::query()->firstOrFail()->fds_date->toDateString())->toBe('2026-07-01');
+
+    $this->from('/onboarding/new')->post('/onboarding', applicantForm(['fds_date' => '2026-05-01']))
+        ->assertSessionHasErrors(['fds_date' => 'The FDS date cannot be before the date applied']);
+});
+
+it('filters by FDS date range and by position', function () {
+    Application::factory()->create(['applicant_name' => 'Early Bird', 'position_applied' => 'Clerk', 'fds_date' => '2026-07-01']);
+    Application::factory()->create(['applicant_name' => 'Mid Month', 'position_applied' => 'Driver', 'fds_date' => '2026-08-15']);
+    Application::factory()->create(['applicant_name' => 'No Date', 'position_applied' => 'Clerk', 'fds_date' => null]);
+
+    $this->get('/onboarding?fdsFrom=2026-08-01&fdsTo=2026-08-31')->assertSee('Mid Month')->assertDontSee('Early Bird')->assertDontSee('No Date');
+    $this->get('/onboarding?fdsFrom=2026-07-01')->assertSee('Early Bird')->assertSee('Mid Month')->assertDontSee('No Date');
+    $this->get('/onboarding?position=Clerk')->assertSee('Early Bird')->assertSee('No Date')->assertDontSee('Mid Month');
+    $this->get('/onboarding?position=Clerk&fdsTo=2026-07-31')->assertSee('Early Bird')->assertDontSee('No Date');
+    $this->get('/onboarding?fdsFrom=not-a-date')->assertSuccessful()->assertSee('Mid Month')->assertSee('No Date');
+});
+
+it('hires on the FDS date when converting an applicant', function () {
+    $application = Application::factory()->create(['applicant_name' => 'Maria Santos', 'start_ojt' => '2026-06-10', 'fds_date' => '2026-07-01']);
+
+    $values = $this->get("/employees/new?fromApplication={$application->id}")->assertSuccessful()->viewData('values');
+
+    expect($values['date_hired'])->toBe('2026-07-01');
+});

@@ -8,7 +8,7 @@
 
     $short = fn (string $label): string => str_replace(['Verification', 'Declaration', 'Assumption of Duty'], ['Verif.', 'Decl.', 'Assumption'], $label);
     $exportQuery = http_build_query(['module' => 'applications', ...request()->except('page')]);
-    $filtered = $text !== '' || $statuses !== [] || $requirements !== null || $station !== null;
+    $filtered = $text !== '' || $statuses !== [] || $requirements !== null || $station !== null || $position !== '' || $fdsFrom !== null || $fdsTo !== null;
 @endphp
 
 <x-layouts.app title="Onboarding Tracker" heading="Onboarding tracker" description="Applicants and their document requirements, plus who joined and left recently.">
@@ -89,6 +89,23 @@
                 @endforeach
             </select>
         </div>
+        <div>
+            <label class="label" for="position">Position</label>
+            <select class="input" id="position" name="position">
+                <option value="">All</option>
+                @foreach ($positions as $option)
+                    <option @selected($option === $position)>{{ $option }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div>
+            <label class="label" for="fdsFrom">FDS from</label>
+            <input class="input" id="fdsFrom" name="fdsFrom" type="date" value="{{ $fdsFrom }}" />
+        </div>
+        <div>
+            <label class="label" for="fdsTo">FDS to</label>
+            <input class="input" id="fdsTo" name="fdsTo" type="date" value="{{ $fdsTo }}" />
+        </div>
         <button class="btn-primary">Filter</button>
         @if ($filtered)
             <a class="btn-ghost" href="{{ route('onboarding.index') }}">Clear</a>
@@ -115,7 +132,8 @@
                                 <th class="!normal-case" title="{{ $requirement->label() }}">{{ $short($requirement->label()) }}</th>
                             @endforeach
                             <x-sort-header field="dateSubmitted" label="Submitted" />
-                            <x-sort-header field="requirementsStatus" label="FDS Status" />
+                            <x-sort-header field="fdsDate" label="FDS" />
+                            <x-sort-header field="requirementsStatus" label="Requirements" />
                         </tr>
                     </thead>
                     <tbody>
@@ -150,6 +168,7 @@
                                     </td>
                                 @endforeach
                                 <td class="whitespace-nowrap tabular text-fg-2">{{ HrDate::format($application->date_submitted) }}</td>
+                                <td class="whitespace-nowrap tabular text-fg-2">{{ HrDate::format($application->fds_date) }}</td>
                                 <td data-fds>
                                     <span class="{{ Badge::for($application->requirements_status) }}">{{ $application->requirements_status === RequirementsCompletion::Complete ? 'Complete' : "{$application->requirements_missing} missing" }}</span>
                                 </td>
