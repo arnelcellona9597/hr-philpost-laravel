@@ -9,6 +9,7 @@ use App\Enums\LeaveStatus;
 use App\Enums\MessageStatus;
 use App\Enums\OnboardingRequirement;
 use App\Enums\PayrollStatus;
+use App\Enums\RemittanceKind;
 use App\Enums\Role;
 use App\Enums\UserStatus;
 use App\Exceptions\UserFacingException;
@@ -16,7 +17,10 @@ use App\Models\Application;
 use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\CertificateTemplate;
+use App\Models\ContractSetting;
+use App\Models\ContractTemplate;
 use App\Models\Employee;
+use App\Models\EmploymentPeriod;
 use App\Models\Holiday;
 use App\Models\ImportJob;
 use App\Models\IpcrRating;
@@ -26,13 +30,16 @@ use App\Models\Notification;
 use App\Models\PayrollPeriod;
 use App\Models\Payslip;
 use App\Models\PdsSubmission;
+use App\Models\ReceivedMail;
 use App\Models\RequirementDeadlineSetting;
 use App\Models\SwornDeclaration;
 use App\Models\User;
 use App\Models\WellnessLeave;
 use App\Services\CertificateService;
+use App\Services\ContractService;
 use App\Services\LeaveService;
 use App\Services\PayrollService;
+use App\Services\RemittanceService;
 use App\Support\AuditTrail;
 use App\Support\GovId;
 use App\Support\HrDate;
@@ -136,6 +143,7 @@ class DemoDataSeeder extends Seeder
             $this->holidays();
             $branches = $this->branches();
             $employees = $this->employees($branches);
+            $this->earlierPeriods($employees);
             $active = $employees->where('employment_status.value', 'Active')->values();
 
             $this->wellnessLeave($active);
@@ -147,6 +155,9 @@ class DemoDataSeeder extends Seeder
             $this->notifications($released);
             $this->activity($staff[0], $active, $released);
             $this->importHistory($staff[0]);
+            $this->receivedMails($branches, $staff[0]);
+            $this->remittances($staff[0]);
+            $this->contracts($staff[0]);
         }));
 
         $this->command?->info("Added {$this->employeeCount} demo employees and their records.");
@@ -255,6 +266,37 @@ class DemoDataSeeder extends Seeder
         }
 
         return $employees;
+    }
+
+    /**
+     * About one in twelve people worked here before and came back: a closed period before the current one.
+     *
+     * @param  Collection<int, Employee>  $employees
+     */
+    private function earlierPeriods(Collection $employees): void
+    {
+        foreach ($employees as $employee) {
+            if (! $this->chance(0.08) || $employee->date_hired === null) {
+                continue;
+            }
+
+            $hired = HrDate::addDays($employee->date_hired->toDateString(), -mt_rand(900, 2600));
+            $separated = HrDate::addDays($hired, mt_rand(200, 700));
+
+            if ($separated >= HrDate::addDays($employee->date_hired->toDateString(), -30)) {
+                continue;
+            }
+
+            EmploymentPeriod::query()->create([
+                'employee_id' => $employee->id,
+                'hired_on' => $hired,
+                'separated_on' => $separated,
+                'separation_type' => $this->pick(['Resigned', 'Terminated']),
+                'position' => $employee->position,
+                'station_id' => $employee->station_id,
+                'classification' => $employee->classification?->value,
+            ]);
+        }
     }
 
     /**
@@ -614,6 +656,99 @@ class DemoDataSeeder extends Seeder
                 'created_at' => now()->subHours($hoursAgo),
                 'updated_at' => now()->subHours($hoursAgo),
             ])->save();
+        }
+    }
+
+    /**
+     * Fictional officials, and this semester's contracts for the first 40 active COS workers.
+     */
+    private function contracts(User $staff): void
+    {
+        ContractSetting::current()->update([
+            'area_director_name' => 'Elena V. Marquez',
+            'adfin_chief_name' => 'Roberto S. Aquino',
+            'hrm_chief_name' => 'Teresita L. Navarro',
+            'budget_officer_name' => 'Gerardo P. Mendoza',
+            'wage_order' => 'the prevailing regional wage order',
+            'default_place_of_service' => 'Davao City',
+        ]);
+
+        $month = (int) substr($this->today, 5, 2);
+        $year = substr($this->today, 0, 4);
+        [$start, $end] = $month >= 7 ? ["{$year}-07-01", "{$year}-12-31"] : ["{$year}-01-01", "{$year}-06-30"];
+        $template = ContractTemplate::query()->firstOrFail();
+        $service = app(ContractService::class);
+        $settings = ContractSetting::current();
+
+        $rows = array_map(fn (Employee $employee): array => [
+            'employee' => $employee->id,
+            ...$service->defaults($employee, $settings, $start, $end),
+            'daily_wage' => '450',
+        ], array_slice($service->candidates($start, $end), 0, 40));
+
+        $service->issueMany($staff, $template->id, $rows, $this->today);
+    }
+
+    /**
+     * Three months of SSS, Pag-IBIG and CMPEAI remittances for the COS workers, the latest one still open.
+     */
+    private function remittances(User $staff): void
+    {
+        $service = app(RemittanceService::class);
+        [$year, $month] = [(int) substr($this->today, 0, 4), (int) substr($this->today, 5, 2)];
+
+        foreach (RemittanceKind::cases() as $kind) {
+            for ($back = 2; $back >= 0; $back--) {
+                $target = $month - $back;
+                $remittance = $service->generate($kind, $target < 1 ? $year - 1 : $year, $target < 1 ? $target + 12 : $target, $staff)['remittance'];
+
+                if ($back > 0) {
+                    $service->finalize($remittance);
+                }
+            }
+        }
+    }
+
+    /**
+     * About three months of incoming mail, a dozen or so pieces on each working day.
+     *
+     * @param  Collection<int, Branch>  $branches
+     */
+    private function receivedMails(Collection $branches, User $staff): void
+    {
+        $offices = $branches->map(fn (Branch $branch): string => mb_strtoupper(str_replace(' Post Office', '', $branch->name)))->all();
+        $rows = [];
+
+        for ($back = 90; $back >= 0; $back--) {
+            $day = HrDate::addDays($this->today, -$back);
+
+            if (HrDate::dayOfWeek($day) === 0 || HrDate::dayOfWeek($day) === 6) {
+                continue;
+            }
+
+            for ($piece = mt_rand(8, 16); $piece > 0; $piece--) {
+                $name = $this->pick(self::LAST_NAMES);
+                $rows[] = [
+                    'received_on' => $day,
+                    'tracking_number' => $this->chance(0.05) ? '#'.mt_rand(100, 999) : sprintf('RL %03d %03d %03d ZZ', mt_rand(0, 999), mt_rand(0, 999), mt_rand(0, 999)),
+                    'post_office' => $this->pick($offices),
+                    'description' => $this->pick([
+                        'DTR for wages for the period of '.date('F', strtotime($day)).' 1-15, '.substr($day, 0, 4),
+                        "Leave application of {$this->pick(['Mr.', 'Ms.'])} {$name}",
+                        'Statement of absences as of '.date('F Y', strtotime($day)),
+                        "Assumption to duty of {$this->pick(['Mr.', 'Ms.'])} {$name}",
+                    ]),
+                    'remarks' => null,
+                    'received_by' => $staff->name,
+                    'created_by' => $staff->id,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+        }
+
+        foreach (array_chunk($rows, 500) as $chunk) {
+            ReceivedMail::query()->insert($chunk);
         }
     }
 

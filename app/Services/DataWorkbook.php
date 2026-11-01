@@ -35,6 +35,7 @@ class DataWorkbook
 
     private const SORTS = [
         'employees' => ['last_name', 'first_name', 'employee_id'],
+        'employment-history' => ['hired_on'],
         'branches' => ['name'],
         'holidays' => ['date'],
         'applications' => ['date_applied', 'application_id'],

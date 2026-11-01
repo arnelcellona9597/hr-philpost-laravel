@@ -2,6 +2,9 @@
 
 namespace App\Support;
 
+use App\Models\Employee;
+use App\Models\EmploymentPeriod;
+use App\Services\EmploymentHistoryService;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
 
@@ -18,6 +21,7 @@ class RecordRules
     private const DATE_ORDER = [
         'employees' => [['date_hired', 'last_day_of_service', 'Last day of service cannot be before the date hired']],
         'applications' => [['date_applied', 'start_ojt', 'Start OJT cannot be before the date applied']],
+        'employment-history' => [['hired_on', 'separated_on', 'The date separated cannot be before the date hired']],
         'wellness-leaves' => [['date_filing', 'date_received', 'Date received cannot be before the filing date']],
         'itr-submissions' => [self::RECEIVED_AFTER_SUBMITTED],
         'sworn-declarations' => [self::RECEIVED_AFTER_SUBMITTED],
@@ -63,6 +67,40 @@ class RecordRules
             $values[$column] = $value instanceof DateTimeInterface ? $value->format('Y-m-d') : $value;
         }
 
-        return self::errors($module, $values);
+        $errors = self::errors($module, $values);
+
+        return [...$errors, ...self::historyErrors($module, $model)];
+    }
+
+    /**
+     * Rules that need the employee's other employment periods.
+     *
+     * @return array<string, string>
+     */
+    private static function historyErrors(string $module, Model $model): array
+    {
+        $history = app(EmploymentHistoryService::class);
+
+        if ($module === 'employment-history' && $model instanceof EmploymentPeriod) {
+            $employee = Employee::query()->find($model->employee_id);
+            $hired = $model->hired_on?->toDateString();
+            $separated = $model->separated_on?->toDateString();
+
+            return match (true) {
+                $separated !== null && $model->separation_type === null => ['separation_type' => 'Choose how the employment ended'],
+                $employee === null => [],
+                default => array_filter(['hired_on' => $history->problem($employee, $model, $hired, $separated)]),
+            };
+        }
+
+        if ($module === 'employees' && $model instanceof Employee) {
+            return $history->employeeProblems($model, [
+                'date_hired' => $model->date_hired?->toDateString(),
+                'last_day_of_service' => $model->last_day_of_service?->toDateString(),
+                'employment_status' => $model->employment_status?->value,
+            ]);
+        }
+
+        return [];
     }
 }

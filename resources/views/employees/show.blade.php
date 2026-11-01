@@ -81,6 +81,150 @@
         </div>
 
         <div class="space-y-6">
+            <section class="card overflow-hidden" id="employment-history" aria-labelledby="employment-title">
+                <header class="flex flex-wrap items-center justify-between gap-2 p-4">
+                    <div>
+                        <h2 id="employment-title" class="text-sm font-semibold">Employment history</h2>
+                        <p class="text-xs text-muted">
+                            {{ count($employment['rows']) }} period{{ count($employment['rows']) === 1 ? '' : 's' }}
+                            @if ($employment['total'])
+                                · {{ HrDate::formatSpan($employment['total']) }} in total
+                            @endif
+                        </p>
+                    </div>
+                </header>
+                @if ($employment['rows'] === [])
+                    <p class="px-4 pb-4 text-sm text-muted">Set a date hired on the record to start the history.</p>
+                @else
+                    <ol class="divide-y divide-line border-t border-line">
+                        @foreach ($employment['rows'] as $row)
+                            @php($period = $row['period'])
+                            <li class="px-4 py-3 text-sm">
+                                @if ($row['gap'])
+                                    <p class="mb-2 text-xs text-muted">Away for {{ HrDate::formatSpan($row['gap']) }}</p>
+                                @endif
+                                <div class="flex flex-wrap items-start justify-between gap-2">
+                                    <div class="min-w-0">
+                                        <p class="font-medium tabular">
+                                            <span class="text-muted">#{{ $row['number'] }}</span>
+                                            {{ HrDate::format($period->hired_on) }} – {{ $period->separated_on ? HrDate::format($period->separated_on) : ($period->separation_type ? 'date unknown' : 'present') }}
+                                        </p>
+                                        <p class="text-xs text-muted">
+                                            {{ HrDate::formatSpan($row['length']) ?: 'less than a day' }}{{ $period->position ? ' · '.$period->position : '' }}{{ $period->station ? ' · '.$period->station->name : '' }}
+                                        </p>
+                                    </div>
+                                    <span class="{{ $period->isOpen() ? 'badge-success' : 'badge-neutral' }}">{{ $period->separation_type?->value ?? 'Active' }}</span>
+                                </div>
+                                @if ($period->remarks)
+                                    <p class="mt-1 text-xs text-fg-2">{{ $period->remarks }}</p>
+                                @endif
+                                <details class="mt-2">
+                                    <summary class="cursor-pointer text-xs text-primary-ink">Correct this period</summary>
+                                    <form method="post" action="{{ route('employment.update', [$employee, $period]) }}" class="mt-3 grid gap-3 sm:grid-cols-2">
+                                        @csrf
+                                        @method('PUT')
+                                        <div><label class="label" for="hired-{{ $period->id }}">Date hired</label><input class="input" id="hired-{{ $period->id }}" name="hired_on" type="date" required value="{{ $period->hired_on->toDateString() }}" /></div>
+                                        <div><label class="label" for="sep-{{ $period->id }}">Date separated</label><input class="input" id="sep-{{ $period->id }}" name="separated_on" type="date" value="{{ $period->separated_on?->toDateString() }}" /></div>
+                                        <div>
+                                            <label class="label" for="type-{{ $period->id }}">How it ended</label>
+                                            <select class="input" id="type-{{ $period->id }}" name="separation_type">
+                                                <option value="">Still employed</option>
+                                                @foreach (['Resigned', 'Retired', 'Terminated'] as $type)
+                                                    <option @selected($period->separation_type?->value === $type)>{{ $type }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div><label class="label" for="pos-{{ $period->id }}">Position</label><input class="input" id="pos-{{ $period->id }}" name="position" maxlength="150" value="{{ $period->position }}" /></div>
+                                        <div>
+                                            <label class="label" for="st-{{ $period->id }}">Station</label>
+                                            <select class="input" id="st-{{ $period->id }}" name="station_id">
+                                                <option value="">—</option>
+                                                @foreach ($branches as $branch)
+                                                    <option value="{{ $branch['value'] }}" @selected($branch['value'] === $period->station_id)>{{ $branch['label'] }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="label" for="cl-{{ $period->id }}">Classification</label>
+                                            <select class="input" id="cl-{{ $period->id }}" name="classification">
+                                                <option value="">—</option>
+                                                @foreach ($classifications as $classification)
+                                                    <option @selected($period->classification?->value === $classification)>{{ $classification }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="sm:col-span-2"><label class="label" for="rm-{{ $period->id }}">Remarks</label><input class="input" id="rm-{{ $period->id }}" name="remarks" maxlength="1000" value="{{ $period->remarks }}" /></div>
+                                        <div class="flex gap-2 sm:col-span-2">
+                                            <button class="btn-primary btn-sm">Save</button>
+                                        </div>
+                                    </form>
+                                    @if (count($employment['rows']) > 1)
+                                        <form method="post" action="{{ route('employment.destroy', [$employee, $period]) }}" class="mt-2" data-confirm="Delete this employment period?">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button class="btn-ghost btn-sm text-danger"><x-icon name="trash" class="size-3.5" /> Delete period</button>
+                                        </form>
+                                    @endif
+                                </details>
+                            </li>
+                        @endforeach
+                    </ol>
+                    @php($latest = end($employment['rows'])['period'])
+                    <div class="border-t border-line p-4">
+                        @if ($latest->isOpen())
+                            <details>
+                                <summary class="cursor-pointer text-sm font-medium">Record a separation</summary>
+                                <form method="post" action="{{ route('employment.separate', $employee) }}" class="mt-3 grid gap-3 sm:grid-cols-2">
+                                    @csrf
+                                    <div><label class="label" for="sep-date">Last day of service</label><input class="input" id="sep-date" name="separated_on" type="date" required /></div>
+                                    <div>
+                                        <label class="label" for="sep-type">How it ended</label>
+                                        <select class="input" id="sep-type" name="separation_type" required>
+                                            @foreach (['Resigned', 'Retired', 'Terminated'] as $type)
+                                                <option>{{ $type }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="sm:col-span-2"><label class="label" for="sep-remarks">Remarks</label><input class="input" id="sep-remarks" name="remarks" maxlength="1000" /></div>
+                                    <div class="sm:col-span-2"><button class="btn-secondary btn-sm">Record separation</button></div>
+                                </form>
+                            </details>
+                        @else
+                            <details>
+                                <summary class="cursor-pointer text-sm font-medium">Hire again</summary>
+                                <form method="post" action="{{ route('employment.hire', $employee) }}" class="mt-3 grid gap-3 sm:grid-cols-2">
+                                    @csrf
+                                    <div><label class="label" for="hire-date">New date hired</label><input class="input" id="hire-date" name="hired_on" type="date" required /></div>
+                                    @unless ($latest->separated_on)
+                                        <div><label class="label" for="prev-end">Last day of the previous period</label><input class="input" id="prev-end" name="previous_separated_on" type="date" required /></div>
+                                    @endunless
+                                    <div><label class="label" for="hire-pos">Position</label><input class="input" id="hire-pos" name="position" maxlength="150" value="{{ $employee->position }}" /></div>
+                                    <div>
+                                        <label class="label" for="hire-station">Station</label>
+                                        <select class="input" id="hire-station" name="station_id">
+                                            <option value="">—</option>
+                                            @foreach ($branches as $branch)
+                                                <option value="{{ $branch['value'] }}" @selected($branch['value'] === $employee->station_id)>{{ $branch['label'] }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="label" for="hire-class">Classification</label>
+                                        <select class="input" id="hire-class" name="classification">
+                                            @foreach ($classifications as $classification)
+                                                <option @selected($employee->classification?->value === $classification)>{{ $classification }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="sm:col-span-2"><label class="label" for="hire-remarks">Remarks</label><input class="input" id="hire-remarks" name="remarks" maxlength="1000" /></div>
+                                    <div class="sm:col-span-2"><button class="btn-primary btn-sm">Hire again</button></div>
+                                </form>
+                            </details>
+                        @endif
+                    </div>
+                @endif
+            </section>
+
             <section class="card overflow-hidden">
                 <header class="flex items-center justify-between p-4">
                     <h2 class="text-sm font-semibold">Wellness leave</h2>
@@ -130,6 +274,30 @@
                                         <span class="block truncate text-xs text-muted">{{ $certificate->template_name }} · {{ HrDate::format($certificate->issued_date) }}</span>
                                     </span>
                                     <span class="{{ $certificate->isVoid() ? 'badge-danger' : 'badge-success' }}">{{ $certificate->status->value }}</span>
+                                </a>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+            </section>
+
+            <section class="card overflow-hidden">
+                <header class="flex items-center justify-between p-4">
+                    <h2 class="text-sm font-semibold">Contracts of service</h2>
+                    <a href="{{ route('contracts.create', ['employee' => $employee->id]) }}" class="text-xs text-primary-ink hover:underline">Issue contract</a>
+                </header>
+                @if ($contracts->isEmpty())
+                    <p class="px-4 pb-4 text-sm text-muted">None issued yet.</p>
+                @else
+                    <ul class="divide-y divide-line border-t border-line">
+                        @foreach ($contracts as $contract)
+                            <li>
+                                <a href="{{ route('contracts.show', $contract) }}" class="flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-surface-2">
+                                    <span class="min-w-0">
+                                        <span class="block font-medium tabular">{{ $contract->control_number }}</span>
+                                        <span class="block truncate text-xs text-muted">{{ HrDate::format($contract->term_start) }} – {{ HrDate::format($contract->term_end) }}</span>
+                                    </span>
+                                    <span class="{{ $contract->isVoid() ? 'badge-danger' : 'badge-success' }}">{{ $contract->status->value }}</span>
                                 </a>
                             </li>
                         @endforeach

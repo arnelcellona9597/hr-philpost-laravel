@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use App\Models\Certificate;
+use App\Models\Contract;
 use App\Models\Media;
 use App\Models\Payslip;
 use App\Models\PayslipSetting;
+use App\Models\Remittance;
 use App\Models\SiteSetting;
 use App\Support\CertificateBlocks;
 use App\Support\CertificateRenderer;
@@ -41,6 +43,32 @@ class PdfRenderer
         ], $paper);
     }
 
+    public function contract(Contract $contract): string
+    {
+        $content = $contract->content;
+        $logo = $this->logo($content['logoId'] ?? null, 120, 56);
+        $paper = CertificateBlocks::PAPER_POINTS[$content['paperSize']] ?? CertificateBlocks::PAPER_POINTS['A4'];
+
+        return $this->render('pdf.certificate', [
+            'title' => "{$contract->control_number} — {$contract->employee_name}",
+            'body' => CertificateRenderer::html($content['blocks'], [
+                'companyName' => $content['companyName'],
+                'font' => $content['font'],
+                'logoUrl' => $logo['src'] ?? null,
+                'logoSize' => $logo['size'] ?? null,
+                'pdf' => true,
+            ]),
+            'margin' => CertificateBlocks::MARGIN_POINTS[$content['margin']] ?? 72,
+            'void' => $contract->isVoid(),
+            'sans' => $content['font'] === 'sans',
+        ], $paper);
+    }
+
+    public function contractFilename(Contract $contract): string
+    {
+        return $this->safeName("{$contract->control_number}-{$contract->employee_name}").'.pdf';
+    }
+
     public function certificateFilename(Certificate $certificate): string
     {
         return $this->safeName("{$certificate->control_number}-{$certificate->employee_name}").'.pdf';
@@ -65,6 +93,21 @@ class PdfRenderer
     public function payslipFilename(Payslip $payslip): string
     {
         return $this->safeName("payslip-{$payslip->period->code}-".($payslip->employee_code ?: $payslip->id)).'.pdf';
+    }
+
+    /**
+     * The disbursement voucher for a remittance. `$data` is the same set of values the voucher page uses.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function voucher(array $data): string
+    {
+        return $this->render('pdf.voucher', [...$data, 'logo' => $this->logo($data['site']->logo_id, 70, 60)], [595.28, 841.89]);
+    }
+
+    public function voucherFilename(Remittance $remittance): string
+    {
+        return $this->safeName("voucher-{$remittance->kind->value}-{$remittance->year}-".sprintf('%02d', $remittance->month)).'.pdf';
     }
 
     /**

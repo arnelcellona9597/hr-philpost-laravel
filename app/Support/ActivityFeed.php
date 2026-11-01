@@ -15,6 +15,7 @@ class ActivityFeed
      */
     private const AREAS = [
         'employees' => ['employee', '/employees/{id}'],
+        'employment-periods' => ['employment period', null],
         'branches' => ['branch', '/branches/{id}'],
         'applications' => ['applicant', '/onboarding/{id}'],
         'wellness-leaves' => ['wellness leave', '/leave/{id}'],
@@ -27,7 +28,11 @@ class ActivityFeed
         'email-templates' => ['email template', '/settings/templates/{id}'],
         'certificates' => ['certificate', '/certificates/{id}'],
         'certificate-templates' => ['certificate template', '/certificates/templates/{id}'],
+        'contracts' => ['contract', '/contracts/{id}'],
+        'contract-templates' => ['contract template', '/contracts/templates/{id}'],
         'holidays' => ['holiday', '/leave/settings'],
+        'received-mails' => ['received mail', '/received-mails/{id}/edit'],
+        'remittances' => ['remittance', '/remittances/{id}'],
         'users' => ['HR account', '/users'],
         'site-settings' => ['branding settings', '/settings'],
         'leave-settings' => ['leave settings', '/leave/settings'],
@@ -35,6 +40,9 @@ class ActivityFeed
         'notification-settings' => ['email settings', '/settings/notifications'],
         'smtp-settings' => ['email server settings', '/settings/email-server'],
         'payslip-settings' => ['payslip template', '/payroll/settings'],
+        'contract-settings' => ['contract settings', '/contracts/settings'],
+        'remittance-settings' => ['remittance template', '/remittances/settings'],
+        'voucher-settings' => ['voucher settings', '/remittances/settings'],
         'import' => ['Excel import', '/data'],
     ];
 

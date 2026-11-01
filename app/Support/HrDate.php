@@ -144,6 +144,21 @@ class HrDate
     }
 
     /**
+     * Add spans together, counting 30 days as a month, such as the service of several periods.
+     *
+     * @param  list<array{years: int, months: int, days: int}>  $spans
+     * @return array{years: int, months: int, days: int}
+     */
+    public static function sumSpans(array $spans): array
+    {
+        $months = array_sum(array_map(fn (array $span): int => $span['years'] * 12 + $span['months'], $spans));
+        $days = array_sum(array_column($spans, 'days'));
+        $months += intdiv($days, 30);
+
+        return ['years' => intdiv($months, 12), 'months' => $months % 12, 'days' => $days % 30];
+    }
+
+    /**
      * Render a span such as "2 yrs 3 mos".
      *
      * @param  array{years: int, months: int, days: int}|null  $span

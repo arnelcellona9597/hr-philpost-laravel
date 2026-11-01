@@ -22,3 +22,12 @@ if (document.getElementById('compose')) {
 if (document.getElementById('branding-form')) {
     import('./branding');
 }
+if (document.getElementById('mail-rows')) {
+    import('./received-mails');
+}
+if (document.getElementById('remittance-grid')) {
+    import('./remittance-grid');
+}
+if (document.getElementById('contract-grid')) {
+    import('./contract-issue');
+}

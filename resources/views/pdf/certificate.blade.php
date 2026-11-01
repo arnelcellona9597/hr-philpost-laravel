@@ -44,6 +44,8 @@
             .cert-sig-title { font-size: 10.5pt; }
             .cert-hr { border: 0; border-top: 1px solid #333; margin: 6pt 0; }
             .cert-footer { font-size: 9pt; color: #444; margin: 0 0 4pt; }
+            .cert-pagebreak { height: 0; page-break-after: always; }
+            .cert-pagefooter { position: fixed; left: 0; right: 0; bottom: -{{ max($margin - 18, 10) }}pt; font-size: 9pt; color: #444; }
             .cert-void { position: fixed; top: 40%; left: -10%; width: 120%; text-align: center; font-family: 'DejaVu Serif', serif; font-weight: bold; font-size: 140pt; line-height: 1; color: #c8102e; opacity: .18; transform: rotate(-35deg); }
         </style>
     </head>

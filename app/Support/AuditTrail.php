@@ -8,8 +8,12 @@ use App\Models\Branch;
 use App\Models\Certificate;
 use App\Models\CertificateTemplate;
 use App\Models\Concerns\IsSingleton;
+use App\Models\Contract;
+use App\Models\ContractSetting;
+use App\Models\ContractTemplate;
 use App\Models\EmailTemplate;
 use App\Models\Employee;
+use App\Models\EmploymentPeriod;
 use App\Models\Holiday;
 use App\Models\IpcrRating;
 use App\Models\ItrSubmission;
@@ -19,11 +23,15 @@ use App\Models\PayrollPeriod;
 use App\Models\Payslip;
 use App\Models\PayslipSetting;
 use App\Models\PdsSubmission;
+use App\Models\ReceivedMail;
+use App\Models\Remittance;
+use App\Models\RemittanceSetting;
 use App\Models\RequirementDeadlineSetting;
 use App\Models\SiteSetting;
 use App\Models\SmtpSetting;
 use App\Models\SwornDeclaration;
 use App\Models\User;
+use App\Models\VoucherSetting;
 use App\Models\WellnessLeave;
 use BackedEnum;
 use Closure;
@@ -41,6 +49,7 @@ class AuditTrail
      */
     private const AREAS = [
         Employee::class => ['employees', 'full_name'],
+        EmploymentPeriod::class => ['employment-periods', 'label'],
         Branch::class => ['branches', 'name'],
         Application::class => ['applications', 'applicant_name'],
         WellnessLeave::class => ['wellness-leaves', 'full_name'],
@@ -49,9 +58,13 @@ class AuditTrail
         PdsSubmission::class => ['pds-submissions', 'full_name'],
         IpcrRating::class => ['ipcr-ratings', 'full_name'],
         Holiday::class => ['holidays', 'name'],
+        ReceivedMail::class => ['received-mails', 'tracking_number'],
+        Remittance::class => ['remittances', 'label'],
         User::class => ['users', 'name'],
         Certificate::class => ['certificates', 'control_number'],
         CertificateTemplate::class => ['certificate-templates', 'name'],
+        Contract::class => ['contracts', 'control_number'],
+        ContractTemplate::class => ['contract-templates', 'name'],
         PayrollPeriod::class => ['payroll-periods', 'name'],
         Payslip::class => ['payslips', 'full_name'],
         EmailTemplate::class => ['email-templates', 'name'],
@@ -59,6 +72,9 @@ class AuditTrail
         LeaveSetting::class => ['leave-settings', null],
         NotificationSetting::class => ['notification-settings', null],
         PayslipSetting::class => ['payslip-settings', null],
+        ContractSetting::class => ['contract-settings', null],
+        RemittanceSetting::class => ['remittance-settings', 'title'],
+        VoucherSetting::class => ['voucher-settings', null],
         SmtpSetting::class => ['smtp-settings', null],
         RequirementDeadlineSetting::class => ['requirement-deadlines', null],
     ];

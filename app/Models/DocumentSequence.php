@@ -38,6 +38,14 @@ class DocumentSequence extends Model
     }
 
     /**
+     * The next contract number, such as COS-2026-0001.
+     */
+    public static function nextContractNumber(string $prefix, int $year): string
+    {
+        return sprintf('%s-%d-%04d', $prefix, $year, static::next("contract:{$prefix}:{$year}"));
+    }
+
+    /**
      * The next application ID, such as APP-2026-001.
      */
     public static function nextApplicationId(int $year): string
