@@ -8,7 +8,7 @@
             submit-label="Save record"
             :action="route('requirements.store', [$type, 'year' => $year])"
         >
-            <p class="text-sm text-muted">Name, station, job title and TIN are copied from the employee record when left blank.</p>
+            <p class="text-sm text-muted">Name, station, job title and TIN come from the employee record.</p>
         </x-module-form>
     </div>
 </x-layouts.app>

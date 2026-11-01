@@ -68,12 +68,31 @@ it('adds a record and fills blank details from the employee', function () {
         ->and($record->tin)->toBe('111-222-333');
 });
 
-it('keeps details typed on a new record', function () {
+it('takes the details from the employee, not from the form', function () {
     $employee = Employee::factory()->create(['position' => 'Clerk']);
 
     $this->post('/requirements/sworn-declaration?year=2026', ['employee' => $employee->id, 'year' => 2026, 'job_title' => 'Officer']);
 
-    expect(SwornDeclaration::query()->firstOrFail()->job_title)->toBe('Officer');
+    expect(SwornDeclaration::query()->firstOrFail()->job_title)->toBe('Clerk');
+});
+
+it('asks only for the employee and the requirement details', function (string $type) {
+    $page = $this->get("/requirements/{$type}/new?year=2026")->assertOk();
+
+    foreach (['last_name', 'first_name', 'middle_name', 'extension', 'station', 'job_title', 'tin'] as $field) {
+        $page->assertDontSee("name=\"{$field}\"", false);
+    }
+
+    $page->assertSee('name="employee"', false)->assertSee('name="date_submitted"', false);
+})->with(['itr', 'sworn-declaration', 'pds', 'ipcr']);
+
+it('keeps the copied details when a record is edited', function () {
+    $record = SwornDeclaration::factory()->create(['year' => 2026, 'job_title' => 'Officer']);
+
+    $this->get("/requirements/sworn-declaration/{$record->id}")->assertOk()->assertDontSee('name="job_title"', false);
+    $this->put("/requirements/sworn-declaration/{$record->id}", ['employee' => $record->employee_id, 'year' => 2026, 'date_submitted' => '2026-03-01'])->assertSessionHasNoErrors();
+
+    expect($record->fresh())->job_title->toBe('Officer')->date_submitted->toDateString()->toBe('2026-03-01');
 });
 
 it('replaces details when the employee changes', function () {
