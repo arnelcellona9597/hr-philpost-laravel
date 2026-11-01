@@ -7,6 +7,7 @@ use App\Models\NotificationSetting;
 use App\Models\SmtpSetting;
 use App\Services\DirectMailer;
 use App\Support\GovId;
+use App\Support\SmtpRules;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -36,23 +37,7 @@ class EmailServerController extends Controller
         $port = filter_var($request->input('port'), FILTER_VALIDATE_INT);
         $security = (string) $request->input('security');
         $from = trim((string) $request->input('from_address'));
-        $errors = [];
-
-        if (! preg_match('/^[a-z0-9.-]+$/i', $host)) {
-            $errors['host'] = 'Enter a valid host name, e.g. mail.example.com';
-        }
-
-        if ($port === false || $port < 1 || $port > 65535) {
-            $errors['port'] = 'Enter a valid port (465 for SSL/TLS, 587 for STARTTLS).';
-        }
-
-        if (! in_array($security, ['ssl', 'starttls', 'none'], true)) {
-            $errors['security'] = 'Choose the connection security.';
-        }
-
-        if ($from === '' || GovId::validateEmail($from) !== null) {
-            $errors['from_address'] = 'Enter a valid From address.';
-        }
+        $errors = SmtpRules::errors($host, $port, $security, $from);
 
         if ($errors !== []) {
             return $this->invalid($errors);
@@ -102,6 +87,8 @@ class EmailServerController extends Controller
             return $this->refused("Sending failed: {$exception->getMessage()}");
         }
 
-        return $this->flash(redirect()->route('settings.email-server'), "Test email sent to {$to}.");
+        return $mailer->usesSavedServer()
+            ? $this->flash(redirect()->route('settings.email-server'), "Test email sent to {$to}.")
+            : $this->refused('Nothing was sent: MAIL_MAILER is not set to smtp, so the message went to the local mailer.');
     }
 }

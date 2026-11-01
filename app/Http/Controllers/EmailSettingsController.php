@@ -80,6 +80,10 @@ class EmailSettingsController extends Controller
         $sent = $mailer->send($user->email, 'Test email from the HR system', "Hi,\n\nThis is a test email sent by {$user->name}. If you can read this, email sending works.");
         $redirect = redirect()->route('settings.notifications');
 
+        if ($sent && ! $mailer->usesSavedServer()) {
+            return $this->flash($redirect, 'Nothing left this server: real email is switched off here.', 'info');
+        }
+
         return $sent
             ? $this->flash($redirect, "Test email sent to {$user->email}.")
             : $this->flash($redirect, 'The test email could not be sent.', 'error');

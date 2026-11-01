@@ -4,6 +4,8 @@ use App\Enums\LoginChallengePurpose;
 use App\Mail\SystemMessage;
 use App\Models\LoginChallenge;
 use App\Models\User;
+use App\Services\DirectMailer;
+use App\Services\SignInService;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
@@ -346,4 +348,20 @@ it('rate limits sign-in posts', function () {
     $this->post('/login', ['email' => 'a@example.test', 'password' => 'x'])
         ->assertTooManyRequests()
         ->assertHeader('Retry-After');
+});
+
+it('says so when the code could not be emailed, and the break-glass code still works', function () {
+    $user = account();
+    $mailer = Mockery::mock(DirectMailer::class);
+    $mailer->shouldReceive('send')->andReturnFalse();
+    $mailer->shouldReceive('isConfigured')->andReturnTrue();
+    app()->instance(DirectMailer::class, $mailer);
+
+    submitPassword()->assertRedirect('/login/verify')->assertSessionHasErrors(['code' => SignInService::NOT_SENT]);
+
+    expect(app(SignInService::class)->issueCodeFor($user))->not->toBeNull();
+
+    $this->travel(61)->seconds();
+
+    $this->post('/login/verify/resend')->assertSessionHasErrors(['code' => SignInService::NOT_SENT]);
 });

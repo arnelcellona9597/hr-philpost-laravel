@@ -83,7 +83,7 @@ class DirectMailer
     public function verifyConnection(): ?string
     {
         if (! $this->usesSavedServer()) {
-            return null;
+            return 'MAIL_MAILER is not set to smtp, so the saved server was not contacted.';
         }
 
         try {
@@ -125,7 +125,10 @@ class DirectMailer
         };
     }
 
-    private function usesSavedServer(): bool
+    /**
+     * Whether mail really leaves through the saved server, rather than a local log.
+     */
+    public function usesSavedServer(): bool
     {
         return config('mail.default') === 'smtp';
     }

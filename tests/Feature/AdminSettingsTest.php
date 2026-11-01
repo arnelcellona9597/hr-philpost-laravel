@@ -144,6 +144,14 @@ it('uses the keyed wording for automatic mail', function () {
     expect(MessageRecipient::query()->sole()->body)->toContain('Net pay: ₱23,749.50');
 });
 
+it('does not claim the mail server works when real email is switched off', function () {
+    signIn($this->admin);
+
+    $this->put('/settings/email-server', smtpForm())->assertSessionHas('flash.type', 'error');
+    $this->post('/settings/email-server/test', ['to' => 'x@example.test'])->assertSessionHasErrors('form');
+    $this->post('/settings/notifications/test')->assertSessionHas('flash.type', 'info');
+});
+
 it('keeps the email server page to System Admins and the password out of reach', function () {
     $this->get('/settings/email-server')->assertRedirect('/?denied=1');
     $this->put('/settings/email-server', smtpForm())->assertRedirect('/?denied=1');
