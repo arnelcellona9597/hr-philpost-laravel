@@ -322,3 +322,21 @@ it('gives templates with headers and dropdowns', function () {
     $this->get('/data/template')->assertOk();
     $this->get('/data')->assertOk()->assertSee('Export ALL data');
 });
+
+it('imports and exports bank details, keeping leading zeros', function () {
+    $check = importFile(dataWorkbook(['Employees' => [[...EMPLOYEE_HEADERS, 'Bank Name', 'Bank Account Number'], [...employeeRow(), 'Sample Bank', '0012345678']]]))->assertOk();
+    $this->post('/data/import/commit', ['token' => $check->viewData('token')]);
+
+    expect(Employee::query()->sole())->bank_name->toBe('Sample Bank')->bank_account_number->toBe('0012345678');
+
+    $bad = importFile(dataWorkbook(['Employees' => [[...EMPLOYEE_HEADERS, 'Bank Account Number'], [...employeeRow(['EMP-2']), 'not-a-number']]]));
+    $bad->assertOk()->assertSee('digits, spaces and hyphens only');
+
+    $path = tempnam(sys_get_temp_dir(), 'export').'.xlsx';
+    file_put_contents($path, $this->get('/data/export?module=employees')->assertOk()->streamedContent());
+    $sheet = IOFactory::load($path)->getSheetByName('Employees');
+    $headers = $sheet->rangeToArray('A1:'.$sheet->getHighestColumn().'1')[0];
+    $column = array_search('Bank Account Number', $headers, true) + 1;
+
+    expect($sheet->getCell([$column, 2])->getValue())->toBe('0012345678');
+});
