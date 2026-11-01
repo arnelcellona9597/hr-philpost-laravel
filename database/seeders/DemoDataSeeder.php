@@ -17,6 +17,7 @@ use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\CertificateTemplate;
 use App\Models\Employee;
+use App\Models\EmploymentPeriod;
 use App\Models\Holiday;
 use App\Models\ImportJob;
 use App\Models\IpcrRating;
@@ -136,6 +137,7 @@ class DemoDataSeeder extends Seeder
             $this->holidays();
             $branches = $this->branches();
             $employees = $this->employees($branches);
+            $this->earlierPeriods($employees);
             $active = $employees->where('employment_status.value', 'Active')->values();
 
             $this->wellnessLeave($active);
@@ -255,6 +257,37 @@ class DemoDataSeeder extends Seeder
         }
 
         return $employees;
+    }
+
+    /**
+     * About one in twelve people worked here before and came back: a closed period before the current one.
+     *
+     * @param  Collection<int, Employee>  $employees
+     */
+    private function earlierPeriods(Collection $employees): void
+    {
+        foreach ($employees as $employee) {
+            if (! $this->chance(0.08) || $employee->date_hired === null) {
+                continue;
+            }
+
+            $hired = HrDate::addDays($employee->date_hired->toDateString(), -mt_rand(900, 2600));
+            $separated = HrDate::addDays($hired, mt_rand(200, 700));
+
+            if ($separated >= HrDate::addDays($employee->date_hired->toDateString(), -30)) {
+                continue;
+            }
+
+            EmploymentPeriod::query()->create([
+                'employee_id' => $employee->id,
+                'hired_on' => $hired,
+                'separated_on' => $separated,
+                'separation_type' => $this->pick(['Resigned', 'Terminated']),
+                'position' => $employee->position,
+                'station_id' => $employee->station_id,
+                'classification' => $employee->classification?->value,
+            ]);
+        }
     }
 
     /**

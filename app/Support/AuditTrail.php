@@ -10,6 +10,7 @@ use App\Models\CertificateTemplate;
 use App\Models\Concerns\IsSingleton;
 use App\Models\EmailTemplate;
 use App\Models\Employee;
+use App\Models\EmploymentPeriod;
 use App\Models\Holiday;
 use App\Models\IpcrRating;
 use App\Models\ItrSubmission;
@@ -41,6 +42,7 @@ class AuditTrail
      */
     private const AREAS = [
         Employee::class => ['employees', 'full_name'],
+        EmploymentPeriod::class => ['employment-periods', 'label'],
         Branch::class => ['branches', 'name'],
         Application::class => ['applications', 'applicant_name'],
         WellnessLeave::class => ['wellness-leaves', 'full_name'],

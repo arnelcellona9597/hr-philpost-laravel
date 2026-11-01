@@ -54,7 +54,12 @@ class DashboardStats
     public function period(array $period, string $sparkFrom, ?int $branchId, ?string $classification): array
     {
         $employees = fn (): Builder => $this->employeeQuery($branchId, $classification);
-        $separated = fn (): Builder => $employees()->where('e.employment_status', '<>', EmploymentStatus::Active->value)->whereNotNull('e.last_day_of_service');
+        // Hires and separations are events of employment periods, so someone hired again counts as a hire.
+        $periods = fn (): Builder => DB::table('employment_periods as p')
+            ->join('employees as e', 'e.id', '=', 'p.employee_id')
+            ->when($branchId, fn (Builder $query) => $query->where('e.station_id', $branchId))
+            ->when($classification, fn (Builder $query) => $query->where('e.classification', $classification));
+        $separated = fn (): Builder => $periods()->whereNotNull('p.separated_on');
         $leave = fn (): Builder => $employees()->join('wellness_leaves as w', 'w.employee_id', '=', 'e.id');
         $counted = fn (): Builder => $leave()->whereIn('w.status', [LeaveStatus::Approved->value, LeaveStatus::Pending->value]);
         $applications = fn (): Builder => DB::table('applications as a')->when($branchId, fn (Builder $query) => $query->where('a.station_id', $branchId));
@@ -76,12 +81,12 @@ class DashboardStats
             ->all();
 
         return [
-            'hiresByDay' => $byDay($employees(), 'e.date_hired'),
-            'separationsByDay' => $byDay($separated(), 'e.last_day_of_service'),
-            'prevHires' => $employees()->whereBetween('e.date_hired', [$period['prevFrom'], $period['prevTo']])->count(),
-            'prevSeparations' => $separated()->whereBetween('e.last_day_of_service', [$period['prevFrom'], $period['prevTo']])->count(),
-            'hiresByMonth' => $byMonth($employees(), 'e.date_hired'),
-            'separationsByMonth' => $byMonth($separated(), 'e.last_day_of_service'),
+            'hiresByDay' => $byDay($periods(), 'p.hired_on'),
+            'separationsByDay' => $byDay($separated(), 'p.separated_on'),
+            'prevHires' => $periods()->whereBetween('p.hired_on', [$period['prevFrom'], $period['prevTo']])->count(),
+            'prevSeparations' => $separated()->whereBetween('p.separated_on', [$period['prevFrom'], $period['prevTo']])->count(),
+            'hiresByMonth' => $byMonth($periods(), 'p.hired_on'),
+            'separationsByMonth' => $byMonth($separated(), 'p.separated_on'),
             'leaveFilings' => $counted()->whereBetween('w.inclusive_date_from', [$period['from'], $period['to']])->count(),
             'leaveDays' => (int) $counted()->whereBetween('w.inclusive_date_from', [$period['from'], $period['to']])->sum('w.days'),
             'prevLeaveDays' => (int) $counted()->whereBetween('w.inclusive_date_from', [$period['prevFrom'], $period['prevTo']])->sum('w.days'),

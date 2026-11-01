@@ -18,6 +18,7 @@ use App\Enums\RequirementStatus;
 use App\Models\Application;
 use App\Models\Branch;
 use App\Models\Employee;
+use App\Models\EmploymentPeriod;
 use App\Models\Holiday;
 use App\Models\IpcrRating;
 use App\Models\ItrSubmission;
@@ -52,6 +53,7 @@ class ImportModules
         'branches' => Branch::class,
         'holidays' => Holiday::class,
         'employees' => Employee::class,
+        'employment-history' => EmploymentPeriod::class,
         'applications' => Application::class,
         'wellness-leaves' => WellnessLeave::class,
         'itr-submissions' => ItrSubmission::class,
@@ -71,6 +73,7 @@ class ImportModules
             self::branches(),
             self::holidays(),
             self::employees(),
+            self::employmentHistory(),
             self::applications(),
             self::wellnessLeaves(),
             ...self::compliance(),
@@ -193,6 +196,25 @@ class ImportModules
             self::field('emergency_contact_number', 'Emergency Contact Number', 'phone', $emergency),
             self::field('emergency_address', 'Emergency Contact Address', 'text', ['width' => 36] + $emergency),
             self::field('remarks', 'Remark', 'textarea', ['width' => 30] + $employment),
+        ]);
+    }
+
+    /**
+     * Every time an employee was hired and separated, oldest first.
+     *
+     * @return Module
+     */
+    private static function employmentHistory(): array
+    {
+        return self::module('employment-history', 'Employment History', 'Employment History', ['employee_id', 'hired_on'], [
+            self::field('employee', 'Employee ID', 'employee', ['required' => true]),
+            self::field('hired_on', 'Date Hired', 'date', ['required' => true]),
+            self::field('separated_on', 'Date Separated', 'date'),
+            self::field('separation_type', 'Separation Type', 'select', ['options' => ['Resigned', 'Retired', 'Terminated'], 'help' => 'Resigned, Retired or Terminated']),
+            self::field('position', 'Position / Designation', 'text', ['width' => 26]),
+            self::field('station', 'Station / Division / Unit', 'branch', ['width' => 26]),
+            self::select('classification', 'Classification', Classification::class),
+            self::field('remarks', 'Remarks', 'textarea', ['width' => 30]),
         ]);
     }
 

@@ -12,6 +12,7 @@ use App\Http\Controllers\EmailServerController;
 use App\Http\Controllers\EmailSettingsController;
 use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\EmploymentPeriodController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\ForgotPasswordController;
 use App\Http\Controllers\LeaveSettingsController;
@@ -76,6 +77,13 @@ Route::middleware(RequireActiveSession::class)->group(function () {
         Route::put('/{employee}', 'update')->name('update')->whereNumber('employee');
         Route::delete('/{employee}', 'destroy')->name('destroy')->whereNumber('employee');
         Route::get('/{employee}/edit', 'edit')->name('edit')->whereNumber('employee');
+    });
+
+    Route::prefix('employees/{employee}/employment')->name('employment.')->whereNumber(['employee', 'period'])->controller(EmploymentPeriodController::class)->group(function () {
+        Route::post('/', 'hire')->name('hire');
+        Route::post('/separate', 'separate')->name('separate');
+        Route::put('/{period}', 'update')->name('update');
+        Route::delete('/{period}', 'destroy')->name('destroy');
     });
 
     Route::prefix('branches')->name('branches.')->controller(BranchController::class)->group(function () {

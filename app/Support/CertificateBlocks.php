@@ -6,6 +6,7 @@ use App\Enums\EmploymentStatus;
 use App\Enums\Gender;
 use App\Exceptions\UserFacingException;
 use App\Models\Employee;
+use App\Models\EmploymentPeriod;
 use DateTimeImmutable;
 use DateTimeZone;
 use Illuminate\Support\Str;
@@ -65,6 +66,9 @@ class CertificateBlocks
         'dateHired' => ['label' => 'Date hired', 'sample' => 'March 5, 2018'],
         'lastDayOfService' => ['label' => 'Last day of service', 'sample' => 'September 30, 2026'],
         'lengthOfService' => ['label' => 'Length of service', 'sample' => '8 years and 6 months'],
+        'firstDateHired' => ['label' => 'First date hired (if hired again)', 'sample' => 'March 5, 2014'],
+        'totalLengthOfService' => ['label' => 'Total service in all periods', 'sample' => '12 years and 3 months'],
+        'employmentCount' => ['label' => 'Times employed', 'sample' => '2'],
         'separation' => ['label' => 'resigned / retired / was separated', 'sample' => 'resigned'],
         'purpose' => ['label' => 'Purpose (entered when issuing)', 'sample' => 'loan application'],
         'issuedDate' => ['label' => 'Date issued', 'sample' => 'October 4, 2026'],
@@ -235,6 +239,7 @@ class CertificateBlocks
         $fullName = Names::firstLast($employee->last_name, $employee->first_name, $employee->middle_name, $employee->extension);
         $hired = $employee->date_hired?->toDateString();
         $lastDay = $employee->last_day_of_service?->toDateString();
+        $periods = $employee->employmentPeriods()->get();
 
         return [
             'fullName' => $fullName,
@@ -253,6 +258,9 @@ class CertificateBlocks
             'dateHired' => self::longDate($hired),
             'lastDayOfService' => self::longDate($lastDay),
             'lengthOfService' => self::serviceInWords($hired, $lastDay, $issuedDate),
+            'firstDateHired' => self::longDate($periods->first()?->hired_on?->toDateString() ?? $hired),
+            'totalLengthOfService' => $periods->isEmpty() ? self::serviceInWords($hired, $lastDay, $issuedDate) : self::totalServiceInWords($periods->all(), $issuedDate),
+            'employmentCount' => (string) max($periods->count(), $hired === null ? 0 : 1),
             'separation' => match ($employee->employment_status) {
                 EmploymentStatus::Resigned => 'resigned',
                 EmploymentStatus::Retired => 'retired',
@@ -288,8 +296,29 @@ class CertificateBlocks
      */
     public static function serviceInWords(?string $dateHired, ?string $lastDay, string $today): string
     {
-        $span = HrDate::lengthOfService($dateHired, $lastDay, $today);
+        return self::spanInWords(HrDate::lengthOfService($dateHired, $lastDay, $today));
+    }
 
+    /**
+     * Service added up over every period of employment, in words.
+     *
+     * @param  list<EmploymentPeriod>  $periods
+     */
+    public static function totalServiceInWords(array $periods, string $today): string
+    {
+        $spans = array_values(array_filter(array_map(
+            fn (EmploymentPeriod $period): ?array => HrDate::lengthOfService($period->hired_on->toDateString(), $period->separated_on?->toDateString(), $today),
+            $periods,
+        )));
+
+        return $spans === [] ? '' : self::spanInWords(HrDate::sumSpans($spans));
+    }
+
+    /**
+     * @param  array{years: int, months: int, days: int}|null  $span
+     */
+    private static function spanInWords(?array $span): string
+    {
         if ($span === null) {
             return '';
         }
