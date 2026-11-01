@@ -115,7 +115,7 @@ class WageOrderController extends Controller
 
         $raised = $pay->apply($order, $request->user(), $premium === '' ? null : (float) $premium);
 
-        return $this->flash(redirect()->route('wage-orders.show', $order), $raised === 0 ? 'Nobody needed a change.' : "{$raised} employee(s) now have this rate in their pay history.");
+        return $this->flash(redirect()->route('wage-orders.show', $order), $raised === 0 ? 'Nobody needed a change.' : "{$raised} employee(s) now have this rate in their compensation history.");
     }
 
     /**

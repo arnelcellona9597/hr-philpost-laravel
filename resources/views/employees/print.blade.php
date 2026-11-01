@@ -70,9 +70,9 @@
         </section>
 
         <section class="mt-4">
-            <h2 class="mb-2 border-b border-[#999] pb-0.5 text-[13px] font-bold">Pay history</h2>
+            <h2 class="mb-2 border-b border-[#999] pb-0.5 text-[13px] font-bold">Compensation History</h2>
             @if ($pay['rows'] === [])
-                <p>No pay records.</p>
+                <p>No compensation records.</p>
             @else
                 <table class="w-full border-collapse">
                     <thead><tr class="bg-[#e8eef8]"><th class="{{ $cell }}">Effective</th><th class="{{ $cell }}">Basic rate</th><th class="{{ $cell }}">Premium</th><th class="{{ $cell }}">Total</th><th class="{{ $cell }}">Paid</th><th class="{{ $cell }}">Kind</th><th class="{{ $cell }}">Reference</th></tr></thead>
