@@ -56,6 +56,7 @@
             autocomplete="off"
             @required($required)
             @if ($kind === 'govId') inputmode="numeric" @endif
+            @if ($kind === 'money') inputmode="decimal" @endif
             @if ($placeholder) placeholder="{{ $placeholder }}" @endif
             @if ($listId) list="{{ $listId }}" @endif
             @if ($kind === 'year') min="2000" max="2100" @else

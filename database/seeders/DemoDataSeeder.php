@@ -3,12 +3,17 @@
 namespace Database\Seeders;
 
 use App\Enums\CertificateStatus;
+use App\Enums\Classification;
 use App\Enums\ImportJobStatus;
 use App\Enums\IpcrPeriod;
 use App\Enums\LeaveStatus;
 use App\Enums\MessageStatus;
 use App\Enums\OnboardingRequirement;
+use App\Enums\PayChangeType;
 use App\Enums\PayrollStatus;
+use App\Enums\PositionChangeType;
+use App\Enums\RateType;
+use App\Enums\Region;
 use App\Enums\RemittanceKind;
 use App\Enums\Role;
 use App\Enums\UserStatus;
@@ -27,19 +32,23 @@ use App\Models\IpcrRating;
 use App\Models\ItrSubmission;
 use App\Models\Message;
 use App\Models\Notification;
+use App\Models\PayChange;
 use App\Models\PayrollPeriod;
 use App\Models\Payslip;
 use App\Models\PdsSubmission;
+use App\Models\PositionChange;
 use App\Models\ReceivedMail;
 use App\Models\RemittanceSetting;
 use App\Models\RequirementDeadlineSetting;
 use App\Models\SwornDeclaration;
 use App\Models\User;
 use App\Models\VoucherSetting;
+use App\Models\WageOrder;
 use App\Models\WellnessLeave;
 use App\Services\CertificateService;
 use App\Services\ContractService;
 use App\Services\LeaveService;
+use App\Services\PayHistoryService;
 use App\Services\PayrollService;
 use App\Services\RemittanceService;
 use App\Support\AuditTrail;
@@ -110,7 +119,7 @@ class DemoDataSeeder extends Seeder
         '12-30' => 'Rizal Day',
     ];
 
-    private string $today;
+    private ?string $today = null;
 
     private int $year;
 
@@ -158,6 +167,7 @@ class DemoDataSeeder extends Seeder
             $this->activity($staff[0], $active, $released);
             $this->importHistory($staff[0]);
             $this->receivedMails($branches, $staff[0]);
+            $this->wagesAndCareers($employees->values());
             $this->remittances($staff[0]);
             $this->contracts($staff[0]);
         }));
@@ -663,6 +673,76 @@ class DemoDataSeeder extends Seeder
                 'created_at' => now()->subHours($hoursAgo),
                 'updated_at' => now()->subHours($hoursAgo),
             ])->save();
+        }
+    }
+
+    /**
+     * Fictional wage orders for each region, a starting rate for everyone, wage orders applied to the
+     * daily-paid, raises for some monthly staff, and a few promotions and demotions.
+     *
+     * @param  Collection<int, Employee>  $employees
+     */
+    public function wagesAndCareers(Collection $employees, ?string $today = null): void
+    {
+        $this->today ??= $today ?? HrDate::today();
+        $year = (int) substr($this->today, 0, 4);
+        $orders = [];
+
+        foreach (Region::cases() as $index => $region) {
+            foreach ([3 => 0, 2 => 2_500, 1 => 5_000, 0 => 8_000] as $back => $raise) {
+                $orders[] = WageOrder::query()->create([
+                    'region' => $region,
+                    'order_number' => sprintf('DEMO-%s-%d', str_replace(' ', '', $region->value), $year - $back),
+                    'sector' => 'Non-agriculture',
+                    'daily_rate_centavos' => 56_000 - $index * 900 + $raise,
+                    'effective_on' => ($year - $back).'-07-01',
+                ]);
+            }
+        }
+
+        $now = now();
+        $pay = [];
+        $positions = [];
+
+        foreach ($employees as $employee) {
+            $hired = $employee->date_hired?->toDateString() ?? ($year - 5).'-01-01';
+            $monthly = $employee->classification === Classification::Regular;
+            $starting = $monthly ? mt_rand(18, 40) * 100_000 : 38_000;
+            $row = ['employee_id' => $employee->id, 'rate_type' => ($monthly ? RateType::Monthly : RateType::Daily)->value, 'created_at' => $now, 'updated_at' => $now];
+            $pay[] = [...$row, 'effective_on' => $hired, 'change_type' => PayChangeType::Starting->value, 'amount_centavos' => $starting, 'reference' => null];
+
+            if ($monthly && $this->roll() < 0.35 && HrDate::addYears($hired, 2) < $this->today) {
+                $pay[] = [...$row, 'effective_on' => HrDate::addYears($hired, 2), 'change_type' => PayChangeType::Increase->value, 'amount_centavos' => $starting + mt_rand(1, 4) * 100_000, 'reference' => 'Demo memo '.mt_rand(100, 999)];
+            }
+
+            if ($this->roll() < 0.1 && HrDate::addYears($hired, 3) < $this->today && filled($employee->position)) {
+                $demoted = $this->roll() < 0.15;
+                $positions[] = [
+                    'employee_id' => $employee->id,
+                    'effective_on' => HrDate::addYears($hired, 3),
+                    'change_type' => ($demoted ? PositionChangeType::Demotion : PositionChangeType::Promotion)->value,
+                    'from_position' => $demoted ? 'Senior '.$employee->position : 'Assistant '.$employee->position,
+                    'to_position' => $employee->position,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+        }
+
+        foreach (array_chunk($pay, 500) as $chunk) {
+            PayChange::query()->insert($chunk);
+        }
+
+        foreach (array_chunk($positions, 500) as $chunk) {
+            PositionChange::query()->insert($chunk);
+        }
+
+        $service = app(PayHistoryService::class);
+
+        foreach ($orders as $order) {
+            if ($order->effective_on->toDateString() <= $this->today) {
+                $service->apply($order);
+            }
         }
     }
 
