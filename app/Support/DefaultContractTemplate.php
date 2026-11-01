@@ -37,7 +37,6 @@ class DefaultContractTemplate
         $space = fn (string $size = 'sm'): array => [...CertificateBlocks::newBlock('spacer'), 'size' => $size];
 
         return [
-            [...CertificateBlocks::newBlock('pageFooter'), 'text' => "{{adfinChief}}\n{{adfinChiefTitle}} | {{fullNameTitle}}\nService Contractor | {{areaDirector}}\n{{areaDirectorTitle}} | {{hrmChief}}\n{{hrmChiefTitle}}"],
             $text("Republic of the Philippines\n**PHILIPPINE POSTAL CORPORATION**\nLiwasang Bonifacio, Manila", 'center'),
             [...CertificateBlocks::newBlock('title'), 'text' => 'CONTRACT OF SERVICE', 'size' => 'md'],
             $space(),
@@ -79,6 +78,7 @@ class DefaultContractTemplate
             $text('This instrument consisting of three (3) pages, including the page on which this acknowledgement is written, refers to the Contract of Service and duly signed by the parties and their instrumental witnesses on every page hereof.'),
             $text('IN WITNESS WHEREOF, I have hereunto set my hand and Notarial Seal this ____day of ______________, at__________________, Philippines.'),
             $text("Doc. No. _______\nPage No. _______\nBook No. _______\nSeries of {{termYear}}.", 'left'),
+            [...CertificateBlocks::newBlock('pageFooter'), 'text' => "{{adfinChief}}\n{{adfinChiefTitle}} | {{fullNameTitle}}\nService Contractor | {{areaDirector}}\n{{areaDirectorTitle}} | {{hrmChief}}\n{{hrmChiefTitle}}"],
         ];
     }
 }
