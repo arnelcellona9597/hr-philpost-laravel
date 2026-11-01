@@ -20,17 +20,20 @@ class CertificateRenderer
      */
     public static function html(array $blocks, array $options): string
     {
-        // The PDF engine repeats a fixed footer only from the page it appears on, so it must come first.
+        $font = CertificateBlocks::font($options['font']);
+        $family = ($options['pdf'] ?? false) ? $font['pdf'] : $font['screen'];
+        $footers = '';
+
+        // The PDF engine repeats a fixed footer on every page only when it sits directly in the page.
         if ($options['pdf'] ?? false) {
-            usort($blocks, fn (array $a, array $b): int => ($b['type'] === 'pageFooter') <=> ($a['type'] === 'pageFooter'));
+            $repeating = array_filter($blocks, fn (array $block): bool => $block['type'] === 'pageFooter');
+            $blocks = array_filter($blocks, fn (array $block): bool => $block['type'] !== 'pageFooter');
+            $footers = implode('', array_map(fn (array $block): string => str_replace('<div class="cert-pagefooter', '<div style="font-family:'.e($family).'" class="cert-pagefooter', self::block($block, $options)), $repeating));
         }
 
         $body = implode('', array_map(fn (array $block): string => self::block($block, $options), $blocks));
 
-        $font = CertificateBlocks::font($options['font']);
-        $family = ($options['pdf'] ?? false) ? $font['pdf'] : $font['screen'];
-
-        return '<div class="cert'.($font['points'] === 11 ? ' cert-compact' : '').'" style="font-family:'.e($family).'">'.$body.'</div>';
+        return $footers.'<div class="cert'.($font['points'] === 11 ? ' cert-compact' : '').'" style="font-family:'.e($family).'">'.$body.'</div>';
     }
 
     /**
