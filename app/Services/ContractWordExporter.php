@@ -37,14 +37,14 @@ class ContractWordExporter
         $content = $contract->content;
         $paper = CertificateBlocks::PAPER_POINTS[$content['paperSize']] ?? CertificateBlocks::PAPER_POINTS['A4'];
         $margin = (int) ((CertificateBlocks::MARGIN_POINTS[$content['margin']] ?? 72) * 20);
-        $font = $content['font'] === 'sans' ? 'Arial' : 'Times New Roman';
+        $font = CertificateBlocks::font($content['font']);
         $escaping = Settings::isOutputEscapingEnabled();
         Settings::setOutputEscapingEnabled(true);
 
         try {
             $word = new PhpWord;
-            $word->setDefaultFontName($font);
-            $word->setDefaultFontSize($content['font'] === 'sans' ? 11 : 12);
+            $word->setDefaultFontName($font['word']);
+            $word->setDefaultFontSize($font['points']);
             $word->getDocInfo()->setTitle($contract->control_number)->setSubject('Contract of Service');
             $section = $word->addSection([
                 'pageSizeW' => (int) ($paper[0] * 20),

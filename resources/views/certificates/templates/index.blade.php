@@ -31,7 +31,7 @@
                     @if ($template->description)
                         <p class="mt-1 text-sm text-muted">{{ $template->description }}</p>
                     @endif
-                    <p class="mt-3 text-xs text-muted">{{ $template->prefix }}-YYYY-0001 · {{ $template->paper_size }} · {{ $template->font === 'sans' ? 'Sans-serif' : 'Serif' }} · {{ $template->certificates_count }} issued</p>
+                    <p class="mt-3 text-xs text-muted">{{ $template->prefix }}-YYYY-0001 · {{ $template->paper_size }} · {{ \App\Support\CertificateBlocks::font($template->font)['label'] }} · {{ $template->certificates_count }} issued</p>
                     <div class="mt-4 flex flex-wrap gap-2 border-t border-line pt-4">
                         <a class="btn-primary btn-sm" href="{{ route('certificates.templates.edit', $template) }}"><x-icon name="edit" class="size-3.5" /> Edit layout</a>
                         <form method="post" action="{{ route('certificates.templates.duplicate', $template) }}">@csrf<button class="btn-secondary btn-sm"><x-icon name="copy" class="size-3.5" /> Duplicate</button></form>

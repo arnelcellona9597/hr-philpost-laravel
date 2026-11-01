@@ -17,6 +17,8 @@ class DefaultCertificateTemplates
     private const RENEWABLE = '{{possessiveCap}} contract is renewable every six (6) months based on {{possessive}} performance.';
 
     /**
+     * Tahoma, as in the office's documents.
+     *
      * @return list<array{key: string, name: string, description: string, sort_order: int, font: string, blocks: list<Block>}>
      */
     public static function all(): array

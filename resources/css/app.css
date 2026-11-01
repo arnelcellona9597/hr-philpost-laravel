@@ -603,8 +603,7 @@
 
 /* Certificate text. Units are points so the screen and print match the PDF. */
 .cert { color: #111; line-height: 1.5; font-size: 12pt; }
-.cert.cert-serif { font-family: 'Times New Roman', Times, 'Liberation Serif', serif; }
-.cert.cert-sans { font-family: 'DejaVu Sans', 'Inter Variable', Arial, sans-serif; font-size: 11pt; }
+.cert.cert-compact { font-size: 11pt; }
 .cert * { box-sizing: border-box; }
 .cert .cert-left { text-align: left; }
 .cert .cert-center { text-align: center; }
@@ -624,7 +623,7 @@
 .cert .cert-s-sm { font-size: 10.5pt; }
 .cert .cert-s-md { font-size: 12pt; }
 .cert .cert-s-lg { font-size: 13.5pt; }
-.cert.cert-sans .cert-s-md { font-size: 11pt; }
+.cert.cert-compact .cert-s-md { font-size: 11pt; }
 .cert .cert-indent { text-indent: 36pt; }
 .cert .cert-details { border-collapse: collapse; margin: 0 0 10pt; }
 .cert .cert-details th { text-align: left; font-weight: 700; padding: 2pt 16pt 2pt 0; vertical-align: top; white-space: nowrap; }
