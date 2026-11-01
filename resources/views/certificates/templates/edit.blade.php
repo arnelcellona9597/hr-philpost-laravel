@@ -48,8 +48,9 @@
                 <div>
                     <label class="label" for="font">Font</label>
                     <select class="input" id="font" name="font" data-page-opt>
-                        <option value="serif" @selected($selectedFont === 'serif')>Serif (Times)</option>
-                        <option value="sans" @selected($selectedFont === 'sans')>Sans-serif</option>
+                        @foreach (CertificateBlocks::FONTS as $key => $font)
+                            <option value="{{ $key }}" @selected($key === $selectedFont) style="font-family: {{ $font['screen'] }}">{{ $font['label'] }}</option>
+                        @endforeach
                     </select>
                 </div>
                 <div>

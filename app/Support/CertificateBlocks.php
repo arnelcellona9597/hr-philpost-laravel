@@ -25,7 +25,23 @@ class CertificateBlocks
 {
     public const PAPER_SIZES = ['A4', 'Letter', 'Legal'];
 
-    public const FONTS = ['serif', 'sans'];
+    /**
+     * The fonts a template can use. Screen, print and Word use the real font where the computer has it.
+     * PDFs can only embed fonts we may redistribute, so each names the closest one, and DejaVu fills in
+     * characters a built-in PDF font lacks, such as the peso sign.
+     *
+     * @var array<string, array{label: string, screen: string, pdf: string, word: string, points: int}>
+     */
+    public const FONTS = [
+        'times' => ['label' => 'Times New Roman', 'screen' => "'Times New Roman', Times, 'Liberation Serif', serif", 'pdf' => "Times, 'DejaVu Serif', serif", 'word' => 'Times New Roman', 'points' => 12],
+        'arial' => ['label' => 'Arial', 'screen' => "Arial, Arimo, 'Liberation Sans', sans-serif", 'pdf' => "Helvetica, 'DejaVu Sans', sans-serif", 'word' => 'Arial', 'points' => 12],
+        'calibri' => ['label' => 'Calibri', 'screen' => 'Calibri, Carlito, Arial, sans-serif', 'pdf' => "Helvetica, 'DejaVu Sans', sans-serif", 'word' => 'Calibri', 'points' => 12],
+        'sans' => ['label' => 'Tahoma', 'screen' => "Tahoma, 'DejaVu Sans', sans-serif", 'pdf' => "'DejaVu Sans', sans-serif", 'word' => 'Tahoma', 'points' => 11],
+        'verdana' => ['label' => 'Verdana', 'screen' => "Verdana, 'DejaVu Sans', sans-serif", 'pdf' => "'DejaVu Sans', sans-serif", 'word' => 'Verdana', 'points' => 11],
+        'georgia' => ['label' => 'Georgia', 'screen' => "Georgia, 'DejaVu Serif', serif", 'pdf' => "'DejaVu Serif', serif", 'word' => 'Georgia', 'points' => 12],
+        'courier' => ['label' => 'Courier New', 'screen' => "'Courier New', Courier, monospace", 'pdf' => "Courier, 'DejaVu Sans Mono', monospace", 'word' => 'Courier New', 'points' => 11],
+        'serif' => ['label' => 'DejaVu Serif', 'screen' => "'Times New Roman', Times, 'Liberation Serif', serif", 'pdf' => "'DejaVu Serif', serif", 'word' => 'Times New Roman', 'points' => 12],
+    ];
 
     public const MARGINS = ['narrow', 'normal', 'wide'];
 
@@ -112,6 +128,16 @@ class CertificateBlocks
     ];
 
     private const MAX_TEXT = 3000;
+
+    /**
+     * A font's settings. A font that is no longer offered falls back to the first one.
+     *
+     * @return array{label: string, screen: string, pdf: string, word: string, points: int}
+     */
+    public static function font(?string $key): array
+    {
+        return self::FONTS[$key] ?? self::FONTS['times'];
+    }
 
     /**
      * A new block of this type with its starting values.

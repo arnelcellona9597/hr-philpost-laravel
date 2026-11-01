@@ -335,3 +335,18 @@ it('keeps contracts away from signed-out visitors', function () {
 
     $this->get('/contracts')->assertRedirectContains('/login');
 });
+
+it('uses the chosen font in the Word file', function () {
+    $this->template->update(['font' => 'georgia']);
+    $employee = cosEmployee();
+    $contract = app(ContractService::class)->issue($this->hr, $this->template->id, $employee->id, contractRow($employee), '2026-06-20');
+
+    $path = tempnam(sys_get_temp_dir(), 'docx');
+    file_put_contents($path, app(ContractWordExporter::class)->render($contract));
+    $zip = new ZipArchive;
+    $zip->open($path);
+    $styles = $zip->getFromName('word/styles.xml');
+    $zip->close();
+
+    expect($styles)->toContain('Georgia');
+});

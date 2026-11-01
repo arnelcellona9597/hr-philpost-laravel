@@ -131,7 +131,8 @@ function renderPage() {
         </div>${inner}</div>`
     })
     .join('')
-  paper.innerHTML = `<div class="cert cert-${font}">${items || '<div class="ed-empty" style="padding:48px">Drag blocks here from the palette.</div>'}</div>`
+  const chosen = data.fonts[font] ?? Object.values(data.fonts)[0]
+  paper.innerHTML = `<div class="cert${chosen.points === 11 ? ' cert-compact' : ''}" style="font-family:${esc(chosen.screen)}">${items || '<div class="ed-empty" style="padding:48px">Drag blocks here from the palette.</div>'}</div>`
   const unknown = unknownPlaceholders()
   warning.textContent = unknown.length ? `Unknown placeholder(s): ${unknown.map((name) => `{{${name}}}`).join(', ')} — they will be refused when saving.` : ''
   warning.classList.toggle('text-danger', unknown.length > 0)

@@ -8,8 +8,7 @@
             @page { margin: {{ $margin }}pt; }
             body { margin: 0; color: #111; }
             .cert { line-height: 1.5; font-size: 12pt; }
-            .cert-serif { font-family: 'DejaVu Serif', serif; }
-            .cert-sans { font-family: 'DejaVu Sans', sans-serif; font-size: 11pt; }
+            .cert-compact { font-size: 11pt; }
             .cert-left { text-align: left; }
             .cert-center { text-align: center; }
             .cert-right { text-align: right; }
@@ -27,7 +26,7 @@
             .cert-wide { letter-spacing: .12em; }
             .cert-p { margin: 0 0 10pt; }
             .cert-s-sm { font-size: 10.5pt; }
-            .cert-s-md { font-size: {{ $sans ? 11 : 12 }}pt; }
+            .cert-s-md { font-size: {{ $compact ? 11 : 12 }}pt; }
             .cert-s-lg { font-size: 13.5pt; }
             .cert-indent { text-indent: 36pt; }
             .cert-details { border-collapse: collapse; margin: 0 0 10pt; }

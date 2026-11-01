@@ -3,7 +3,9 @@
 use App\Enums\Role;
 use App\Models\Certificate;
 use App\Models\CertificateTemplate;
+use App\Models\Employee;
 use App\Models\User;
+use App\Services\CertificateService;
 use App\Support\CertificateBlocks;
 use App\Support\CertificateRenderer;
 
@@ -131,4 +133,38 @@ it('escapes template text when rendering and sanitizes block values', function (
         ->and($html)->toContain('&lt;img src=x&gt;')
         ->toContain('<strong>b&lt;i&gt;</strong><br>line')
         ->not->toContain('<img');
+});
+
+it('offers named fonts, and every one prints a certificate with a peso sign', function (string $font) {
+    $template = CertificateTemplate::query()->where('key', 'coe-active')->sole();
+    $template->update(['font' => $font, 'blocks' => CertificateBlocks::sanitize([['type' => 'paragraph', 'text' => 'Wage ₱540.00 for {{fullName}}', 'align' => 'left', 'size' => 'md', 'indent' => false]])]);
+    $employee = Employee::factory()->create();
+
+    $this->get("/certificates/templates/{$template->id}")->assertOk()->assertSee(CertificateBlocks::font($font)['label']);
+
+    $certificate = app(CertificateService::class)->issue(User::query()->first(), $template->id, $employee->id, null, '2026-10-04');
+
+    $this->get("/certificates/{$certificate->id}")->assertOk()->assertSee(e(explode(',', CertificateBlocks::font($font)['screen'])[0]), false);
+    expect(substr($this->get("/certificates/{$certificate->id}/pdf")->assertOk()->getContent(), 0, 4))->toBe('%PDF');
+})->with(array_keys(CertificateBlocks::FONTS));
+
+it('saves a chosen font and refuses an unknown one', function () {
+    $template = CertificateTemplate::query()->where('key', 'coe-active')->sole();
+    $form = ['name' => $template->name, 'prefix' => 'COE', 'blocks' => json_encode($template->blocks), 'active' => '1'];
+
+    $this->put("/certificates/templates/{$template->id}", [...$form, 'font' => 'georgia'])->assertSessionHasNoErrors();
+    expect($template->fresh()->font)->toBe('georgia');
+
+    $this->put("/certificates/templates/{$template->id}", [...$form, 'font' => 'comic-sans']);
+    expect($template->fresh()->font)->toBe('times');
+});
+
+it('keeps the font a certificate was issued with', function () {
+    $template = CertificateTemplate::query()->where('key', 'coe-active')->sole();
+    $certificate = app(CertificateService::class)->issue(User::query()->first(), $template->id, Employee::factory()->create()->id, null, '2026-10-04');
+
+    $template->update(['font' => 'courier']);
+
+    expect($certificate->fresh()->content['font'])->toBe('sans');
+    $this->get("/certificates/{$certificate->id}")->assertOk()->assertDontSee('Courier New');
 });
