@@ -7,6 +7,49 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## PhilPost HR
+
+A Laravel 13, PHP 8.5 and MySQL 8 rebuild of the PhilPost HR system (the old Astro, Payload and SQLite app). Plan and handoff notes are in `docs/rebuild/`.
+
+**What it does**
+
+| Area | Notes |
+|---|---|
+| Employees | Records, search, Excel import and export, branches, and a dated employment history: one person can be hired and separated many times. The employee record shows the latest period; the profile lists every period with gaps and total service |
+| Onboarding, leave, requirements | Applicant tracker, wellness leave, annual ITR, Sworn Declaration, PDS and IPCR records |
+| Certificates | Numbered certificates from drag-and-drop templates, with PDF and print |
+| Contracts | Contracts of Service for COS workers, issued singly or for a group. Drag-and-drop templates with a page break and a footer that repeats on every page. Officials and wage wording are set once in settings. Download as PDF or Word (.docx), or a ZIP of either. Issued contracts keep their text and can only be voided. A worker cannot hold two overlapping valid contracts |
+| Payroll | Periods, payslip grid, release, PDF and email |
+| Remittances | Monthly SSS, Pag-IBIG (HDMF) and CMPEAI lists. A month starts from the previous one; finalize to lock it. Excel export and import in the office's sheet layouts, print, and a disbursement voucher (print and PDF) with the amount in words. Titles, employer details, signatories and voucher wording are edited in settings |
+| Received Mails | Daily log of incoming mail with paste-from-Excel entry, filters, print, and Excel export and import in the monthly log layout |
+| Messages, import and export, audit log | Internal messages and email queue, Excel modules, and a full audit trail |
+
+**Setup**
+
+```bash
+composer install
+cp .env.example .env && php artisan key:generate
+php artisan migrate
+npm install && npm run build
+composer run dev
+```
+
+Demo data (1,000 fictional employees plus sample mail, remittances and contracts): `php artisan db:seed --class=DemoDataSeeder`. Do not run it against real data.
+
+**Checks**
+
+```bash
+vendor/bin/pint --dirty --format agent
+php artisan test --compact
+```
+
+Tests use a separate MySQL database (`hr_philpost_test`).
+
+**Notes for operators**
+
+- Real names, member numbers and addresses never belong in the repository. The officials who sign contracts and vouchers start blank and are filled in from the app's settings pages.
+- Word export uses `phpoffice/phpword`, which needs the `zip`, `dom`, `gd` and `xml` PHP extensions.
+
 ## Live server (phlposthr.com)
 
 Reference for deployment. No access details belong in this file, because this repository may be public.
