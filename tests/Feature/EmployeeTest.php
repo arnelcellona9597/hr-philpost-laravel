@@ -324,3 +324,28 @@ it('refuses to convert an applicant twice', function () {
 
     expect(Employee::query()->count())->toBe(1);
 });
+
+it('prints the whole employee profile on a page of its own', function () {
+    $branch = Branch::factory()->create(['name' => 'Sample Post Office']);
+    $employee = Employee::factory()->create(['last_name' => 'Reyes', 'first_name' => 'Ana', 'middle_name' => null, 'position' => 'Clerk', 'station_id' => $branch->id, 'date_hired' => '2020-03-02', 'tin' => '123-456-789-000', 'address' => '12 Sample St.']);
+
+    $this->get("/employees/{$employee->id}")->assertOk()->assertSee("/employees/{$employee->id}/print");
+
+    $this->get("/employees/{$employee->id}/print")->assertOk()
+        ->assertSee('EMPLOYEE PROFILE')
+        ->assertSee('Reyes, Ana')
+        ->assertSee('Sample Post Office')
+        ->assertSee('123-456-789-000')
+        ->assertSee('12 Sample St.')
+        ->assertSee('Employment history')
+        ->assertSee('Mar 2, 2020')
+        ->assertDontSee('Correct this period')
+        ->assertDontSee('Delete');
+});
+
+it('keeps the printed profile away from signed-out visitors', function () {
+    $employee = Employee::factory()->create();
+    auth()->logout();
+
+    $this->get("/employees/{$employee->id}/print")->assertRedirectContains('/login');
+});
