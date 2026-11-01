@@ -42,7 +42,7 @@ class PdfRenderer
             ]),
             'margin' => CertificateBlocks::MARGIN_POINTS[$content['margin']] ?? 72,
             'void' => $certificate->isVoid(),
-            'sans' => $content['font'] === 'sans',
+            'compact' => CertificateBlocks::font($content['font'])['points'] === 11,
         ], $paper);
     }
 
@@ -63,7 +63,7 @@ class PdfRenderer
             ]),
             'margin' => CertificateBlocks::MARGIN_POINTS[$content['margin']] ?? 72,
             'void' => $contract->isVoid(),
-            'sans' => $content['font'] === 'sans',
+            'compact' => CertificateBlocks::font($content['font'])['points'] === 11,
         ], $paper);
     }
 

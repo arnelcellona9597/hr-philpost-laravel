@@ -22,7 +22,10 @@ class CertificateRenderer
     {
         $body = implode('', array_map(fn (array $block): string => self::block($block, $options), $blocks));
 
-        return '<div class="cert cert-'.e($options['font']).'">'.$body.'</div>';
+        $font = CertificateBlocks::font($options['font']);
+        $family = ($options['pdf'] ?? false) ? $font['pdf'] : $font['screen'];
+
+        return '<div class="cert'.($font['points'] === 11 ? ' cert-compact' : '').'" style="font-family:'.e($family).'">'.$body.'</div>';
     }
 
     /**
