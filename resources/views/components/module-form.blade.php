@@ -25,6 +25,8 @@
     @csrf
     @if ($spoof)
         @method($spoof)
+    @else
+        <input type="hidden" name="submission" value="{{ \Illuminate\Support\Str::uuid() }}" />
     @endif
     @if ($formError)
         <div class="rounded-lg bg-danger-soft px-4 py-3 text-sm text-danger" role="alert">{{ $formError }}</div>
