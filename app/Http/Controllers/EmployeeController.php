@@ -13,6 +13,7 @@ use App\Models\Employee;
 use App\Models\LeaveSetting;
 use App\Models\Media;
 use App\Models\RequirementDeadlineSetting;
+use App\Models\SiteSetting;
 use App\Services\ApplicationService;
 use App\Services\DuplicateFinder;
 use App\Services\EmploymentHistoryService;
@@ -140,6 +141,20 @@ class EmployeeController extends Controller
             'requirementYears' => collect($requirements)->flatten()->pluck('year')->unique()->sortDesc()->values(),
             'deadlineSettings' => RequirementDeadlineSetting::current()->toArray(),
             'history' => AuditLog::query()->visibleTo($request->user())->where('collection_slug', 'employees')->where('doc_id', (string) $employee->id)->latest('id')->limit(30)->get(),
+        ]);
+    }
+
+    public function print(Employee $employee, EmploymentHistoryService $history): View
+    {
+        Gate::authorize('view', $employee);
+
+        $employee->load('station');
+
+        return view('employees.print', [
+            'employee' => $employee,
+            'fields' => ImportModules::find('employees')['fields'],
+            'employment' => $history->summary($employee),
+            'site' => SiteSetting::current(),
         ]);
     }
 

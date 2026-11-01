@@ -5,19 +5,6 @@
     use Illuminate\Support\Str;
 
     $sections = collect($fields)->groupBy('section');
-    $display = function (array $field) use ($employee): string {
-        $value = match ($field['kind']) {
-            'branch' => $employee->station?->name,
-            default => $employee->getAttribute($field['name']),
-        };
-
-        return match (true) {
-            $value === null || $value === '' => '—',
-            $field['kind'] === 'date' => HrDate::format($value),
-            $value instanceof BackedEnum => $value->value,
-            default => (string) $value,
-        };
-    };
     $timely = fn ($record): array => Deadlines::timeliness($record->date_submitted, Deadlines::for($deadlineSettings, $record::SLUG, $record->year, $record->ratingPeriodValue()));
     $short = ['on-time' => 'On time', 'late' => 'Late', 'overdue' => 'Overdue', 'pending' => 'Pending', 'submitted' => '✓'];
     $describe = fn ($record): string => ($record->date_submitted ? 'Submitted '.HrDate::format($record->date_submitted) : 'Not submitted').' · '.$timely($record)['label'];
@@ -28,6 +15,7 @@
         <a class="btn-secondary" href="{{ url("/messages/new?employees={$employee->id}") }}"><x-icon name="mail" /> Email employee</a>
         <a class="btn-secondary" href="{{ route('leave.create', ['employee' => $employee->id]) }}"><x-icon name="calendar" /> File leave</a>
         <a class="btn-secondary" href="{{ url("/certificates/new?employee={$employee->id}") }}"><x-icon name="award" /> Issue certificate</a>
+        <a class="btn-secondary" href="{{ route('employees.print', $employee) }}" target="_blank" rel="noopener"><x-icon name="printer" /> Print</a>
         <a class="btn-primary" href="{{ route('employees.edit', $employee) }}"><x-icon name="edit" /> Edit</a>
         <form method="post" action="{{ route('employees.destroy', $employee) }}" data-confirm="Delete {{ $employee->full_name }}? This cannot be undone. Consider setting the status to Resigned/Retired/Terminated instead.">
             @csrf
@@ -72,7 +60,7 @@
                         @foreach ($sectionFields as $field)
                             <div @class(['sm:col-span-2 lg:col-span-3' => $field['kind'] === 'textarea' || Str::contains($field['name'], 'address')])>
                                 <dt class="text-xs text-muted">{{ $field['label'] }}</dt>
-                                <dd @class(['mt-0.5 text-sm', 'font-mono' => $field['kind'] === 'govId'])>{{ $display($field) }}</dd>
+                                <dd @class(['mt-0.5 text-sm', 'font-mono' => $field['kind'] === 'govId'])>{{ $employee->fieldText($field) }}</dd>
                             </div>
                         @endforeach
                     </dl>
