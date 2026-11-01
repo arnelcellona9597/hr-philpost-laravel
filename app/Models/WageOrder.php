@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\Region;
 use App\Models\Concerns\Audited;
+use App\Support\HrDate;
 use Database\Factories\WageOrderFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -39,7 +40,17 @@ class WageOrder extends Model
      */
     protected function label(): Attribute
     {
-        return Attribute::get(fn (): string => "{$this->order_number} ({$this->region?->value})");
+        return Attribute::get(fn (): string => "{$this->display_name} ({$this->region?->value})");
+    }
+
+    /**
+     * The order number, or the date when the number isn't known yet.
+     *
+     * @return Attribute<string, never>
+     */
+    protected function displayName(): Attribute
+    {
+        return Attribute::get(fn (): string => $this->order_number ?: 'Rate from '.HrDate::format($this->effective_on));
     }
 
     /**

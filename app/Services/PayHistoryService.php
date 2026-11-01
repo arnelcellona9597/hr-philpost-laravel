@@ -3,11 +3,11 @@
 namespace App\Services;
 
 use App\Enums\Classification;
-use App\Enums\EmploymentStatus;
 use App\Enums\PayChangeType;
 use App\Enums\RateType;
 use App\Enums\Region;
 use App\Exceptions\UserFacingException;
+use App\Models\ContractSetting;
 use App\Models\Employee;
 use App\Models\PayChange;
 use App\Models\User;
@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\DB;
  * Each employee's pay over time, and regional wage orders applied to it. Amounts are whole centavos.
  * A rate holds from its effective date until the next one, so the history needs no end dates.
  *
- * @phpstan-type Impact array{pending: list<int>, applied: int, atOrAbove: int, monthly: int, noRate: int}
+ * @phpstan-type Impact array{pending: list<array{employee_id: int, effective_on: string, premium: float|null}>, applied: int, atOrAbove: int, monthly: int, noRate: int}
  */
 class PayHistoryService
 {
@@ -96,7 +96,7 @@ class PayHistoryService
     }
 
     /**
-     * @param  array{effective_on: string, change_type: string, rate_type: string, amount_centavos: int, reference?: string|null, remarks?: string|null}  $data
+     * @param  array{effective_on: string, change_type: string, rate_type: string, amount_centavos: int, premium_percent?: float|int|string|null, reference?: string|null, remarks?: string|null}  $data
      *
      * @throws UserFacingException
      */
@@ -114,6 +114,12 @@ class PayHistoryService
             throw new UserFacingException('Enter the new rate.');
         }
 
+        $premium = $data['premium_percent'] ?? 0;
+
+        if (! is_numeric($premium) || (float) $premium < 0 || (float) $premium > 100) {
+            throw new UserFacingException('The premium must be a percentage from 0 to 100.');
+        }
+
         if (PayChange::query()->where('employee_id', $employee->id)->where('effective_on', $data['effective_on'])->exists()) {
             throw new UserFacingException('There is already a pay record on '.HrDate::format($data['effective_on']).'. Delete it first, or choose another date.');
         }
@@ -126,42 +132,48 @@ class PayHistoryService
     }
 
     /**
-     * Who a wage order would change. Daily-paid active employees in the region below the new rate are
-     * raised, as are COS and contractual workers with no rate yet. Monthly-paid staff are left alone.
+     * Who a wage order would change: everyone in the region employed while it applied, so old rates can
+     * be filled in for people who have since left. It runs until the region's next rate, and someone
+     * hired in between gets it from their own hire date. Lower daily rates are raised, and COS and
+     * contractual workers with no rate yet are given one. Monthly-paid staff are left alone.
      *
      * @return Impact
      */
     public function impact(WageOrder $order): array
     {
         $date = $order->effective_on->toDateString();
+        $next = WageOrder::query()->where('region', $order->region->value)->where('sector', $order->sector)->where('effective_on', '>', $date)->min('effective_on');
         $applied = PayChange::query()->where('wage_order_id', $order->id)->pluck('employee_id')->flip();
-        $sameDay = PayChange::query()->where('effective_on', $date)->pluck('employee_id')->flip();
         $impact = ['pending' => [], 'applied' => $applied->count(), 'atOrAbove' => 0, 'monthly' => 0, 'noRate' => 0];
 
-        $employees = DB::table('employees as e')
+        $periods = DB::table('employment_periods as p')
+            ->join('employees as e', 'e.id', '=', 'p.employee_id')
             ->leftJoin('branches as b', 'b.id', '=', 'e.station_id')
-            ->leftJoin('pay_changes as p', function ($join) use ($date): void {
-                $join->on('p.employee_id', '=', 'e.id')
-                    ->whereRaw('p.effective_on = (SELECT MAX(p2.effective_on) FROM pay_changes p2 WHERE p2.employee_id = e.id AND p2.effective_on <= ?)', [$date]);
-            })
-            ->where('e.employment_status', EmploymentStatus::Active->value)
             ->whereRaw('COALESCE(e.region, b.region) = ?', [$order->region->value])
-            ->where(fn ($query) => $query->whereNull('e.date_hired')->orWhere('e.date_hired', '<=', $date))
-            ->get(['e.id', 'e.classification', 'p.rate_type', 'p.amount_centavos']);
+            ->where(fn ($query) => $query->whereNull('p.separated_on')->orWhere('p.separated_on', '>=', $date))
+            ->when($next, fn ($query) => $query->where('p.hired_on', '<', $next))
+            ->orderBy('p.hired_on')
+            ->get(['e.id', 'e.classification', 'p.hired_on'])
+            ->unique('id');
 
-        foreach ($employees as $employee) {
-            if ($applied->has($employee->id)) {
+        $rates = PayChange::query()->whereIn('employee_id', $periods->pluck('id'))->orderBy('effective_on')->get(['employee_id', 'effective_on', 'rate_type', 'amount_centavos', 'premium_percent'])->groupBy('employee_id');
+
+        foreach ($periods as $period) {
+            if ($applied->has($period->id)) {
                 continue;
             }
 
-            if ($employee->rate_type === null && $employee->classification === Classification::Regular->value) {
+            $start = max($date, substr($period->hired_on, 0, 10));
+            $rate = ($rates[$period->id] ?? collect())->last(fn (PayChange $change): bool => $change->effective_on->toDateString() <= $start);
+
+            if ($rate === null && $period->classification === Classification::Regular->value) {
                 $impact['noRate']++;
-            } elseif ($employee->rate_type === RateType::Monthly->value) {
+            } elseif ($rate?->rate_type === RateType::Monthly) {
                 $impact['monthly']++;
-            } elseif ($sameDay->has($employee->id) || ($employee->amount_centavos !== null && (int) $employee->amount_centavos >= $order->daily_rate_centavos)) {
+            } elseif ($rate !== null && ($rate->effective_on->toDateString() === $start || $rate->amount_centavos >= $order->daily_rate_centavos)) {
                 $impact['atOrAbove']++;
             } else {
-                $impact['pending'][] = (int) $employee->id;
+                $impact['pending'][] = ['employee_id' => (int) $period->id, 'effective_on' => $start, 'premium' => $rate === null ? null : (float) $rate->premium_percent];
             }
         }
 
@@ -169,23 +181,27 @@ class PayHistoryService
     }
 
     /**
-     * Add the wage order to everyone it raises. Applying again only picks up people added since.
+     * Add the wage order to everyone it raises. Each person keeps their premium unless one is given.
+     * Applying again only picks up people added since.
      *
      * @return int employees raised
      */
-    public function apply(WageOrder $order, ?User $user = null): int
+    public function apply(WageOrder $order, ?User $user = null, ?float $premium = null): int
     {
-        return DB::transaction(function () use ($order, $user): int {
+        return DB::transaction(function () use ($order, $user, $premium): int {
             $pending = $this->impact($order)['pending'];
+            $default = (float) ContractSetting::current()->premium_percent;
+            $date = $order->effective_on->toDateString();
             $now = now();
 
             foreach (array_chunk($pending, 500) as $chunk) {
-                PayChange::query()->insert(array_map(fn (int $employeeId): array => [
-                    'employee_id' => $employeeId,
-                    'effective_on' => $order->effective_on->toDateString(),
-                    'change_type' => PayChangeType::WageOrder->value,
+                PayChange::query()->insert(array_map(fn (array $person): array => [
+                    'employee_id' => $person['employee_id'],
+                    'effective_on' => $person['effective_on'],
+                    'change_type' => ($person['effective_on'] === $date ? PayChangeType::WageOrder : PayChangeType::Starting)->value,
                     'rate_type' => RateType::Daily->value,
                     'amount_centavos' => $order->daily_rate_centavos,
+                    'premium_percent' => $premium ?? $person['premium'] ?? $default,
                     'wage_order_id' => $order->id,
                     'reference' => $order->order_number,
                     'created_by' => $user?->id,

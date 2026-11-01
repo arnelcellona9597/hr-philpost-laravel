@@ -24,7 +24,7 @@
                             <td class="font-medium"><a class="hover:text-primary-ink" href="{{ route('wage-orders.index', ['region' => $option->value]) }}">{{ $option->value }}</a></td>
                             @if ($current)
                                 <td class="text-right font-medium tabular">{{ Money::format($current->daily_rate_centavos) }}</td>
-                                <td><a class="text-primary-ink hover:underline" href="{{ route('wage-orders.show', $current) }}">{{ $current->order_number }}</a></td>
+                                <td><a class="text-primary-ink hover:underline" href="{{ route('wage-orders.show', $current) }}">{{ $current->display_name }}</a></td>
                                 <td class="text-fg-2">{{ $current->sector }}</td>
                                 <td class="whitespace-nowrap text-fg-2 tabular">{{ HrDate::format($current->effective_on) }}</td>
                             @else
@@ -62,7 +62,7 @@
                     <tbody>
                         @foreach ($orders as $order)
                             <tr>
-                                <td class="font-medium"><a class="text-primary-ink hover:underline" href="{{ route('wage-orders.show', $order) }}">{{ $order->order_number }}</a></td>
+                                <td class="font-medium"><a class="text-primary-ink hover:underline" href="{{ route('wage-orders.show', $order) }}">{{ $order->display_name }}</a></td>
                                 <td>{{ $order->region->value }}</td>
                                 <td class="text-fg-2">{{ $order->sector }}</td>
                                 <td class="text-right tabular">{{ Money::format($order->daily_rate_centavos) }}</td>
