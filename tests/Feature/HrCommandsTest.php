@@ -2,11 +2,14 @@
 
 use App\Enums\Role;
 use App\Mail\SystemMessage;
+use App\Models\SmtpSetting;
 use App\Models\User;
+use App\Services\DirectMailer;
 use App\Services\SignInService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Process;
 
 beforeEach(fn () => config(['hr.admin_password' => 'fixture-password-1']));
 
@@ -102,3 +105,76 @@ it('refuses a code when no sign-in is in progress', function () {
     $this->artisan('hr:issue-login-code', ['email' => 'ana@example.test'])->assertFailed();
     $this->artisan('hr:issue-login-code', ['email' => 'nobody@example.test'])->assertFailed();
 });
+
+it('reports a failed backup and never puts the database password on the command line', function () {
+    config(['database.connections.mysql.password' => 'database-secret']);
+    Process::fake(fn () => Process::result(errorOutput: 'mysqldump: not found', exitCode: 127));
+
+    $this->artisan('hr:backup')->expectsOutputToContain('mysqldump: not found')->assertFailed();
+
+    Process::assertRan(fn ($process) => str_contains(implode(' ', (array) $process->command), 'mysqldump') && ! str_contains(implode(' ', (array) $process->command), 'database-secret'));
+});
+
+function smtpConfig(array $overrides = []): void
+{
+    config(['hr.smtp' => [
+        'host' => 'smtp.example.test',
+        'port' => '587',
+        'security' => 'starttls',
+        'username' => 'info@example.test',
+        'password' => 'fixture-mail-password-1',
+        'from_address' => null,
+        'from_name' => 'HR Office',
+        ...$overrides,
+    ]]);
+}
+
+it('saves the mail server from the environment, checks it and sends a test', function () {
+    smtpConfig();
+    $mailer = Mockery::mock(DirectMailer::class);
+    $mailer->shouldReceive('verifyConnection')->once()->andReturnNull();
+    $mailer->shouldReceive('deliver')->once()->with('info@example.test', Mockery::type('string'), Mockery::type('string'));
+    app()->instance(DirectMailer::class, $mailer);
+
+    $this->artisan('hr:configure-smtp', ['--test' => 'info@example.test'])
+        ->expectsOutputToContain('Connected and signed in')
+        ->doesntExpectOutputToContain('fixture-mail-password-1')
+        ->assertSuccessful();
+
+    $settings = SmtpSetting::current();
+
+    expect($settings->host)->toBe('smtp.example.test')
+        ->and($settings->port)->toBe(587)
+        ->and($settings->from_address)->toBe('info@example.test')
+        ->and($settings->password)->toBe('fixture-mail-password-1')
+        ->and(DB::table('smtp_settings')->value('password'))->not->toContain('fixture-mail-password-1');
+});
+
+it('reports a mail server it could not sign in to', function () {
+    smtpConfig();
+    $mailer = Mockery::mock(DirectMailer::class);
+    $mailer->shouldReceive('verifyConnection')->once()->andReturn('Authentication failed');
+    app()->instance(DirectMailer::class, $mailer);
+
+    $this->artisan('hr:configure-smtp')->expectsOutputToContain('Connecting failed: Authentication failed')->assertFailed();
+});
+
+it('does not claim success when real email is switched off', function () {
+    smtpConfig();
+
+    $this->artisan('hr:configure-smtp')->expectsOutputToContain('MAIL_MAILER is not set to smtp')->assertFailed();
+});
+
+it('refuses mail server values that cannot work', function (array $overrides, array $arguments, string $message) {
+    smtpConfig($overrides);
+
+    $this->artisan('hr:configure-smtp', $arguments)->expectsOutputToContain($message)->assertFailed();
+
+    expect(DB::table('smtp_settings')->count())->toBe(0);
+})->with([
+    'host' => [['host' => ''], [], 'Enter a valid host name'],
+    'port' => [['port' => 'x'], [], 'Enter a valid port'],
+    'security' => [['security' => 'tls'], [], 'Choose the connection security'],
+    'password' => [['password' => ''], [], 'HR_SMTP_PASSWORD is empty'],
+    'test address' => [[], ['--test' => 'nope'], 'The --test address is not valid'],
+]);

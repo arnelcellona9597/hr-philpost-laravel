@@ -14,6 +14,7 @@ use App\Support\Deadlines;
 use App\Support\HrDate;
 use App\Support\ImportModules;
 use App\Support\RecordForm;
+use App\Support\RecordRules;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
@@ -240,16 +241,7 @@ class RequirementController extends Controller
         $fields = $this->fields($type, $record->year ?? $this->year($request));
         ['data' => $data, 'errors' => $errors] = RecordForm::parse($request, $fields, $record->getTable(), record: $record);
 
-        $submitted = $data['date_submitted'] ?? null;
-        $received = $data['date_received'] ?? null;
-
-        if ($submitted !== null && $received !== null && $received < $submitted) {
-            $errors['date_received'] = 'Date received cannot be before the date submitted';
-        }
-
-        if (($data['period_from'] ?? null) !== null && ($data['period_to'] ?? null) !== null && $data['period_to'] < $data['period_from']) {
-            $errors['period_to'] = 'Period end is before period start';
-        }
+        $errors = [...$errors, ...RecordRules::errors($record::SLUG, $data)];
 
         if (isset($data['employee_id']) && ! Employee::query()->whereKey($data['employee_id'])->exists()) {
             $errors['employee'] = 'Select a valid employee';

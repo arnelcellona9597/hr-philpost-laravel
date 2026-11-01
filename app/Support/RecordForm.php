@@ -112,7 +112,7 @@ class RecordForm
      * @param  ModuleField  $field
      * @return array{0: mixed, 1: string|null}
      */
-    private static function convert(array $field, string $raw): array
+    public static function convert(array $field, string $raw): array
     {
         $label = $field['label'];
 
@@ -179,7 +179,7 @@ class RecordForm
      *
      * @return array<string, int>
      */
-    private static function columnLimits(string $table): array
+    public static function columnLimits(string $table): array
     {
         $limits = [];
 

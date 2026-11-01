@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Audited;
 use Database\Factories\PayslipFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Payslip extends Model
 {
     /** @use HasFactory<PayslipFactory> */
-    use HasFactory;
+    use Audited, HasFactory;
 
     /**
      * Totals are added up in whole centavos: no floating-point drift and no tax formulas.

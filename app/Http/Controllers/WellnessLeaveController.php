@@ -14,6 +14,7 @@ use App\Support\Choices;
 use App\Support\HrDate;
 use App\Support\ImportModules;
 use App\Support\RecordForm;
+use App\Support\RecordRules;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -167,14 +168,8 @@ class WellnessLeaveController extends Controller
     private function parse(Request $request): array
     {
         $parsed = RecordForm::parse($request, $this->fields(), 'wellness_leaves');
-        $filed = $parsed['data']['date_filing'] ?? null;
-        $received = $parsed['data']['date_received'] ?? null;
 
-        if ($filed !== null && $received !== null && $received < $filed) {
-            $parsed['errors']['date_received'] = 'Date received cannot be before the filing date';
-        }
-
-        return $parsed;
+        return [...$parsed, 'errors' => [...$parsed['errors'], ...RecordRules::errors('wellness-leaves', $parsed['data'])]];
     }
 
     /**

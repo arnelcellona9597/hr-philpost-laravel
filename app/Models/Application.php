@@ -6,6 +6,7 @@ use App\Enums\ApplicationStatus;
 use App\Enums\OnboardingRequirement;
 use App\Enums\RequirementsCompletion;
 use App\Enums\RequirementStatus;
+use App\Models\Concerns\Audited;
 use Database\Factories\ApplicationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Application extends Model
 {
     /** @use HasFactory<ApplicationFactory> */
-    use HasFactory;
+    use Audited, HasFactory;
 
     /**
      * Keep the computed requirement summary and the Hired timestamp in step with each save.

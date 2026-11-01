@@ -22,15 +22,18 @@ class RequirementService
      * "Complied" means the employee has a record with a Date Submitted. For IPCR, one period is enough.
      *
      * @param  class-string<ComplianceRecord>  $model
+     * @param  array{branch?: int|null, classification?: string|null}  $filter
      * @return array{active: int, complied: int, missing: int, missingIds: list<int>}
      */
-    public function compliance(string $model, int $year): array
+    public function compliance(string $model, int $year, array $filter = []): array
     {
         $rows = DB::table('employees as e')
             ->leftJoin((new $model)->getTable().' as r', function ($join) use ($year): void {
                 $join->on('r.employee_id', '=', 'e.id')->where('r.year', '=', $year);
             })
             ->where('e.employment_status', EmploymentStatus::Active->value)
+            ->when($filter['branch'] ?? null, fn ($query, int $branch) => $query->where('e.station_id', $branch))
+            ->when($filter['classification'] ?? null, fn ($query, string $classification) => $query->where('e.classification', $classification))
             ->groupBy('e.id')
             ->selectRaw('e.id, MAX(r.date_submitted IS NOT NULL) AS complied')
             ->get();
@@ -45,9 +48,10 @@ class RequirementService
      * On time / Late counts, classified by the same rules as the list badges. IPCR counts per period.
      *
      * @param  class-string<ComplianceRecord>  $model
+     * @param  array{branch?: int|null, classification?: string|null}  $filter
      * @return array{counts: array<string, int>, ids: array<string, list<int>>, deadlines: list<array{period: string|null, deadline: string|null, source: string}>}
      */
-    public function timeliness(string $model, int $year): array
+    public function timeliness(string $model, int $year, array $filter = []): array
     {
         $isIpcr = $model === IpcrRating::class;
         $settings = RequirementDeadlineSetting::current()->toArray();
@@ -57,6 +61,8 @@ class RequirementService
                 $join->on('r.employee_id', '=', 'e.id')->where('r.year', '=', $year);
             })
             ->where('e.employment_status', EmploymentStatus::Active->value)
+            ->when($filter['branch'] ?? null, fn ($query, int $branch) => $query->where('e.station_id', $branch))
+            ->when($filter['classification'] ?? null, fn ($query, string $classification) => $query->where('e.classification', $classification))
             ->select('e.id', 'r.date_submitted')
             ->when($isIpcr, fn ($query) => $query->addSelect('r.rating_period'))
             ->get();

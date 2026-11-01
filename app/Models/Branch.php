@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\Region;
+use App\Models\Concerns\Audited;
 use Database\Factories\BranchFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Branch extends Model
 {
     /** @use HasFactory<BranchFactory> */
-    use HasFactory;
+    use Audited, HasFactory;
 
     /**
      * Get the attributes that should be cast.

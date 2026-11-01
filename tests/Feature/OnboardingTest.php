@@ -152,8 +152,7 @@ it('respects the setting', function () {
 });
 
 it('uses the saved template when there is one', function () {
-    $template = EmailTemplate::factory()->create(['subject' => 'Welcome {{firstName}}', 'body' => '{{requirementsList}}']);
-    $template->forceFill(['key' => 'hired-requirements'])->save();
+    EmailTemplate::query()->where('key', 'hired-requirements')->update(['subject' => 'Welcome {{firstName}}', 'body' => '{{requirementsList}}']);
 
     $this->post('/onboarding', applicantForm(['application_status' => 'Hired', 'email' => 'ana@example.test']));
 

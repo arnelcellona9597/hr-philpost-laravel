@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Audited;
 use App\Models\Concerns\IsSingleton;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 #[Fillable(['annual_allowance', 'year_overrides'])]
 class LeaveSetting extends Model
 {
-    use IsSingleton;
+    use Audited, IsSingleton;
 
     /**
      * Values for the row created on a fresh install.

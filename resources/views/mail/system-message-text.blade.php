@@ -1,1 +1,1 @@
-{!! $bodyText !!}
+{!! $plainText !!}

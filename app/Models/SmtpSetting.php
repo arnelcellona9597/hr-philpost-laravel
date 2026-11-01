@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Audited;
 use App\Models\Concerns\IsSingleton;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -12,7 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 #[Hidden(['password'])]
 class SmtpSetting extends Model
 {
-    use IsSingleton;
+    use Audited, IsSingleton;
 
     /**
      * Values for the row created on a fresh install.

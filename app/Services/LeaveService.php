@@ -25,7 +25,7 @@ use Throwable;
  */
 class LeaveService
 {
-    private const COUNTED = [LeaveStatus::Approved, LeaveStatus::Pending];
+    public const COUNTED = [LeaveStatus::Approved, LeaveStatus::Pending];
 
     public function __construct(protected MessageQueue $queue) {}
 
@@ -104,7 +104,7 @@ class LeaveService
      *
      * @throws UserFacingException when the filing breaks a leave rule
      */
-    public function save(WellnessLeave $leave, array $data, ?User $actor): WellnessLeave
+    public function save(WellnessLeave $leave, array $data, ?User $actor, bool $notify = true): WellnessLeave
     {
         $wasCreated = ! $leave->exists;
         $previousStatus = $leave->status;
@@ -130,6 +130,10 @@ class LeaveService
                 'year' => (int) $leave->inclusive_date_from->format('Y'),
             ])->save();
         });
+
+        if (! $notify) {
+            return $leave;
+        }
 
         if ($wasCreated) {
             $this->notify($leave, 'filed', $actor);
@@ -195,10 +199,7 @@ class LeaveService
      */
     public function usedInYear(Employee $employee, int $year): int
     {
-        return $employee->wellnessLeaves()
-            ->whereIn('status', self::COUNTED)
-            ->get()
-            ->sum(fn (WellnessLeave $leave): int => (int) ($leave->days_by_year[$year] ?? 0));
+        return $employee->wellnessDaysUsedIn($year);
     }
 
     /**
@@ -265,6 +266,7 @@ class LeaveService
 
             $from = $leave->inclusive_date_from->toDateString();
             $to = $leave->inclusive_date_to->toDateString();
+            $year = $leave->inclusive_date_from->year;
 
             $this->queue->queueOne(
                 $this->queue->template($kind === 'filed' ? 'leave-filed' : 'leave-status', [
@@ -277,6 +279,7 @@ class LeaveService
                     'leaveDates' => $from === $to ? HrDate::format($from) : HrDate::format($from).' to '.HrDate::format($to),
                     'leaveDays' => $leave->days,
                     'leaveStatus' => $leave->status->value,
+                    'leaveRemaining' => LeaveSetting::current()->allowanceForYear($year) - $leave->employee->wellnessDaysUsedIn($year),
                 ],
                 'Employee (automatic)',
                 ['collection' => 'wellness-leaves', 'id' => $leave->id],
