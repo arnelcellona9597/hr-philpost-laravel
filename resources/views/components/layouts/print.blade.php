@@ -4,6 +4,7 @@
     $size = match ($paper) {
         'Letter' => 'letter',
         'Legal' => 'legal',
+        'Folio' => '8.5in 13in',
         'Half-Letter' => '5.5in 8.5in',
         default => 'A4',
     };

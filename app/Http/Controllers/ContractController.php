@@ -6,6 +6,7 @@ use App\Enums\ContractStatus;
 use App\Exceptions\UserFacingException;
 use App\Http\Controllers\Concerns\RespondsToForms;
 use App\Models\Contract;
+use App\Models\ContractScope;
 use App\Models\ContractSetting;
 use App\Models\ContractTemplate;
 use App\Models\Employee;
@@ -100,6 +101,7 @@ class ContractController extends Controller
             'termEnd' => $end,
             'issuedDate' => old('issued_date', HrDate::today()),
             'settings' => $settings,
+            'scopes' => ContractScope::query()->where('active', true)->orderBy('name')->get(),
             'ready' => $ready,
             'tooMany' => count($people) > ContractService::MAX_BULK,
             'rows' => array_map(fn (Employee $employee): array => ['employee' => $employee, ...$this->contracts->defaults($employee, $settings, $start, $end), 'checked' => $chosen === null || $employee->id === $chosen->id], array_slice($people, 0, ContractService::MAX_BULK)),
@@ -128,7 +130,11 @@ class ContractController extends Controller
             'wage_order' => $request->input('wage_order'),
             'premium_percent' => $request->input('premium_percent', ContractSetting::current()->premium_percent),
         ];
-        $rows = array_map(fn (array $row): array => [...$shared, ...array_intersect_key($row, array_flip(['employee', 'position', 'office', 'place_of_service', 'address', 'daily_wage']))], array_values(array_filter($grid, fn (mixed $row): bool => is_array($row) && ($row['selected'] ?? false))));
+        $rows = array_map(fn (array $row): array => [
+            ...$shared,
+            ...array_intersect_key($row, array_flip(['employee', 'position', 'office', 'place_of_service', 'address', 'daily_wage'])),
+            'scope' => ($row['scope'] ?? '') ?: $request->input('scope'),
+        ], array_values(array_filter($grid, fn (mixed $row): bool => is_array($row) && ($row['selected'] ?? false))));
 
         try {
             $issued = $this->contracts->issueMany($request->user(), $request->integer('template') ?: null, $rows, (string) $request->input('issued_date'));

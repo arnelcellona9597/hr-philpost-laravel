@@ -23,7 +23,7 @@ use Illuminate\Support\Str;
  */
 class CertificateBlocks
 {
-    public const PAPER_SIZES = ['A4', 'Letter', 'Legal'];
+    public const PAPER_SIZES = ['A4', 'Letter', 'Legal', 'Folio'];
 
     /**
      * The fonts a template can use. Screen, print and Word use the real font where the computer has it.
@@ -48,7 +48,7 @@ class CertificateBlocks
     /**
      * Page sizes in PDF points.
      */
-    public const PAPER_POINTS = ['A4' => [595.28, 841.89], 'Letter' => [612, 792], 'Legal' => [612, 1008]];
+    public const PAPER_POINTS = ['A4' => [595.28, 841.89], 'Letter' => [612, 792], 'Legal' => [612, 1008], 'Folio' => [612, 936]];
 
     public const MARGIN_POINTS = ['narrow' => 50, 'normal' => 72, 'wide' => 96];
 
@@ -492,7 +492,7 @@ class CertificateBlocks
                 'type' => $type,
                 'text' => self::text($block['text'] ?? null),
                 'align' => self::pick($block['align'] ?? null, ['left', 'center', 'right', 'justify'], 'justify'),
-                'size' => self::pick($block['size'] ?? null, ['sm', 'md', 'lg'], 'md'),
+                'size' => self::pick($block['size'] ?? null, ['xs', 'sm', 'md', 'lg'], 'md'),
                 'indent' => self::bool($block['indent'] ?? null),
             ],
             'details' => [

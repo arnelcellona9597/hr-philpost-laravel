@@ -7,6 +7,7 @@ use App\Http\Controllers\BranchController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\CertificateTemplateController;
 use App\Http\Controllers\ContractController;
+use App\Http\Controllers\ContractScopeController;
 use App\Http\Controllers\ContractSettingsController;
 use App\Http\Controllers\ContractTemplateController;
 use App\Http\Controllers\DashboardController;
@@ -303,6 +304,16 @@ Route::middleware(RequireActiveSession::class)->group(function () {
         Route::controller(ContractSettingsController::class)->group(function () {
             Route::get('/settings', 'edit')->name('settings');
             Route::put('/settings', 'update');
+        });
+
+        Route::prefix('scopes')->name('scopes.')->whereNumber('scope')->controller(ContractScopeController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::get('/new', 'create')->name('create');
+            Route::post('/', 'store')->name('store');
+            Route::get('/{scope}', 'edit')->name('edit');
+            Route::put('/{scope}', 'update')->name('update');
+            Route::post('/{scope}/duplicate', 'duplicate')->name('duplicate');
+            Route::delete('/{scope}', 'destroy')->name('destroy');
         });
 
         Route::prefix('templates')->name('templates.')->controller(ContractTemplateController::class)->group(function () {

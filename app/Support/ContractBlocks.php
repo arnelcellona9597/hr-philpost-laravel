@@ -3,20 +3,25 @@
 namespace App\Support;
 
 use App\Enums\Gender;
+use App\Models\ContractScope;
 use App\Models\ContractSetting;
 use App\Models\Employee;
+use App\Services\PayHistoryService;
 
 /**
  * The placeholders a Contract of Service can use, and the values merged into them at the moment of issue.
  * Blocks themselves (validation, merging, rendering) come from {@see CertificateBlocks}.
  *
- * @phpstan-type Terms array{position: string, office: string, place_of_service: string, address: string, term_start: string, term_end: string, daily_wage_centavos: int, second_wage_centavos: int|null, second_wage_from: string|null, wage_order: string|null, premium_percent: int}
+ * @phpstan-type Terms array{position: string, office: string, place_of_service: string, address: string, term_start: string, term_end: string, daily_wage_centavos: int, second_wage_centavos: int|null, second_wage_from: string|null, wage_order: string|null, premium_percent: int, contract_scope_id: int|null}
  */
 class ContractBlocks
 {
+    private const SCOPE_CLAUSE = 6;
+
     private const PERSONAL = [
         'fullName' => ['label' => 'Full name', 'sample' => 'Juan A. Dela Cruz'],
         'fullNameUpper' => ['label' => 'Full name (capitals)', 'sample' => 'JUAN A. DELA CRUZ'],
+        'fullNameTitle' => ['label' => 'Full name (Juan A. Dela Cruz, even if stored in capitals)', 'sample' => 'Juan A. Dela Cruz'],
         'firstName' => ['label' => 'First name', 'sample' => 'Juan'],
         'lastName' => ['label' => 'Last name', 'sample' => 'Dela Cruz'],
         'honorific' => ['label' => 'Mr. / Ms.', 'sample' => 'Mr.'],
@@ -30,7 +35,8 @@ class ContractBlocks
     private const TERMS = [
         'position' => ['label' => 'Position', 'sample' => 'Mail Handler'],
         'office' => ['label' => 'Office / unit', 'sample' => 'Sample Area Office'],
-        'placeOfService' => ['label' => 'Place of service', 'sample' => 'Sample City'],
+        'placeOfService' => ['label' => 'Supervisor (place of service)', 'sample' => 'Postmaster of Sample Post Office'],
+        'scopeOfService' => ['label' => 'Scope of service (numbered list)', 'sample' => "6.1 Attends to the receiving, sorting, and routing of each mail item;\n6.2 Performs other related duties as assigned by the immediate superior."],
         'termStart' => ['label' => 'Term starts', 'sample' => 'July 1, 2026'],
         'termEnd' => ['label' => 'Term ends', 'sample' => 'December 31, 2026'],
         'termYear' => ['label' => 'Year of the term', 'sample' => '2026'],
@@ -39,9 +45,9 @@ class ContractBlocks
         'secondWage' => ['label' => 'Second daily wage (figures)', 'sample' => '₱470.00'],
         'secondWageWords' => ['label' => 'Second daily wage (words)', 'sample' => 'Four Hundred Seventy Pesos'],
         'secondWageFrom' => ['label' => 'Second wage starts', 'sample' => 'October 1, 2026'],
-        'wageOrder' => ['label' => 'Wage order', 'sample' => 'Wage Order No. 1'],
+        'wageOrder' => ['label' => 'Wage order', 'sample' => 'RB XI-24 tranche 2'],
         'premiumPercent' => ['label' => 'Premium (%)', 'sample' => '15'],
-        'remuneration' => ['label' => 'Remuneration sentence (all of the above, composed)', 'sample' => 'Four Hundred Fifty Pesos (₱450.00) per day, with a premium of 15%'],
+        'remuneration' => ['label' => 'Remuneration sentence (all of the above, composed)', 'sample' => 'Five Hundred Twenty Five Pesos (₱ 525.00) from March 13, 2026 to August 31, 2026, effective September 1, 2026, the new minimum wage rate as per Wage Order No. RB XI-24 tranche 2 is Five Hundred Forty Pesos (₱ 540.00) and Fifteen percent (15%) premium'],
     ];
 
     private const ISSUE = [
@@ -88,7 +94,7 @@ class ContractBlocks
      * @param  Terms  $terms
      * @return array<string, string>
      */
-    public static function values(Employee $employee, array $terms, ContractSetting $settings, string $issuedDate, ?string $controlNumber, string $companyName): array
+    public static function values(Employee $employee, array $terms, ContractSetting $settings, string $issuedDate, ?string $controlNumber, string $companyName, ?ContractScope $scope = null): array
     {
         $female = $employee->gender === Gender::Female;
         $fullName = Names::firstLast($employee->last_name, $employee->first_name, $employee->middle_name, $employee->extension);
@@ -97,6 +103,7 @@ class ContractBlocks
         $values = [
             'fullName' => $fullName,
             'fullNameUpper' => mb_strtoupper($fullName),
+            'fullNameTitle' => mb_convert_case($fullName, MB_CASE_TITLE),
             'firstName' => trim((string) $employee->first_name),
             'lastName' => trim((string) $employee->last_name),
             'honorific' => $female ? 'Ms.' : 'Mr.',
@@ -108,6 +115,7 @@ class ContractBlocks
             'position' => $terms['position'],
             'office' => $terms['office'],
             'placeOfService' => $terms['place_of_service'],
+            'scopeOfService' => self::scopeList($scope),
             'termStart' => CertificateBlocks::longDate($terms['term_start']),
             'termEnd' => CertificateBlocks::longDate($terms['term_end']),
             'termYear' => substr($terms['term_start'], 0, 4),
@@ -125,7 +133,7 @@ class ContractBlocks
             'companyName' => $companyName,
         ];
 
-        $values['remuneration'] = self::remuneration($values, $terms, $hasSecond);
+        $values['remuneration'] = self::remuneration($values, $terms, $hasSecond, $employee);
 
         foreach (array_keys(ContractSetting::OFFICIALS) as $key) {
             $name = lcfirst(str_replace(' ', '', ucwords(str_replace('_', ' ', $key))));
@@ -138,25 +146,36 @@ class ContractBlocks
     }
 
     /**
-     * "Four Hundred Fifty Pesos (₱450.00) per day, and … starting …, as provided under …, with a premium of 15%".
+     * The duties as a numbered list under clause 6 of the contract.
+     */
+    private static function scopeList(?ContractScope $scope): string
+    {
+        $number = 1;
+
+        return implode("\n", array_map(function (string $item) use (&$number): string {
+            return self::SCOPE_CLAUSE.'.'.$number++." {$item}";
+        }, $scope?->items ?? []));
+    }
+
+    /**
+     * The office's wage sentence: one rate, or a rate that changes during the term under a wage order.
      *
      * @param  array<string, string>  $values
      * @param  Terms  $terms
      */
-    private static function remuneration(array $values, array $terms, bool $hasSecond): string
+    private static function remuneration(array $values, array $terms, bool $hasSecond, Employee $employee): string
     {
-        $text = "{$values['dailyWageWords']} ({$values['dailyWage']}) per day";
+        $figure = fn (int $centavos): string => '₱ '.number_format($centavos / 100, 2);
+        $text = "{$values['dailyWageWords']} ({$figure($terms['daily_wage_centavos'])})";
 
         if ($hasSecond) {
-            $text .= ", and {$values['secondWageWords']} ({$values['secondWage']}) per day starting {$values['secondWageFrom']}";
-        }
-
-        if (trim((string) $terms['wage_order']) !== '') {
-            $text .= ", as provided under {$terms['wage_order']}";
+            $from = app(PayHistoryService::class)->rateOn($employee, $terms['term_start'])?->effective_on?->toDateString() ?? $terms['term_start'];
+            $order = trim((string) $terms['wage_order']) === '' ? 'the new rate' : "the new minimum wage rate as per Wage Order No. {$terms['wage_order']}";
+            $text .= ' from '.CertificateBlocks::longDate($from).' to '.CertificateBlocks::longDate(HrDate::addDays($terms['second_wage_from'], -1)).", effective {$values['secondWageFrom']}, {$order} is {$values['secondWageWords']} ({$figure($terms['second_wage_centavos'])})";
         }
 
         if ($terms['premium_percent'] > 0) {
-            $text .= ", with a premium of {$terms['premium_percent']}%";
+            $text .= ' and '.ucfirst(mb_strtolower(Money::numberInWords($terms['premium_percent'])))." percent ({$terms['premium_percent']}%) premium";
         }
 
         return $text;
