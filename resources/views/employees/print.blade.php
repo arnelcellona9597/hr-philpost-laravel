@@ -9,17 +9,8 @@
 
 <x-layouts.print :title="'Employee profile — '.$employee->full_name" paper="A4" :back="route('employees.show', $employee)">
     <article class="sheet mx-auto max-w-[8.27in] bg-white p-6 text-[12px] leading-snug text-[#111418]">
-        <header class="text-center">
-            @if ($site->logo_id)
-                <img src="{{ route('files.show', $site->logo_id, false) }}" alt="" class="mx-auto mb-1 max-h-14" />
-            @endif
-            <p>Republic of the Philippines</p>
-            <p class="text-sm font-bold">{{ mb_strtoupper($site->company_name) }}</p>
-            @if ($site->tagline)
-                <p>{{ $site->tagline }}</p>
-            @endif
-            <h1 class="mt-4 text-lg font-bold">EMPLOYEE PROFILE</h1>
-        </header>
+        <x-letterhead :site="$site" />
+        <h1 class="mt-3 text-center text-lg font-bold">EMPLOYEE PROFILE</h1>
 
         <section class="mt-4 flex items-center gap-4 border-y border-[#999] py-3">
             @if ($employee->profile_picture_id)

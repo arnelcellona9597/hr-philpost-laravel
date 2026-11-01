@@ -87,7 +87,28 @@ class SiteSettingsController extends Controller
             return $this->refused($exception->getMessage());
         }
 
+        $previousLetterheadLogo = $settings->letterheadLogo;
+        $letterheadFile = $request->file('letterhead_logo');
+        $letterheadLogoId = $settings->letterhead_logo_id;
+
+        try {
+            if ($letterheadFile instanceof UploadedFile) {
+                $letterheadLogo = $media->store($letterheadFile, "{$name} letterhead logo", MediaStore::IMAGE_TYPES, self::LOGO_MAX_BYTES);
+                $letterheadLogo->forceFill(['is_public' => true])->save();
+                $letterheadLogoId = $letterheadLogo->id;
+            } elseif ($request->boolean('remove_letterhead_logo')) {
+                $letterheadLogoId = null;
+            }
+        } catch (UserFacingException $exception) {
+            return $this->refused($exception->getMessage());
+        }
+
         $settings->forceFill([
+            'letterhead_top' => mb_substr(trim((string) $request->input('letterhead_top')), 0, 160) ?: null,
+            'letterhead_name' => mb_substr(trim((string) $request->input('letterhead_name')), 0, 400) ?: null,
+            'letterhead_details' => mb_substr(trim((string) $request->input('letterhead_details')), 0, 600) ?: null,
+            'letterhead_section' => mb_substr(trim((string) $request->input('letterhead_section')), 0, 160) ?: null,
+            'letterhead_logo_id' => $letterheadLogoId,
             'company_name' => mb_substr($name, 0, 120),
             'tagline' => mb_substr(trim((string) $request->input('tagline')), 0, 160) ?: null,
             'default_theme' => ThemeMode::tryFrom((string) $request->input('default_theme')) ?? ThemeMode::System,
@@ -97,6 +118,10 @@ class SiteSettingsController extends Controller
 
         if ($previousLogo instanceof Media && $previousLogo->id !== $logoId) {
             $media->delete($previousLogo);
+        }
+
+        if ($previousLetterheadLogo instanceof Media && $previousLetterheadLogo->id !== $letterheadLogoId) {
+            $media->delete($previousLetterheadLogo);
         }
 
         return $this->flash(redirect()->route('settings.site'), 'Branding saved. The new look applies to everyone right away.');
