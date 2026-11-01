@@ -21,11 +21,14 @@ use App\Models\Payslip;
 use App\Models\PayslipSetting;
 use App\Models\PdsSubmission;
 use App\Models\ReceivedMail;
+use App\Models\Remittance;
+use App\Models\RemittanceSetting;
 use App\Models\RequirementDeadlineSetting;
 use App\Models\SiteSetting;
 use App\Models\SmtpSetting;
 use App\Models\SwornDeclaration;
 use App\Models\User;
+use App\Models\VoucherSetting;
 use App\Models\WellnessLeave;
 use BackedEnum;
 use Closure;
@@ -53,6 +56,7 @@ class AuditTrail
         IpcrRating::class => ['ipcr-ratings', 'full_name'],
         Holiday::class => ['holidays', 'name'],
         ReceivedMail::class => ['received-mails', 'tracking_number'],
+        Remittance::class => ['remittances', 'label'],
         User::class => ['users', 'name'],
         Certificate::class => ['certificates', 'control_number'],
         CertificateTemplate::class => ['certificate-templates', 'name'],
@@ -63,6 +67,8 @@ class AuditTrail
         LeaveSetting::class => ['leave-settings', null],
         NotificationSetting::class => ['notification-settings', null],
         PayslipSetting::class => ['payslip-settings', null],
+        RemittanceSetting::class => ['remittance-settings', 'title'],
+        VoucherSetting::class => ['voucher-settings', null],
         SmtpSetting::class => ['smtp-settings', null],
         RequirementDeadlineSetting::class => ['requirement-deadlines', null],
     ];

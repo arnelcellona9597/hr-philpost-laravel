@@ -27,6 +27,9 @@ use App\Http\Controllers\PayslipSettingsController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReceivedMailController;
 use App\Http\Controllers\ReceivedMailImportController;
+use App\Http\Controllers\RemittanceController;
+use App\Http\Controllers\RemittanceImportController;
+use App\Http\Controllers\RemittanceSettingsController;
 use App\Http\Controllers\RequirementController;
 use App\Http\Controllers\RequirementDeadlineController;
 use App\Http\Controllers\SetPasswordController;
@@ -264,6 +267,35 @@ Route::middleware(RequireActiveSession::class)->group(function () {
         Route::controller(ReceivedMailImportController::class)->group(function () {
             Route::post('/import', 'preview')->name('import');
             Route::post('/import/commit', 'commit')->name('import.commit');
+        });
+    });
+
+    Route::prefix('remittances')->name('remittances.')->group(function () {
+        Route::controller(RemittanceSettingsController::class)->group(function () {
+            Route::get('/settings', 'edit')->name('settings');
+            Route::put('/settings/voucher', 'updateVoucher')->name('settings.voucher');
+            Route::put('/settings/{kind}', 'update')->name('settings.update');
+        });
+
+        Route::controller(RemittanceImportController::class)->group(function () {
+            Route::post('/import', 'preview')->name('import');
+            Route::post('/import/commit', 'commit')->name('import.commit');
+        });
+
+        Route::controller(RemittanceController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('/', 'store')->name('store');
+            Route::get('/{remittance}', 'show')->name('show')->whereNumber('remittance');
+            Route::put('/{remittance}', 'update')->name('update')->whereNumber('remittance');
+            Route::delete('/{remittance}', 'destroy')->name('destroy')->whereNumber('remittance');
+            Route::post('/{remittance}/missing', 'addMissing')->name('missing')->whereNumber('remittance');
+            Route::put('/{remittance}/voucher-details', 'voucherDetails')->name('voucher-details')->whereNumber('remittance');
+            Route::post('/{remittance}/finalize', 'finalize')->name('finalize')->whereNumber('remittance');
+            Route::post('/{remittance}/reopen', 'reopen')->name('reopen')->whereNumber('remittance');
+            Route::get('/{remittance}/export', 'export')->name('export')->whereNumber('remittance');
+            Route::get('/{remittance}/print', 'print')->name('print')->whereNumber('remittance');
+            Route::get('/{remittance}/voucher', 'voucher')->name('voucher')->whereNumber('remittance');
+            Route::get('/{remittance}/voucher.pdf', 'voucherPdf')->name('voucher.pdf')->whereNumber('remittance');
         });
     });
 

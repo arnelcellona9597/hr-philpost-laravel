@@ -41,6 +41,7 @@ class Navigation
                     ['href' => '/payroll', 'label' => 'Payroll', 'icon' => 'wallet'],
                     ['href' => '/messages', 'label' => 'Messages', 'icon' => 'mail'],
                     ['href' => '/received-mails', 'label' => 'Received Mails', 'icon' => 'inbox'],
+                    ['href' => '/remittances', 'label' => 'Remittances', 'icon' => 'landmark'],
                     ['href' => '/data', 'label' => 'Import / Export', 'icon' => 'sheet'],
                 ],
             ],

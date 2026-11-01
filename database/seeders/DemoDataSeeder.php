@@ -9,6 +9,7 @@ use App\Enums\LeaveStatus;
 use App\Enums\MessageStatus;
 use App\Enums\OnboardingRequirement;
 use App\Enums\PayrollStatus;
+use App\Enums\RemittanceKind;
 use App\Enums\Role;
 use App\Enums\UserStatus;
 use App\Exceptions\UserFacingException;
@@ -35,6 +36,7 @@ use App\Models\WellnessLeave;
 use App\Services\CertificateService;
 use App\Services\LeaveService;
 use App\Services\PayrollService;
+use App\Services\RemittanceService;
 use App\Support\AuditTrail;
 use App\Support\GovId;
 use App\Support\HrDate;
@@ -151,6 +153,7 @@ class DemoDataSeeder extends Seeder
             $this->activity($staff[0], $active, $released);
             $this->importHistory($staff[0]);
             $this->receivedMails($branches, $staff[0]);
+            $this->remittances($staff[0]);
         }));
 
         $this->command?->info("Added {$this->employeeCount} demo employees and their records.");
@@ -649,6 +652,26 @@ class DemoDataSeeder extends Seeder
                 'created_at' => now()->subHours($hoursAgo),
                 'updated_at' => now()->subHours($hoursAgo),
             ])->save();
+        }
+    }
+
+    /**
+     * Three months of SSS, Pag-IBIG and CMPEAI remittances for the COS workers, the latest one still open.
+     */
+    private function remittances(User $staff): void
+    {
+        $service = app(RemittanceService::class);
+        [$year, $month] = [(int) substr($this->today, 0, 4), (int) substr($this->today, 5, 2)];
+
+        foreach (RemittanceKind::cases() as $kind) {
+            for ($back = 2; $back >= 0; $back--) {
+                $target = $month - $back;
+                $remittance = $service->generate($kind, $target < 1 ? $year - 1 : $year, $target < 1 ? $target + 12 : $target, $staff)['remittance'];
+
+                if ($back > 0) {
+                    $service->finalize($remittance);
+                }
+            }
         }
     }
 

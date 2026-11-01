@@ -25,3 +25,6 @@ if (document.getElementById('branding-form')) {
 if (document.getElementById('mail-rows')) {
     import('./received-mails');
 }
+if (document.getElementById('remittance-grid')) {
+    import('./remittance-grid');
+}

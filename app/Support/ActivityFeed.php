@@ -30,6 +30,7 @@ class ActivityFeed
         'certificate-templates' => ['certificate template', '/certificates/templates/{id}'],
         'holidays' => ['holiday', '/leave/settings'],
         'received-mails' => ['received mail', '/received-mails/{id}/edit'],
+        'remittances' => ['remittance', '/remittances/{id}'],
         'users' => ['HR account', '/users'],
         'site-settings' => ['branding settings', '/settings'],
         'leave-settings' => ['leave settings', '/leave/settings'],
@@ -37,6 +38,8 @@ class ActivityFeed
         'notification-settings' => ['email settings', '/settings/notifications'],
         'smtp-settings' => ['email server settings', '/settings/email-server'],
         'payslip-settings' => ['payslip template', '/payroll/settings'],
+        'remittance-settings' => ['remittance template', '/remittances/settings'],
+        'voucher-settings' => ['voucher settings', '/remittances/settings'],
         'import' => ['Excel import', '/data'],
     ];
 

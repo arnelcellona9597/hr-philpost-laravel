@@ -6,6 +6,7 @@ use App\Models\Certificate;
 use App\Models\Media;
 use App\Models\Payslip;
 use App\Models\PayslipSetting;
+use App\Models\Remittance;
 use App\Models\SiteSetting;
 use App\Support\CertificateBlocks;
 use App\Support\CertificateRenderer;
@@ -65,6 +66,21 @@ class PdfRenderer
     public function payslipFilename(Payslip $payslip): string
     {
         return $this->safeName("payslip-{$payslip->period->code}-".($payslip->employee_code ?: $payslip->id)).'.pdf';
+    }
+
+    /**
+     * The disbursement voucher for a remittance. `$data` is the same set of values the voucher page uses.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function voucher(array $data): string
+    {
+        return $this->render('pdf.voucher', [...$data, 'logo' => $this->logo($data['site']->logo_id, 70, 60)], [595.28, 841.89]);
+    }
+
+    public function voucherFilename(Remittance $remittance): string
+    {
+        return $this->safeName("voucher-{$remittance->kind->value}-{$remittance->year}-".sprintf('%02d', $remittance->month)).'.pdf';
     }
 
     /**
