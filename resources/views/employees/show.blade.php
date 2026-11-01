@@ -219,7 +219,7 @@
 
             <section class="card overflow-hidden" id="pay-history" aria-labelledby="pay-title">
                 <header class="p-4">
-                    <h2 id="pay-title" class="text-sm font-semibold">Pay history</h2>
+                    <h2 id="pay-title" class="text-sm font-semibold">Compensation History</h2>
                     @if ($pay['current'])
                         <p class="text-lg font-semibold tabular">{{ Money::format($pay['current']->total_centavos) }} <span class="text-xs font-normal text-muted">{{ $pay['current']->rate_type === RateType::Daily ? 'a day' : 'a month' }}</span></p>
                         <p class="text-xs text-muted tabular">Basic {{ Money::format($pay['current']->amount_centavos) }} + {{ $pay['current']->premium_label }} premium</p>
@@ -232,7 +232,7 @@
                     <p class="mx-4 mb-3 rounded-lg bg-warning-soft px-3 py-2 text-xs text-warning" role="status">⚠ This rate is below the regional minimum.</p>
                 @endif
                 @if ($pay['rows'] === [])
-                    <p class="px-4 pb-4 text-sm text-muted">No pay records yet.</p>
+                    <p class="px-4 pb-4 text-sm text-muted">No compensation records yet.</p>
                 @else
                     <ol class="divide-y divide-line border-t border-line">
                         @foreach (array_reverse($pay['rows']) as $row)
@@ -251,10 +251,10 @@
                                         <p class="text-xs text-fg-2">{{ $change->remarks }}</p>
                                     @endif
                                 </div>
-                                <form method="post" action="{{ route('pay.destroy', [$employee, $change]) }}" data-confirm="Delete this pay record?">
+                                <form method="post" action="{{ route('pay.destroy', [$employee, $change]) }}" data-confirm="Delete this compensation record?">
                                     @csrf
                                     @method('DELETE')
-                                    <button class="btn-ghost btn-sm" aria-label="Delete this pay record"><x-icon name="trash" class="size-3.5" /></button>
+                                    <button class="btn-ghost btn-sm" aria-label="Delete this compensation record"><x-icon name="trash" class="size-3.5" /></button>
                                 </form>
                             </li>
                         @endforeach
@@ -285,7 +285,7 @@
                         </div>
                         <div class="sm:col-span-2"><label class="label" for="pay-ref">Reference</label><input class="input" id="pay-ref" name="reference" maxlength="120" placeholder="Memo or wage order number" /></div>
                         <div class="sm:col-span-2"><label class="label" for="pay-remarks">Remarks</label><input class="input" id="pay-remarks" name="remarks" maxlength="1000" /></div>
-                        <div class="sm:col-span-2"><button class="btn-primary btn-sm">Add pay record</button></div>
+                        <div class="sm:col-span-2"><button class="btn-primary btn-sm">Add compensation record</button></div>
                     </form>
                 </details>
             </section>

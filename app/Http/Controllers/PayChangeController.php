@@ -37,7 +37,7 @@ class PayChangeController extends Controller
             return $this->back($employee, "The rate {$exception->getMessage()}.", 'error');
         }
 
-        return $this->back($employee, 'The pay record was added.');
+        return $this->back($employee, 'The compensation record was added.');
     }
 
     public function destroy(Employee $employee, PayChange $change): RedirectResponse
@@ -47,7 +47,7 @@ class PayChangeController extends Controller
 
         $change->delete();
 
-        return $this->back($employee, 'The pay record was deleted.');
+        return $this->back($employee, 'The compensation record was deleted.');
     }
 
     private function back(Employee $employee, string $message, string $type = 'success'): RedirectResponse
