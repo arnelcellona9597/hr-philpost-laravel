@@ -11,6 +11,7 @@ use App\Http\Controllers\ContractSettingsController;
 use App\Http\Controllers\ContractTemplateController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DataController;
+use App\Http\Controllers\DuplicateController;
 use App\Http\Controllers\EmailServerController;
 use App\Http\Controllers\EmailSettingsController;
 use App\Http\Controllers\EmailTemplateController;
@@ -339,6 +340,9 @@ Route::middleware(RequireActiveSession::class)->group(function () {
         Route::post('/import', 'preview')->name('import');
         Route::post('/import/commit', 'commit')->name('import.commit');
     });
+
+    Route::get('/data/duplicates', [DuplicateController::class, 'index'])->name('data.duplicates');
+    Route::post('/data/duplicates', [DuplicateController::class, 'destroy'])->name('data.duplicates.destroy');
 
     Route::get('/audit', [AuditLogController::class, 'index'])->name('audit.index');
 

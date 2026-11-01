@@ -1,4 +1,5 @@
 <x-layouts.app title="Import / Export" heading="Import and export" description="Move HR data in and out as Excel workbooks. Every import is checked row by row and saved all-or-nothing.">
+    <a class="mb-4 flex items-center gap-2 rounded-lg bg-surface-2 px-4 py-3 text-sm hover:underline" href="{{ route('data.duplicates') }}"><x-icon name="copy" class="size-4" /> Check for duplicate employees and applicants</a>
     <div class="grid gap-6 xl:grid-cols-2">
         <section class="card p-5">
             <h2 class="font-semibold">Export to Excel</h2>

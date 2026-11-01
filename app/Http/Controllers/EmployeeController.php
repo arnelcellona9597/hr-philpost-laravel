@@ -14,6 +14,7 @@ use App\Models\LeaveSetting;
 use App\Models\Media;
 use App\Models\RequirementDeadlineSetting;
 use App\Services\ApplicationService;
+use App\Services\DuplicateFinder;
 use App\Services\EmploymentHistoryService;
 use App\Services\LeaveService;
 use App\Services\MediaStore;
@@ -103,7 +104,9 @@ class EmployeeController extends Controller
             ? $applications->convert($application, $data, $request->user())
             : Employee::query()->create($data);
 
-        return $this->flash(redirect()->route('employees.show', $employee), "Employee {$employee->full_name} was added.");
+        $similar = count(app(DuplicateFinder::class)->similarTo($employee));
+
+        return $this->flash(redirect()->route('employees.show', $employee), "Employee {$employee->full_name} was added.".($similar > 0 ? ' Someone with the same name and birth date, email or ID number already exists; check Import / Export → duplicates.' : ''));
     }
 
     public function show(Employee $employee, LeaveService $leave, EmploymentHistoryService $history, Request $request): View

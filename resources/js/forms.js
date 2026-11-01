@@ -9,6 +9,40 @@ document.querySelectorAll('form[data-dirty-guard]').forEach((form) => {
   })
 })
 
+// A second click on a save button must not send the form twice. After the first submit the form ignores
+// further submits and its buttons look busy; they come back if the person returns to the page or, for
+// downloads that keep the page open, after a few seconds.
+document.querySelectorAll('form').forEach((form) => {
+  if ((form.method || 'get').toLowerCase() !== 'post') return
+  const release = () => {
+    delete form.dataset.submitting
+    form.querySelectorAll('button:not([type=button]), input[type=submit]').forEach((button) => {
+      button.removeAttribute('aria-busy')
+      button.classList.remove('pointer-events-none', 'opacity-60')
+    })
+  }
+  form.addEventListener('submit', (event) => {
+    if (event.defaultPrevented) return
+    if (form.dataset.submitting) {
+      event.preventDefault()
+      return
+    }
+    // Later handlers (a confirmation prompt) may still cancel this submit, so look again once they have run.
+    setTimeout(() => {
+      if (event.defaultPrevented) return
+      form.dataset.submitting = '1'
+      form.querySelectorAll('button:not([type=button]), input[type=submit]').forEach((button) => {
+        button.setAttribute('aria-busy', 'true')
+        button.classList.add('pointer-events-none', 'opacity-60')
+      })
+      setTimeout(release, 8000)
+    }, 0)
+  })
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) release()
+  })
+})
+
 // Confirmation prompts for destructive actions.
 document.querySelectorAll('form[data-confirm]').forEach((form) => {
   form.addEventListener('submit', (e) => {
