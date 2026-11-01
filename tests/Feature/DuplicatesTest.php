@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Application;
+use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\User;
 use App\Models\WellnessLeave;
@@ -76,13 +77,12 @@ it('deletes duplicate applications', function () {
     expect(Application::query()->count())->toBe(1)->and(Application::query()->first()->id)->toBe($first->id);
 });
 
-it('warns when a newly added record looks like an existing one', function () {
+it('warns when a newly added employee looks like an existing one', function () {
+    $branch = Branch::factory()->create();
     Employee::factory()->create(['last_name' => 'Reyes', 'first_name' => 'Ana', 'date_of_birth' => '1992-02-02']);
-    $existing = Application::factory()->create(['applicant_name' => 'Ana Reyes', 'position_applied' => 'Clerk', 'date_applied' => '2026-06-01']);
+    $employee = Employee::factory()->make(['last_name' => 'Reyes', 'first_name' => 'Ana', 'date_of_birth' => '1992-02-02']);
 
-    $this->post('/onboarding', ['applicant_name' => 'Ana Reyes', 'position_applied' => 'Clerk', 'date_applied' => '2026-06-01', 'application_status' => 'Pending'])
-        ->assertSessionHas('flash', fn (array $flash): bool => str_contains($flash['message'], 'looks like 1 other application'));
-    expect($existing->id)->toBeGreaterThan(0);
+    expect(app(DuplicateFinder::class)->similarTo(Employee::query()->create($employee->toArray() + ['station_id' => $branch->id])))->toHaveCount(1);
 });
 
 it('ignores a second send of the same new-application form', function () {

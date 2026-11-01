@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Application;
 use App\Models\Employee;
 use App\Models\EmploymentPeriod;
 use App\Services\EmploymentHistoryService;
@@ -53,6 +54,26 @@ class RecordRules
     }
 
     /**
+     * An applicant is listed once: the message when another application already has this name, ignoring
+     * capitals and extra spaces.
+     */
+    public static function duplicateApplicant(?string $name, ?int $exceptId = null): ?string
+    {
+        $clean = mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', (string) $name)));
+
+        if ($clean === '') {
+            return null;
+        }
+
+        $existing = Application::query()
+            ->whereRaw('LOWER(TRIM(applicant_name)) = ?', [$clean])
+            ->when($exceptId, fn ($query) => $query->whereKeyNot($exceptId))
+            ->first(['id', 'applicant_name', 'application_id']);
+
+        return $existing === null ? null : "An applicant named {$existing->applicant_name} is already listed ({$existing->application_id}). Open that application instead of adding a second one.";
+    }
+
+    /**
      * The same rules for a model holding new values alongside its saved ones.
      *
      * @return array<string, string>
@@ -68,6 +89,10 @@ class RecordRules
         }
 
         $errors = self::errors($module, $values);
+
+        if ($module === 'applications' && $model instanceof Application && ($message = self::duplicateApplicant($model->applicant_name, $model->exists ? $model->getKey() : null)) !== null) {
+            $errors['applicant_name'] = $message;
+        }
 
         return [...$errors, ...self::historyErrors($module, $model)];
     }

@@ -239,7 +239,9 @@ class ApplicationController extends Controller
     {
         $parsed = RecordForm::parse($request, $fields, 'applications', ['application_id' => 'That Application ID is already used.'], $application);
 
-        return [...$parsed, 'errors' => [...$parsed['errors'], ...RecordRules::errors('applications', $parsed['data'])]];
+        $duplicate = RecordRules::duplicateApplicant((string) ($parsed['data']['applicant_name'] ?? ''), $application?->id);
+
+        return [...$parsed, 'errors' => [...$parsed['errors'], ...RecordRules::errors('applications', $parsed['data']), ...($duplicate === null ? [] : ['applicant_name' => $duplicate])]];
     }
 
     /**
