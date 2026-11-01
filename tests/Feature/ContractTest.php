@@ -435,5 +435,14 @@ it('prints on 8.5 by 13 paper with the footer in columns on every page', functio
 
     $body = CertificateRenderer::html($contract->content['blocks'], ['companyName' => 'x', 'font' => 'arial', 'pdf' => true]);
 
-    expect(strpos($body, 'cert-pagefooter'))->toBeLessThan(strpos($body, 'CONTRACT OF SERVICE'));
+    expect(strpos($body, 'cert-pagefooter'))->toBeLessThan(strpos($body, 'class="cert'.'"'))
+        ->and(strpos($body, 'cert-pagefooter'))->toBeLessThan(strpos($body, 'CONTRACT OF SERVICE'));
+});
+
+it('shows the page footer at the end of the contract on screen', function () {
+    $employee = cosEmployee();
+    $contract = app(ContractService::class)->issue($this->hr, $this->template->id, $employee->id, contractRow($employee), '2026-06-20');
+    $html = $this->get("/contracts/{$contract->id}")->assertOk()->getContent();
+
+    expect(strpos($html, 'cert-pagefooter'))->toBeGreaterThan(strpos($html, 'A C K N O W L E D G E M E N T'));
 });
