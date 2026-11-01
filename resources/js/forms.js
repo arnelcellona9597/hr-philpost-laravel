@@ -1,4 +1,9 @@
 // Form behaviour shared across pages.
+// Browsers let a date field take a six-digit year unless it has a maximum.
+document.querySelectorAll('input[type=date]:not([max])').forEach((input) => {
+  input.max = '9999-12-31'
+})
+
 // Warn before leaving a form with unsaved changes.
 document.querySelectorAll('form[data-dirty-guard]').forEach((form) => {
   let dirty = false
@@ -287,7 +292,8 @@ document.querySelectorAll('form[data-autosubmit]').forEach((form) => {
   if (!dates.length || !period) return
   period.addEventListener('change', () => dates.forEach((input) => { input.value = '' }), { capture: true })
   dates.forEach((input) => input.addEventListener('change', () => {
-    if (dates.every((date) => date.value)) form.requestSubmit()
+    // A date is already valid after the first digit of its year, so wait until a real one is typed.
+    if (dates.every((date) => date.value >= '1900-01-01')) form.requestSubmit()
   }))
 })
 
