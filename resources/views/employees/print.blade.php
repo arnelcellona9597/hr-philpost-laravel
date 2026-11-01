@@ -33,7 +33,7 @@
                     @foreach ($sectionFields as $field)
                         <div @class(['break-inside-avoid', 'col-span-3' => $field['kind'] === 'textarea' || Str::contains($field['name'], 'address')])>
                             <dt class="text-[10px] text-[#555]">{{ $field['label'] }}</dt>
-                            <dd @class(['font-mono' => $field['kind'] === 'govId'])>{{ $employee->fieldText($field) }}</dd>
+                            <dd @class(['font-mono' => $field['kind'] === 'govId' || $field['name'] === 'bank_account_number'])>{{ $employee->fieldText($field) }}</dd>
                         </div>
                     @endforeach
                 </dl>
