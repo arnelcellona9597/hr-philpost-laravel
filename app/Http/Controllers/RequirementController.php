@@ -274,18 +274,22 @@ class RequirementController extends Controller
     }
 
     /**
+     * The fields of the form. Name, station, job title and TIN come from the chosen employee, so they
+     * are not asked for again; Excel can still set them.
+     *
      * @return list<array<string, mixed>>
      */
     private function fields(string $type, int $year, ?string $period = null): array
     {
         $module = $this->module($type);
         $help = $this->deadlineHelp($module['slug'], $year, $period);
+        $asked = array_values(array_filter($module['fields'], fn (array $field): bool => ! ($field['fromEmployee'] ?? false)));
 
         return array_map(fn (array $field): array => match ($field['name']) {
             'employee' => ['label' => 'Employee'] + $field,
             'date_submitted' => ['help' => $help] + $field,
             default => $field,
-        }, $module['fields']);
+        }, $asked);
     }
 
     /**
