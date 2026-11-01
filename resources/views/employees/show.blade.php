@@ -282,6 +282,30 @@
             </section>
 
             <section class="card overflow-hidden">
+                <header class="flex items-center justify-between p-4">
+                    <h2 class="text-sm font-semibold">Contracts of service</h2>
+                    <a href="{{ route('contracts.create', ['employee' => $employee->id]) }}" class="text-xs text-primary-ink hover:underline">Issue contract</a>
+                </header>
+                @if ($contracts->isEmpty())
+                    <p class="px-4 pb-4 text-sm text-muted">None issued yet.</p>
+                @else
+                    <ul class="divide-y divide-line border-t border-line">
+                        @foreach ($contracts as $contract)
+                            <li>
+                                <a href="{{ route('contracts.show', $contract) }}" class="flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-surface-2">
+                                    <span class="min-w-0">
+                                        <span class="block font-medium tabular">{{ $contract->control_number }}</span>
+                                        <span class="block truncate text-xs text-muted">{{ HrDate::format($contract->term_start) }} – {{ HrDate::format($contract->term_end) }}</span>
+                                    </span>
+                                    <span class="{{ $contract->isVoid() ? 'badge-danger' : 'badge-success' }}">{{ $contract->status->value }}</span>
+                                </a>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+            </section>
+
+            <section class="card overflow-hidden">
                 <header class="p-4"><h2 class="text-sm font-semibold">Annual requirements</h2></header>
                 @if ($requirementYears->isEmpty())
                     <p class="px-4 pb-4 text-sm text-muted">No records yet.</p>

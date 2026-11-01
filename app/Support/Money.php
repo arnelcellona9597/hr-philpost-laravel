@@ -72,6 +72,17 @@ class Money
         return self::spell($pesos).' '.($pesos === 1 ? 'Peso' : 'Pesos')." and {$cents}/100 Only";
     }
 
+    /**
+     * 45000 becomes "Four Hundred Fifty Pesos"; centavos are added only when there are some.
+     */
+    public static function pesosInWords(int $centavos): string
+    {
+        $pesos = intdiv(abs($centavos), 100);
+        $cents = abs($centavos) % 100;
+
+        return self::spell($pesos).' '.($pesos === 1 ? 'Peso' : 'Pesos').($cents > 0 ? " and {$cents}/100" : '');
+    }
+
     private static function spell(int $number): string
     {
         if ($number === 0) {

@@ -73,6 +73,10 @@ function renderBlock(block, options) {
       return '<hr class="cert-hr">'
     case 'footer':
       return `<p class="cert-footer cert-${block.align}">${inline(block.text, options)}</p>`
+    case 'pageBreak':
+      return '<div class="cert-pagebreak"></div>'
+    case 'pageFooter':
+      return `<div class="cert-pagefooter cert-${block.align}">${inline(block.text, options) || '&nbsp;'}</div>`
     default:
       return ''
   }
@@ -176,6 +180,13 @@ function renderInspector() {
       html += field('Text', area('text', block.text, 3))
       html += field('Alignment', select('align', block.align, ALIGN3))
       break
+    case 'pageFooter':
+      html += field('Text', area('text', block.text, 2), 'Printed at the bottom of every page. Placeholders work here too.')
+      html += field('Alignment', select('align', block.align, ALIGN3))
+      break
+    case 'pageBreak':
+      html += '<p class="text-sm text-muted">The next block starts on a new page.</p>'
+      break
     case 'spacer':
       html += field('Height', select('size', block.size, [['sm', 'Small'], ['md', 'Medium'], ['lg', 'Large'], ['xl', 'Extra large']]))
       break
@@ -199,7 +210,7 @@ function renderInspector() {
           ${block.signers.length > 1 ? `<button type="button" class="btn-ghost btn-sm text-danger" data-remove-signer="${index}">Remove</button>` : ''}
         </fieldset>`
       })
-      if (block.signers.length < 3) html += '<button type="button" class="btn-secondary btn-sm" data-add-signer>Add signatory</button>'
+      if (block.signers.length < 4) html += '<button type="button" class="btn-secondary btn-sm" data-add-signer>Add signatory</button>'
       break
   }
   inspector.innerHTML = html

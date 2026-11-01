@@ -6,6 +6,9 @@ use App\Http\Controllers\AuthenticatedSessionController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\CertificateTemplateController;
+use App\Http\Controllers\ContractController;
+use App\Http\Controllers\ContractSettingsController;
+use App\Http\Controllers\ContractTemplateController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DataController;
 use App\Http\Controllers\EmailServerController;
@@ -267,6 +270,36 @@ Route::middleware(RequireActiveSession::class)->group(function () {
         Route::controller(ReceivedMailImportController::class)->group(function () {
             Route::post('/import', 'preview')->name('import');
             Route::post('/import/commit', 'commit')->name('import.commit');
+        });
+    });
+
+    Route::prefix('contracts')->name('contracts.')->group(function () {
+        Route::controller(ContractSettingsController::class)->group(function () {
+            Route::get('/settings', 'edit')->name('settings');
+            Route::put('/settings', 'update');
+        });
+
+        Route::prefix('templates')->name('templates.')->controller(ContractTemplateController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('/', 'store')->name('store');
+            Route::get('/{template}', 'edit')->name('edit')->whereNumber('template');
+            Route::put('/{template}', 'update')->name('update')->whereNumber('template');
+            Route::post('/{template}/duplicate', 'duplicate')->name('duplicate')->whereNumber('template');
+            Route::post('/{template}/toggle', 'toggle')->name('toggle')->whereNumber('template');
+            Route::delete('/{template}', 'destroy')->name('destroy')->whereNumber('template');
+        });
+
+        Route::controller(ContractController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::get('/new', 'create')->name('create');
+            Route::post('/', 'store')->name('store');
+            Route::post('/download', 'download')->name('download');
+            Route::get('/{contract}', 'show')->name('show')->whereNumber('contract');
+            Route::get('/{contract}/print', 'print')->name('print')->whereNumber('contract');
+            Route::get('/{contract}/pdf', 'pdf')->name('pdf')->whereNumber('contract');
+            Route::get('/{contract}/docx', 'docx')->name('docx')->whereNumber('contract');
+            Route::post('/{contract}/void', 'void')->name('void')->whereNumber('contract');
+            Route::delete('/{contract}', 'destroy')->name('destroy')->whereNumber('contract');
         });
     });
 

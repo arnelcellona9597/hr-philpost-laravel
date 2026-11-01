@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Certificate;
+use App\Models\Contract;
 use App\Models\Media;
 use App\Models\Payslip;
 use App\Models\PayslipSetting;
@@ -40,6 +41,32 @@ class PdfRenderer
             'void' => $certificate->isVoid(),
             'sans' => $content['font'] === 'sans',
         ], $paper);
+    }
+
+    public function contract(Contract $contract): string
+    {
+        $content = $contract->content;
+        $logo = $this->logo($content['logoId'] ?? null, 120, 56);
+        $paper = CertificateBlocks::PAPER_POINTS[$content['paperSize']] ?? CertificateBlocks::PAPER_POINTS['A4'];
+
+        return $this->render('pdf.certificate', [
+            'title' => "{$contract->control_number} — {$contract->employee_name}",
+            'body' => CertificateRenderer::html($content['blocks'], [
+                'companyName' => $content['companyName'],
+                'font' => $content['font'],
+                'logoUrl' => $logo['src'] ?? null,
+                'logoSize' => $logo['size'] ?? null,
+                'pdf' => true,
+            ]),
+            'margin' => CertificateBlocks::MARGIN_POINTS[$content['margin']] ?? 72,
+            'void' => $contract->isVoid(),
+            'sans' => $content['font'] === 'sans',
+        ], $paper);
+    }
+
+    public function contractFilename(Contract $contract): string
+    {
+        return $this->safeName("{$contract->control_number}-{$contract->employee_name}").'.pdf';
     }
 
     public function certificateFilename(Certificate $certificate): string

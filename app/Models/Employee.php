@@ -171,6 +171,14 @@ class Employee extends Model
     }
 
     /**
+     * @return HasMany<Contract, $this>
+     */
+    public function contracts(): HasMany
+    {
+        return $this->hasMany(Contract::class);
+    }
+
+    /**
      * @return HasMany<Certificate, $this>
      */
     public function certificates(): HasMany
@@ -199,6 +207,7 @@ class Employee extends Model
             $this->ipcrRatings(),
             $this->payslips(),
             $this->certificates(),
+            $this->contracts(),
             $this->applications(),
         ])->sum(fn (HasMany $records): int => $records->count());
 

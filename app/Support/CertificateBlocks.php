@@ -43,10 +43,25 @@ class CertificateBlocks
         ['type' => 'title', 'label' => 'Title', 'description' => 'e.g. CERTIFICATE OF EMPLOYMENT', 'icon' => 'file'],
         ['type' => 'paragraph', 'label' => 'Paragraph', 'description' => 'Text with {{placeholders}}; **bold**', 'icon' => 'edit'],
         ['type' => 'details', 'label' => 'Details table', 'description' => 'Employee details as label: value rows', 'icon' => 'sheet'],
-        ['type' => 'signatory', 'label' => 'Signatories', 'description' => 'Up to 3 names with titles and signature lines', 'icon' => 'user'],
+        ['type' => 'signatory', 'label' => 'Signatories', 'description' => 'Up to 4 names with titles and signature lines', 'icon' => 'user'],
         ['type' => 'spacer', 'label' => 'Space', 'description' => 'Empty vertical space', 'icon' => 'minus'],
         ['type' => 'divider', 'label' => 'Line', 'description' => 'A thin horizontal rule', 'icon' => 'minus'],
         ['type' => 'footer', 'label' => 'Footnote', 'description' => 'Small print, e.g. "Not valid without dry seal"', 'icon' => 'info'],
+    ];
+
+    /**
+     * The blocks offered when building a contract: certificates' blocks without the details table and
+     * footnote, plus a page break and a footer that repeats on every page.
+     */
+    public const CONTRACT_BLOCK_TYPES = [
+        ['type' => 'header', 'label' => 'Letterhead', 'description' => 'Logo, company name and address lines', 'icon' => 'building'],
+        ['type' => 'title', 'label' => 'Title', 'description' => 'e.g. CONTRACT OF SERVICE', 'icon' => 'file'],
+        ['type' => 'paragraph', 'label' => 'Paragraph / clause', 'description' => 'Text with {{placeholders}}; **bold** for clause headings', 'icon' => 'edit'],
+        ['type' => 'signatory', 'label' => 'Signatories', 'description' => 'Up to 4 names with titles and signature lines', 'icon' => 'user'],
+        ['type' => 'spacer', 'label' => 'Space', 'description' => 'Empty vertical space', 'icon' => 'minus'],
+        ['type' => 'divider', 'label' => 'Line', 'description' => 'A thin horizontal rule', 'icon' => 'minus'],
+        ['type' => 'pageBreak', 'label' => 'Page break', 'description' => 'Start the next block on a new page', 'icon' => 'file'],
+        ['type' => 'pageFooter', 'label' => 'Page footer', 'description' => 'Printed at the bottom of every page, e.g. initials', 'icon' => 'info'],
     ];
 
     public const FIELDS = [
@@ -96,6 +111,8 @@ class CertificateBlocks
             'spacer' => ['size' => 'md'],
             'divider' => [],
             'footer' => ['text' => 'Not valid without the official dry seal.', 'align' => 'left'],
+            'pageBreak' => [],
+            'pageFooter' => ['text' => '', 'align' => 'center'],
         };
 
         return ['id' => self::newId(), 'type' => $type, ...$block];
@@ -133,12 +150,14 @@ class CertificateBlocks
     /**
      * Check and normalise a template's blocks. Layouts come from the browser, so nothing is trusted.
      *
+     * @param  array<string, array{label: string, sample: string}>|null  $fields  The placeholders this kind of document allows
      * @return list<Block>
      *
      * @throws UserFacingException with a message for the person editing the template
      */
-    public static function sanitize(mixed $input): array
+    public static function sanitize(mixed $input, ?array $fields = null): array
     {
+        $fields ??= self::FIELDS;
         $raw = is_string($input) ? json_decode($input, true) : $input;
 
         if (! is_array($raw) || ! array_is_list($raw)) {
@@ -165,10 +184,10 @@ class CertificateBlocks
             }
 
             $ids[$id] = true;
-            $blocks[] = ['id' => $id, ...self::sanitizeBlock($block)];
+            $blocks[] = ['id' => $id, ...self::sanitizeBlock($block, $fields)];
         }
 
-        $unknown = self::unknownPlaceholders($blocks);
+        $unknown = self::unknownPlaceholders($blocks, $fields);
 
         if ($unknown !== []) {
             throw new UserFacingException('Unknown placeholder(s): '.implode(', ', array_map(fn (string $name): string => "{{{$name}}}", $unknown)));
@@ -179,9 +198,10 @@ class CertificateBlocks
 
     /**
      * @param  list<Block>  $blocks
+     * @param  array<string, mixed>|null  $fields
      * @return list<string>
      */
-    public static function unknownPlaceholders(array $blocks): array
+    public static function unknownPlaceholders(array $blocks, ?array $fields = null): array
     {
         $found = [];
 
@@ -191,7 +211,7 @@ class CertificateBlocks
             }
         }
 
-        return array_values(array_diff(array_unique($found), array_keys(self::FIELDS)));
+        return array_values(array_diff(array_unique($found), array_keys($fields ?? self::FIELDS)));
     }
 
     /**
@@ -213,6 +233,7 @@ class CertificateBlocks
                 case 'title':
                 case 'paragraph':
                 case 'footer':
+                case 'pageFooter':
                     return [...$block, 'text' => $fill($block['text'])];
 
                 case 'signatory':
@@ -331,9 +352,10 @@ class CertificateBlocks
 
     /**
      * @param  Block  $block
+     * @param  array<string, mixed>  $fields
      * @return array<string, mixed>
      */
-    private static function sanitizeBlock(array $block): array
+    private static function sanitizeBlock(array $block, array $fields): array
     {
         $type = $block['type'] ?? null;
 
@@ -363,7 +385,7 @@ class CertificateBlocks
                 'type' => $type,
                 'fields' => array_slice(array_values(array_unique(array_filter(
                     is_array($block['fields'] ?? null) ? $block['fields'] : [],
-                    fn (mixed $field): bool => is_string($field) && isset(self::FIELDS[$field]),
+                    fn (mixed $field): bool => is_string($field) && isset($fields[$field]),
                 ))), 0, 12),
             ],
             'signatory' => [
@@ -378,6 +400,12 @@ class CertificateBlocks
                 'text' => self::text($block['text'] ?? null, 600),
                 'align' => self::pick($block['align'] ?? null, ['left', 'center', 'right'], 'left'),
             ],
+            'pageBreak' => ['type' => $type],
+            'pageFooter' => [
+                'type' => $type,
+                'text' => self::text($block['text'] ?? null, 300),
+                'align' => self::pick($block['align'] ?? null, ['left', 'center', 'right'], 'center'),
+            ],
             default => throw new UserFacingException('The template contains an unknown block.'),
         };
     }
@@ -391,7 +419,7 @@ class CertificateBlocks
             'label' => self::text($signer['label'] ?? null, 60),
             'name' => self::text($signer['name'] ?? null, 120),
             'title' => self::text($signer['title'] ?? null, 160),
-        ], array_slice(array_values(array_filter(is_array($input) ? $input : [], is_array(...))), 0, 3));
+        ], array_slice(array_values(array_filter(is_array($input) ? $input : [], is_array(...))), 0, 4));
 
         return $signers !== [] ? $signers : [['label' => '', 'name' => '', 'title' => '']];
     }
@@ -406,7 +434,7 @@ class CertificateBlocks
     {
         return match ($block['type']) {
             'header' => [$block['companyName'], $block['lines']],
-            'title', 'paragraph', 'footer' => [$block['text']],
+            'title', 'paragraph', 'footer', 'pageFooter' => [$block['text']],
             'signatory' => array_merge(...array_map(fn (array $signer): array => array_values($signer), $block['signers'])),
             default => [],
         };

@@ -28,3 +28,6 @@ if (document.getElementById('mail-rows')) {
 if (document.getElementById('remittance-grid')) {
     import('./remittance-grid');
 }
+if (document.getElementById('contract-grid')) {
+    import('./contract-issue');
+}

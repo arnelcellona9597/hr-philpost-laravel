@@ -38,6 +38,7 @@ class Navigation
                     ['href' => '/branches', 'label' => 'Branches', 'icon' => 'building'],
                     ['href' => '/requirements', 'label' => 'Annual Requirements', 'icon' => 'file'],
                     ['href' => '/certificates', 'label' => 'Certificates', 'icon' => 'award'],
+                    ['href' => '/contracts', 'label' => 'Contracts', 'icon' => 'briefcase'],
                     ['href' => '/payroll', 'label' => 'Payroll', 'icon' => 'wallet'],
                     ['href' => '/messages', 'label' => 'Messages', 'icon' => 'mail'],
                     ['href' => '/received-mails', 'label' => 'Received Mails', 'icon' => 'inbox'],

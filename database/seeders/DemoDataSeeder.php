@@ -17,6 +17,8 @@ use App\Models\Application;
 use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\CertificateTemplate;
+use App\Models\ContractSetting;
+use App\Models\ContractTemplate;
 use App\Models\Employee;
 use App\Models\EmploymentPeriod;
 use App\Models\Holiday;
@@ -34,6 +36,7 @@ use App\Models\SwornDeclaration;
 use App\Models\User;
 use App\Models\WellnessLeave;
 use App\Services\CertificateService;
+use App\Services\ContractService;
 use App\Services\LeaveService;
 use App\Services\PayrollService;
 use App\Services\RemittanceService;
@@ -154,6 +157,7 @@ class DemoDataSeeder extends Seeder
             $this->importHistory($staff[0]);
             $this->receivedMails($branches, $staff[0]);
             $this->remittances($staff[0]);
+            $this->contracts($staff[0]);
         }));
 
         $this->command?->info("Added {$this->employeeCount} demo employees and their records.");
@@ -653,6 +657,36 @@ class DemoDataSeeder extends Seeder
                 'updated_at' => now()->subHours($hoursAgo),
             ])->save();
         }
+    }
+
+    /**
+     * Fictional officials, and this semester's contracts for the first 40 active COS workers.
+     */
+    private function contracts(User $staff): void
+    {
+        ContractSetting::current()->update([
+            'area_director_name' => 'Elena V. Marquez',
+            'adfin_chief_name' => 'Roberto S. Aquino',
+            'hrm_chief_name' => 'Teresita L. Navarro',
+            'budget_officer_name' => 'Gerardo P. Mendoza',
+            'wage_order' => 'the prevailing regional wage order',
+            'default_place_of_service' => 'Davao City',
+        ]);
+
+        $month = (int) substr($this->today, 5, 2);
+        $year = substr($this->today, 0, 4);
+        [$start, $end] = $month >= 7 ? ["{$year}-07-01", "{$year}-12-31"] : ["{$year}-01-01", "{$year}-06-30"];
+        $template = ContractTemplate::query()->firstOrFail();
+        $service = app(ContractService::class);
+        $settings = ContractSetting::current();
+
+        $rows = array_map(fn (Employee $employee): array => [
+            'employee' => $employee->id,
+            ...$service->defaults($employee, $settings, $start, $end),
+            'daily_wage' => '450',
+        ], array_slice($service->candidates($start, $end), 0, 40));
+
+        $service->issueMany($staff, $template->id, $rows, $this->today);
     }
 
     /**

@@ -132,6 +132,7 @@ class EmployeeController extends Controller
             'classifications' => array_column(Classification::cases(), 'value'),
             'leaves' => $employee->wellnessLeaves()->orderByDesc('inclusive_date_from')->limit(8)->get(),
             'certificates' => $employee->certificates()->latest()->limit(10)->get(),
+            'contracts' => $employee->contracts()->latest('term_start')->limit(10)->get(),
             'requirements' => $requirements,
             'requirementYears' => collect($requirements)->flatten()->pluck('year')->unique()->sortDesc()->values(),
             'deadlineSettings' => RequirementDeadlineSetting::current()->toArray(),

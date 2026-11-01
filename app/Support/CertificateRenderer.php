@@ -41,6 +41,8 @@ class CertificateRenderer
             'spacer' => '<div style="height:'.CertificateBlocks::SPACER_POINTS[$block['size']].'pt"></div>',
             'divider' => '<hr class="cert-hr">',
             'footer' => '<p class="cert-footer cert-'.e($block['align']).'">'.self::inline($block['text'], $options).'</p>',
+            'pageBreak' => '<div class="cert-pagebreak"></div>',
+            'pageFooter' => '<div class="cert-pagefooter cert-'.e($block['align']).'">'.self::inline($block['text'], $options).'</div>',
             default => '',
         };
     }

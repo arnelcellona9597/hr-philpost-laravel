@@ -127,7 +127,7 @@ it('escapes template text when rendering and sanitizes block values', function (
         ->and($blocks[0]['indent'])->toBeTrue()
         ->and($blocks[1]['id'])->toMatch('/^[a-z0-9]{1,16}$/')
         ->and($blocks[1]['fields'])->toBe(['fullName'])
-        ->and($blocks[2]['signers'])->toHaveCount(3)
+        ->and($blocks[2]['signers'])->toHaveCount(4)
         ->and($html)->toContain('&lt;img src=x&gt;')
         ->toContain('<strong>b&lt;i&gt;</strong><br>line')
         ->not->toContain('<img');

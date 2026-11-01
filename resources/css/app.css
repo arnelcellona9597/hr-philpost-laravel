@@ -643,6 +643,12 @@
 .cert .cert-sig-title { font-size: 10.5pt; }
 .cert .cert-hr { border: 0; border-top: 1px solid #333; margin: 6pt 0; }
 .cert .cert-footer { font-size: 9pt; color: #444; margin: 0 0 4pt; }
+.cert .cert-pagebreak { height: 0; margin: 14pt 0; border-top: 1px dashed #9aa3b2; }
+.cert .cert-pagefooter { margin: 10pt 0 0; padding-top: 3pt; border-top: 1px solid #ccc; font-size: 9pt; color: #444; }
+@media print {
+  .cert .cert-pagebreak { margin: 0; border: 0; break-after: page; }
+  .cert .cert-pagefooter { position: fixed; right: 0; bottom: 0; left: 0; margin: 0; background: #fff; }
+}
 .cert .cert-ph { background: #e8f0fb; color: #00539b; border-radius: 3px; padding: 0 3px; font-family: ui-monospace, monospace; font-size: 0.85em; white-space: nowrap; }
 .cert .cert-ph::before { content: '{{'; }
 .cert .cert-ph::after { content: '}}'; }
