@@ -14,6 +14,7 @@ use App\Models\Branch;
 use App\Models\DocumentSequence;
 use App\Models\Employee;
 use App\Services\ApplicationService;
+use App\Services\DuplicateFinder;
 use App\Support\Choices;
 use App\Support\HrDate;
 use App\Support\ImportModules;
@@ -32,6 +33,8 @@ use Illuminate\View\View;
 class ApplicationController extends Controller
 {
     use RespondsToForms;
+
+    public const PAGE_SIZES = [10, 25, 50, 100];
 
     private const SORTS = [
         'applicationId' => 'application_id',
@@ -53,6 +56,7 @@ class ApplicationController extends Controller
         $statuses = array_values(array_intersect(Arr::wrap($request->query('status')), array_column(ApplicationStatus::cases(), 'value')));
         $requirements = RequirementsCompletion::tryFrom((string) $request->query('requirements'));
         $station = $request->integer('station') ?: null;
+        $perPage = in_array($request->integer('perPage'), self::PAGE_SIZES, true) ? $request->integer('perPage') : 25;
         $position = Str::limit(trim((string) $request->query('position')), 150, '');
         $fdsFrom = HrDate::isValid((string) $request->query('fdsFrom')) ? (string) $request->query('fdsFrom') : null;
         $fdsTo = HrDate::isValid((string) $request->query('fdsTo')) ? (string) $request->query('fdsTo') : null;
@@ -80,7 +84,7 @@ class ApplicationController extends Controller
             ->when($fdsTo, fn (Builder $query) => $query->where('fds_date', '<=', $fdsTo))
             ->orderBy(self::SORTS[ltrim($sort, '-')], str_starts_with($sort, '-') ? 'desc' : 'asc')
             ->orderBy('id')
-            ->paginate(25)
+            ->paginate($perPage)
             ->withQueryString();
 
         $separated = Employee::query()
@@ -100,6 +104,7 @@ class ApplicationController extends Controller
             'requirements' => $requirements,
             'station' => $station,
             'position' => $position,
+            'pageSizes' => self::PAGE_SIZES,
             'positions' => Application::query()->whereNotNull('position_applied')->distinct()->orderBy('position_applied')->pluck('position_applied'),
             'fdsFrom' => $fdsFrom,
             'fdsTo' => $fdsTo,
@@ -129,6 +134,10 @@ class ApplicationController extends Controller
     {
         Gate::authorize('create', Application::class);
 
+        if ($this->alreadySubmitted($request)) {
+            return $this->flash(redirect()->route('onboarding.index'), 'That application was already added.');
+        }
+
         ['data' => $data, 'errors' => $errors] = $this->parse($request, $this->fieldsForNew());
 
         if ($errors !== []) {
@@ -140,7 +149,9 @@ class ApplicationController extends Controller
 
         $application = $applications->save(new Application, $data, $request->user());
 
-        return $this->flash(redirect()->route('onboarding.index'), "Application {$application->application_id} for {$application->applicant_name} was added.");
+        $similar = count(app(DuplicateFinder::class)->similarTo($application));
+
+        return $this->flash(redirect()->route('onboarding.index'), "Application {$application->application_id} for {$application->applicant_name} was added.".($similar > 0 ? " It looks like {$similar} other ".($similar === 1 ? 'application' : 'applications').'; check Import / Export → duplicates.' : ''));
     }
 
     public function show(Application $application, ApplicationService $applications): View

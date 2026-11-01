@@ -14,6 +14,7 @@
 <x-layouts.app title="Onboarding Tracker" heading="Onboarding tracker" description="Applicants and their document requirements, plus who joined and left recently.">
     <x-slot:actions>
         <a class="btn-secondary" href="{{ url("/data/export?{$exportQuery}") }}"><x-icon name="download" /> Export</a>
+        <a class="btn-ghost" href="{{ route('data.duplicates', ['module' => 'applications']) }}"><x-icon name="copy" /> Duplicates</a>
         <a class="btn-primary" href="{{ route('onboarding.create') }}"><x-icon name="plus" /> New application</a>
     </x-slot:actions>
 
@@ -122,8 +123,8 @@
                 <table class="table text-xs">
                     <thead>
                         <tr>
+                            <x-sort-header field="applicantName" label="Applicant" class="sticky left-0 z-20 !bg-surface-2 shadow-[1px_0_0_var(--line)]" />
                             <x-sort-header field="applicationId" label="App ID" />
-                            <x-sort-header field="applicantName" label="Applicant" />
                             <x-sort-header field="positionApplied" label="Position" />
                             <th>Station</th>
                             <x-sort-header field="dateApplied" label="Applied" />
@@ -139,13 +140,13 @@
                     <tbody>
                         @foreach ($applications as $application)
                             <tr data-app="{{ $application->id }}">
-                                <td class="whitespace-nowrap font-mono text-fg-2"><a class="hover:text-primary-ink" href="{{ route('onboarding.show', $application) }}">{{ $application->application_id }}</a></td>
-                                <td class="min-w-36 text-sm">
+                                <td class="sticky left-0 z-10 min-w-44 bg-surface text-sm shadow-[1px_0_0_var(--line)]">
                                     <a class="font-medium hover:text-primary-ink" href="{{ route('onboarding.show', $application) }}">{{ $application->applicant_name }}</a>
                                     @if ($application->replacement)
                                         <span class="block text-xs text-muted">Replaces {{ $application->replacement }}</span>
                                     @endif
                                 </td>
+                                <td class="whitespace-nowrap font-mono text-fg-2"><a class="hover:text-primary-ink" href="{{ route('onboarding.show', $application) }}">{{ $application->application_id }}</a></td>
                                 <td class="min-w-32">{{ $application->position_applied }}</td>
                                 <td class="min-w-28 text-fg-2">{{ $application->station?->name }}</td>
                                 <td class="whitespace-nowrap tabular text-fg-2">{{ HrDate::format($application->date_applied) }}</td>
@@ -177,7 +178,7 @@
                     </tbody>
                 </table>
             </div>
-            <x-pagination :paginator="$applications" />
+            <x-pagination :paginator="$applications" :sizes="$pageSizes" />
         @endif
     </div>
     <p class="mt-2 text-xs text-muted">Change a requirement directly in the table — it saves immediately. FDS status is Complete when every document is Submitted, Verified or N/A.</p>
