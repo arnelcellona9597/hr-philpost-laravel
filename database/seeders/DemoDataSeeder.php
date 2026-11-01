@@ -31,9 +31,11 @@ use App\Models\PayrollPeriod;
 use App\Models\Payslip;
 use App\Models\PdsSubmission;
 use App\Models\ReceivedMail;
+use App\Models\RemittanceSetting;
 use App\Models\RequirementDeadlineSetting;
 use App\Models\SwornDeclaration;
 use App\Models\User;
+use App\Models\VoucherSetting;
 use App\Models\WellnessLeave;
 use App\Services\CertificateService;
 use App\Services\ContractService;
@@ -674,19 +676,42 @@ class DemoDataSeeder extends Seeder
         ]);
 
         $month = (int) substr($this->today, 5, 2);
-        $year = substr($this->today, 0, 4);
+        $year = (int) substr($this->today, 0, 4);
         [$start, $end] = $month >= 7 ? ["{$year}-07-01", "{$year}-12-31"] : ["{$year}-01-01", "{$year}-06-30"];
-        $template = ContractTemplate::query()->firstOrFail();
+        [$previousStart, $previousEnd] = $month >= 7 ? ["{$year}-01-01", "{$year}-06-30"] : [($year - 1).'-07-01', ($year - 1).'-12-31'];
+        $standard = ContractTemplate::query()->firstOrFail();
+        $templates = [$standard];
+
+        foreach (['Contract of Service – Driver', 'Contract of Service – Teller'] as $name) {
+            $copy = $standard->replicate(['key']);
+            $copy->name = $name;
+            $copy->sort_order = 20 + count($templates);
+            $copy->save();
+            $templates[] = $copy;
+        }
+
         $service = app(ContractService::class);
         $settings = ContractSetting::current();
+        $issue = function (ContractTemplate $template, string $from, string $to, int $count, string $wage) use ($service, $settings, $staff): array {
+            $rows = array_map(fn (Employee $employee): array => [
+                'employee' => $employee->id,
+                ...$service->defaults($employee, $settings, $from, $to),
+                'daily_wage' => $wage,
+            ], array_slice($service->candidates($from, $to), 0, $count));
 
-        $rows = array_map(fn (Employee $employee): array => [
-            'employee' => $employee->id,
-            ...$service->defaults($employee, $settings, $start, $end),
-            'daily_wage' => '450',
-        ], array_slice($service->candidates($start, $end), 0, 40));
+            return $rows === [] ? [] : $service->issueMany($staff, $template->id, $rows, $from);
+        };
 
-        $service->issueMany($staff, $template->id, $rows, $this->today);
+        // Ending within the month, so the "ending soon" notice has something to show.
+        $issue($standard, HrDate::addDays($this->today, -70), HrDate::addDays($this->today, 18), 12, '450');
+        $previous = $issue($standard, $previousStart, $previousEnd, 40, '440');
+        $issue($templates[1], $start, $end, 25, '470');
+        $issue($templates[2], $start, $end, 25, '460');
+        $issue($standard, $start, $end, 60, '450');
+
+        foreach (array_slice($previous, 0, 3) as $index => $contract) {
+            $service->void($contract, ['Wrong position', 'Reissued with a new wage', 'Worker declined'][$index]);
+        }
     }
 
     /**
@@ -697,13 +722,44 @@ class DemoDataSeeder extends Seeder
         $service = app(RemittanceService::class);
         [$year, $month] = [(int) substr($this->today, 0, 4), (int) substr($this->today, 5, 2)];
 
+        VoucherSetting::current()->update([
+            'fund_cluster' => '01',
+            'responsibility_center' => '100-01-001',
+            'supervisor_name' => 'Teresita L. Navarro',
+            'accountant_name' => 'Roberto S. Aquino',
+            'approver_name' => 'Elena V. Marquez',
+        ]);
+
+        foreach (RemittanceKind::cases() as $kind) {
+            RemittanceSetting::forKind($kind)->update([
+                'employer_id' => '12-3456789-0',
+                'employer_name' => 'Sample Postal Corporation',
+                'employer_address' => '1 Sample Avenue, Davao City',
+                'employer_contact' => 'HR Office, 0000-000-0000',
+                'prepared_by_name' => 'Teresita L. Navarro',
+                'noted_by_name' => 'Roberto S. Aquino',
+                'voucher_payee' => match ($kind) {
+                    RemittanceKind::Sss => 'Social Security System',
+                    RemittanceKind::Hdmf => 'Home Development Mutual Fund',
+                    RemittanceKind::Cmpeai => 'Sample Employees Association Inc.',
+                },
+                'voucher_address' => 'Davao City',
+            ]);
+        }
+
         foreach (RemittanceKind::cases() as $kind) {
             for ($back = 2; $back >= 0; $back--) {
                 $target = $month - $back;
                 $remittance = $service->generate($kind, $target < 1 ? $year - 1 : $year, $target < 1 ? $target + 12 : $target, $staff)['remittance'];
 
+                // Some CMPEAI members also repay loans, so their total payment is higher.
+                if ($kind === RemittanceKind::Cmpeai) {
+                    $remittance->lines()->inRandomOrder()->limit(max(1, intdiv($remittance->lines()->count(), 6)))->increment('amount_centavos', 91_700);
+                }
+
                 if ($back > 0) {
                     $service->finalize($remittance);
+                    $remittance->update(['voucher_number' => sprintf('%d-%02d-%04d', $year, $target < 1 ? $target + 12 : $target, mt_rand(1, 400)), 'voucher_date' => HrDate::addDays($this->today, -30 * $back + 3)]);
                 }
             }
         }
