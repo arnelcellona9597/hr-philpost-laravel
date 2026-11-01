@@ -14,6 +14,7 @@ use App\Services\EmploymentHistoryService;
 use App\Services\LeaveService;
 use App\Support\HrDate;
 use App\Support\Names;
+use BackedEnum;
 use Database\Factories\EmployeeFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -192,6 +193,23 @@ class Employee extends Model
     public function applications(): HasMany
     {
         return $this->hasMany(Application::class);
+    }
+
+    /**
+     * A field of this record as a person reads it, for the profile page and its printout.
+     *
+     * @param  array{name: string, kind: string}  $field
+     */
+    public function fieldText(array $field): string
+    {
+        $value = $field['kind'] === 'branch' ? $this->station?->name : $this->getAttribute($field['name']);
+
+        return match (true) {
+            $value === null || $value === '' => '—',
+            $field['kind'] === 'date' => HrDate::format($value),
+            $value instanceof BackedEnum => $value->value,
+            default => (string) $value,
+        };
     }
 
     /**

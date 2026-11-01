@@ -86,6 +86,7 @@ Route::middleware(RequireActiveSession::class)->group(function () {
         Route::put('/{employee}', 'update')->name('update')->whereNumber('employee');
         Route::delete('/{employee}', 'destroy')->name('destroy')->whereNumber('employee');
         Route::get('/{employee}/edit', 'edit')->name('edit')->whereNumber('employee');
+        Route::get('/{employee}/print', 'print')->name('print')->whereNumber('employee');
     });
 
     Route::prefix('employees/{employee}/employment')->name('employment.')->whereNumber(['employee', 'period'])->controller(EmploymentPeriodController::class)->group(function () {
