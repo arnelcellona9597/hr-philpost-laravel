@@ -221,7 +221,8 @@
                 <header class="p-4">
                     <h2 id="pay-title" class="text-sm font-semibold">Pay history</h2>
                     @if ($pay['current'])
-                        <p class="text-lg font-semibold tabular">{{ Money::format($pay['current']->amount_centavos) }} <span class="text-xs font-normal text-muted">{{ $pay['current']->rate_type === RateType::Daily ? 'a day' : 'a month' }}</span></p>
+                        <p class="text-lg font-semibold tabular">{{ Money::format($pay['current']->total_centavos) }} <span class="text-xs font-normal text-muted">{{ $pay['current']->rate_type === RateType::Daily ? 'a day' : 'a month' }}</span></p>
+                        <p class="text-xs text-muted tabular">Basic {{ Money::format($pay['current']->amount_centavos) }} + {{ $pay['current']->premium_label }} premium</p>
                     @endif
                     @if ($pay['minimum'])
                         <p class="text-xs text-muted">Regional minimum {{ Money::format($pay['minimum']->daily_rate_centavos) }} a day ({{ $pay['minimum']->label }})</p>
@@ -239,11 +240,12 @@
                             <li class="flex items-start justify-between gap-3 px-4 py-2.5 text-sm">
                                 <div class="min-w-0">
                                     <p class="font-medium tabular">
-                                        {{ Money::format($change->amount_centavos) }} <span class="font-normal text-muted">{{ mb_strtolower($change->rate_type->value) }}</span>
+                                        {{ Money::format($change->total_centavos) }} <span class="font-normal text-muted">{{ mb_strtolower($change->rate_type->value) }}</span>
                                         @if ($row['difference'])
                                             <span @class(['text-xs', 'text-success' => $row['difference'] > 0, 'text-danger' => $row['difference'] < 0])>{{ $row['difference'] > 0 ? '+' : '−' }}{{ Money::format(abs($row['difference'])) }}</span>
                                         @endif
                                     </p>
+                                    <p class="text-xs text-muted tabular">Basic {{ Money::format($change->amount_centavos) }} + {{ $change->premium_label }}</p>
                                     <p class="text-xs text-muted">{{ HrDate::format($change->effective_on) }} · {{ $change->change_type->value }}{{ $change->reference ? ' · '.$change->reference : '' }}{{ $row['upcoming'] ? ' · upcoming' : '' }}</p>
                                     @if ($change->remarks)
                                         <p class="text-xs text-fg-2">{{ $change->remarks }}</p>
@@ -271,7 +273,8 @@
                                 @endforeach
                             </select>
                         </div>
-                        <div><label class="label" for="pay-amount">New rate (pesos)</label><input class="input text-right tabular" id="pay-amount" name="amount" inputmode="decimal" required /></div>
+                        <div><label class="label" for="pay-amount">Basic rate (pesos)</label><input class="input text-right tabular" id="pay-amount" name="amount" inputmode="decimal" required /></div>
+                        <div><label class="label" for="pay-premium">Premium %</label><input class="input text-right tabular" id="pay-premium" name="premium_percent" inputmode="decimal" value="{{ $pay['current'] ? rtrim(rtrim((string) $pay['current']->premium_percent, '0'), '.') : '' }}" /></div>
                         <div>
                             <label class="label" for="pay-rate">Paid</label>
                             <select class="input" id="pay-rate" name="rate_type">
@@ -297,7 +300,7 @@
                             <li class="flex items-start justify-between gap-3 px-4 py-2.5 text-sm">
                                 <div class="min-w-0">
                                     <p class="font-medium">{{ $change->to_position }}</p>
-                                    <p class="text-xs text-muted">{{ HrDate::format($change->effective_on) }} · {{ $change->from_position ? 'from '.$change->from_position : 'no earlier position' }}</p>
+                                    <p class="text-xs text-muted">{{ HrDate::format($change->effective_on) }} · {{ $change->from_position ? 'from '.$change->from_position : 'no earlier position' }}{{ $change->to_classification ? ' · now '.$change->to_classification->value : '' }}</p>
                                     @if ($change->remarks)
                                         <p class="text-xs text-fg-2">{{ $change->remarks }}</p>
                                     @endif
@@ -328,7 +331,16 @@
                         </div>
                         <div><label class="label" for="move-date">Effective date</label><input class="input" id="move-date" name="effective_on" type="date" required /></div>
                         <div class="sm:col-span-2"><label class="label" for="move-position">New position</label><input class="input" id="move-position" name="to_position" maxlength="150" required /></div>
-                        <div><label class="label" for="move-amount">New rate (optional)</label><input class="input text-right tabular" id="move-amount" name="amount" inputmode="decimal" /></div>
+                        <div class="sm:col-span-2">
+                            <label class="label" for="move-classification">New classification (optional)</label>
+                            <select class="input" id="move-classification" name="to_classification">
+                                <option value="">No change</option>
+                                @foreach ($classifications as $classification)
+                                    <option>{{ $classification }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div><label class="label" for="move-amount">New basic rate (optional)</label><input class="input text-right tabular" id="move-amount" name="amount" inputmode="decimal" /></div>
                         <div>
                             <label class="label" for="move-rate">Paid</label>
                             <select class="input" id="move-rate" name="rate_type">

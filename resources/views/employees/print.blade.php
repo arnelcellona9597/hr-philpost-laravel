@@ -75,15 +75,16 @@
                 <p>No pay records.</p>
             @else
                 <table class="w-full border-collapse">
-                    <thead><tr class="bg-[#e8eef8]"><th class="{{ $cell }}">Effective</th><th class="{{ $cell }}">Rate</th><th class="{{ $cell }}">Paid</th><th class="{{ $cell }}">Change</th><th class="{{ $cell }}">Kind</th><th class="{{ $cell }}">Reference</th></tr></thead>
+                    <thead><tr class="bg-[#e8eef8]"><th class="{{ $cell }}">Effective</th><th class="{{ $cell }}">Basic rate</th><th class="{{ $cell }}">Premium</th><th class="{{ $cell }}">Total</th><th class="{{ $cell }}">Paid</th><th class="{{ $cell }}">Kind</th><th class="{{ $cell }}">Reference</th></tr></thead>
                     <tbody>
                         @foreach ($pay['rows'] as $row)
                             @php($change = $row['change'])
                             <tr class="break-inside-avoid">
                                 <td class="{{ $cell }} whitespace-nowrap">{{ HrDate::format($change->effective_on) }}</td>
                                 <td class="{{ $cell }} whitespace-nowrap">{{ Money::format($change->amount_centavos) }}</td>
+                                <td class="{{ $cell }} whitespace-nowrap">{{ $change->premium_label }} · {{ Money::format($change->premium_centavos) }}</td>
+                                <td class="{{ $cell }} whitespace-nowrap font-semibold">{{ Money::format($change->total_centavos) }}</td>
                                 <td class="{{ $cell }}">{{ $change->rate_type->value }}</td>
-                                <td class="{{ $cell }} whitespace-nowrap">{{ $row['difference'] ? ($row['difference'] > 0 ? '+' : '−').Money::format(abs($row['difference'])) : '' }}</td>
                                 <td class="{{ $cell }}">{{ $change->change_type->value }}</td>
                                 <td class="{{ $cell }}">{{ $change->reference }}</td>
                             </tr>
@@ -99,7 +100,7 @@
                 <p>None recorded.</p>
             @else
                 <table class="w-full border-collapse">
-                    <thead><tr class="bg-[#e8eef8]"><th class="{{ $cell }}">Effective</th><th class="{{ $cell }}">Kind</th><th class="{{ $cell }}">From</th><th class="{{ $cell }}">To</th></tr></thead>
+                    <thead><tr class="bg-[#e8eef8]"><th class="{{ $cell }}">Effective</th><th class="{{ $cell }}">Kind</th><th class="{{ $cell }}">From</th><th class="{{ $cell }}">To</th><th class="{{ $cell }}">Classification</th></tr></thead>
                     <tbody>
                         @foreach ($positionChanges as $change)
                             <tr class="break-inside-avoid">
@@ -107,6 +108,7 @@
                                 <td class="{{ $cell }}">{{ $change->change_type->value }}</td>
                                 <td class="{{ $cell }}">{{ $change->from_position }}</td>
                                 <td class="{{ $cell }}">{{ $change->to_position }}</td>
+                                <td class="{{ $cell }}">{{ $change->to_classification ? ($change->from_classification?->value ?? '—').' → '.$change->to_classification->value : '' }}</td>
                             </tr>
                         @endforeach
                     </tbody>

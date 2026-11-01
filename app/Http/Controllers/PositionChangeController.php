@@ -26,6 +26,7 @@ class PositionChangeController extends Controller
                 'effective_on' => trim((string) $request->input('effective_on')),
                 'change_type' => (string) $request->input('change_type'),
                 'to_position' => mb_substr(trim((string) $request->input('to_position')), 0, 150),
+                'to_classification' => (string) $request->input('to_classification'),
                 'remarks' => mb_substr(trim((string) $request->input('remarks')), 0, 1000) ?: null,
                 'amount_centavos' => Money::toCentavos($request->input('amount')),
                 'rate_type' => (string) $request->input('rate_type'),

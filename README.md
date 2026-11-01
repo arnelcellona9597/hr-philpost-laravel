@@ -19,7 +19,7 @@ A Laravel 13, PHP 8.5 and MySQL 8 rebuild of the PhilPost HR system (the old Ast
 | Onboarding, leave, requirements | Applicant tracker, wellness leave, annual ITR, Sworn Declaration, PDS and IPCR records |
 | Certificates | Numbered certificates from drag-and-drop templates, with PDF and print |
 | Contracts | Contracts of Service for COS workers, issued singly or for a group. Drag-and-drop templates with a page break and a footer that repeats on every page. Officials and wage wording are set once in settings. Download as PDF or Word (.docx), or a ZIP of either. Issued contracts keep their text and can only be voided. A worker cannot hold two overlapping valid contracts |
-| Wage orders and pay | Minimum wage per region from each wage order, applied in one step to the daily-paid employees it covers. Each employee keeps a pay history (starting rate, wage orders, salary increases) and a record of promotions and demotions, with Excel import and export |
+| Wage orders and pay | Minimum wage per region from each wage order, applied in one step to the daily-paid employees it covers. Each employee keeps a pay history (basic rate plus premium, from starting rate through wage orders and salary increases) and a record of promotions and demotions, including changes of classification, with Excel import and export |
 | Payroll | Periods, payslip grid, release, PDF and email |
 | Remittances | Monthly SSS, Pag-IBIG (HDMF) and CMPEAI lists. A month starts from the previous one; finalize to lock it. Excel export and import in the office's sheet layouts, print, and a disbursement voucher (print and PDF) with the amount in words. Titles, employer details, signatories and voucher wording are edited in settings |
 | Received Mails | Daily log of incoming mail with paste-from-Excel entry, filters, print, and Excel export and import in the monthly log layout |
@@ -49,6 +49,7 @@ Tests use a separate MySQL database (`hr_philpost_test`).
 **Notes for operators**
 
 - Real names, member numbers and addresses never belong in the repository. The officials who sign contracts and vouchers start blank and are filled in from the app's settings pages.
+- The Region XI and Region XIII (Caraga) daily rates from the COS record load with `php artisan db:seed --class=RegionalWageSeeder`. It is safe to run again, and the wage order numbers are added on the Wage Orders page.
 - Word export uses `phpoffice/phpword`, which needs the `zip`, `dom`, `gd` and `xml` PHP extensions.
 
 ## Live server (phlposthr.com)

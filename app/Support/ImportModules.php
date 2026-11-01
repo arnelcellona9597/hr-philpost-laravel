@@ -244,7 +244,7 @@ class ImportModules
     {
         return self::module('wage-orders', 'Wage Orders', 'Wage Orders', ['region', 'sector', 'effective_on'], [
             self::select('region', 'Region', Region::class, ['required' => true]),
-            self::field('order_number', 'Wage Order No.', 'text', ['required' => true, 'width' => 20]),
+            self::field('order_number', 'Wage Order No.', 'text', ['width' => 20]),
             self::field('sector', 'Sector', 'text', ['required' => true, 'width' => 22, 'help' => 'For example Non-agriculture, Agriculture, or Retail and service.']),
             self::field('daily_rate_centavos', 'Daily Minimum Wage', 'money', ['required' => true, 'width' => 16]),
             self::field('effective_on', 'Effective Date', 'date', ['required' => true]),
@@ -264,7 +264,8 @@ class ImportModules
             self::field('effective_on', 'Effective Date', 'date', ['required' => true]),
             self::select('change_type', 'Change Type', PayChangeType::class, ['required' => true, 'width' => 16]),
             self::select('rate_type', 'Rate Type', RateType::class, ['required' => true]),
-            self::field('amount_centavos', 'Rate', 'money', ['required' => true]),
+            self::field('amount_centavos', 'Basic Rate', 'money', ['required' => true]),
+            self::field('premium_percent', 'Premium %', 'number', ['min' => 0, 'max' => 100, 'step' => 0.01, 'width' => 10]),
             self::field('reference', 'Reference', 'text', ['width' => 22, 'help' => 'The wage order or memo behind this change.']),
             self::field('remarks', 'Remarks', 'textarea', ['width' => 30]),
         ]);
@@ -283,6 +284,7 @@ class ImportModules
             self::select('change_type', 'Change Type', PositionChangeType::class, ['required' => true]),
             self::field('from_position', 'From Position', 'text', ['width' => 26]),
             self::field('to_position', 'To Position', 'text', ['required' => true, 'width' => 26]),
+            self::select('to_classification', 'New Classification', Classification::class),
             self::field('remarks', 'Remarks', 'textarea', ['width' => 30]),
         ]);
     }

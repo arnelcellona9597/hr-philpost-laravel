@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Classification;
 use App\Enums\PositionChangeType;
 use App\Models\Concerns\Audited;
 use Database\Factories\PositionChangeFactory;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * A promotion or demotion on an employee's record.
  */
-#[Fillable(['employee_id', 'effective_on', 'change_type', 'from_position', 'to_position', 'remarks'])]
+#[Fillable(['employee_id', 'effective_on', 'change_type', 'from_position', 'to_position', 'from_classification', 'to_classification', 'remarks'])]
 class PositionChange extends Model
 {
     /** @use HasFactory<PositionChangeFactory> */
@@ -30,6 +31,8 @@ class PositionChange extends Model
         return [
             'effective_on' => 'date:Y-m-d',
             'change_type' => PositionChangeType::class,
+            'from_classification' => Classification::class,
+            'to_classification' => Classification::class,
         ];
     }
 
