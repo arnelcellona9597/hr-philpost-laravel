@@ -402,6 +402,7 @@ class DataImporter
 
             case 'number':
             case 'year':
+            case 'money':
                 $text = str_replace(',', '', $text);
                 break;
 

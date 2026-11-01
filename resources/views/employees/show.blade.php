@@ -1,7 +1,11 @@
 @php
+    use App\Enums\PayChangeType;
+    use App\Enums\PositionChangeType;
+    use App\Enums\RateType;
     use App\Support\Badge;
     use App\Support\Deadlines;
     use App\Support\HrDate;
+    use App\Support\Money;
     use Illuminate\Support\Str;
 
     $sections = collect($fields)->groupBy('section');
@@ -211,6 +215,132 @@
                         @endif
                     </div>
                 @endif
+            </section>
+
+            <section class="card overflow-hidden" id="pay-history" aria-labelledby="pay-title">
+                <header class="p-4">
+                    <h2 id="pay-title" class="text-sm font-semibold">Pay history</h2>
+                    @if ($pay['current'])
+                        <p class="text-lg font-semibold tabular">{{ Money::format($pay['current']->amount_centavos) }} <span class="text-xs font-normal text-muted">{{ $pay['current']->rate_type === RateType::Daily ? 'a day' : 'a month' }}</span></p>
+                    @endif
+                    @if ($pay['minimum'])
+                        <p class="text-xs text-muted">Regional minimum {{ Money::format($pay['minimum']->daily_rate_centavos) }} a day ({{ $pay['minimum']->label }})</p>
+                    @endif
+                </header>
+                @if ($pay['belowMinimum'])
+                    <p class="mx-4 mb-3 rounded-lg bg-warning-soft px-3 py-2 text-xs text-warning" role="status">⚠ This rate is below the regional minimum.</p>
+                @endif
+                @if ($pay['rows'] === [])
+                    <p class="px-4 pb-4 text-sm text-muted">No pay records yet.</p>
+                @else
+                    <ol class="divide-y divide-line border-t border-line">
+                        @foreach (array_reverse($pay['rows']) as $row)
+                            @php($change = $row['change'])
+                            <li class="flex items-start justify-between gap-3 px-4 py-2.5 text-sm">
+                                <div class="min-w-0">
+                                    <p class="font-medium tabular">
+                                        {{ Money::format($change->amount_centavos) }} <span class="font-normal text-muted">{{ mb_strtolower($change->rate_type->value) }}</span>
+                                        @if ($row['difference'])
+                                            <span @class(['text-xs', 'text-success' => $row['difference'] > 0, 'text-danger' => $row['difference'] < 0])>{{ $row['difference'] > 0 ? '+' : '−' }}{{ Money::format(abs($row['difference'])) }}</span>
+                                        @endif
+                                    </p>
+                                    <p class="text-xs text-muted">{{ HrDate::format($change->effective_on) }} · {{ $change->change_type->value }}{{ $change->reference ? ' · '.$change->reference : '' }}{{ $row['upcoming'] ? ' · upcoming' : '' }}</p>
+                                    @if ($change->remarks)
+                                        <p class="text-xs text-fg-2">{{ $change->remarks }}</p>
+                                    @endif
+                                </div>
+                                <form method="post" action="{{ route('pay.destroy', [$employee, $change]) }}" data-confirm="Delete this pay record?">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button class="btn-ghost btn-sm" aria-label="Delete this pay record"><x-icon name="trash" class="size-3.5" /></button>
+                                </form>
+                            </li>
+                        @endforeach
+                    </ol>
+                @endif
+                <details class="border-t border-line p-4">
+                    <summary class="cursor-pointer text-sm font-medium">Record a salary increase or rate</summary>
+                    <form method="post" action="{{ route('pay.store', $employee) }}" class="mt-3 grid gap-3 sm:grid-cols-2">
+                        @csrf
+                        <div><label class="label" for="pay-date">Effective date</label><input class="input" id="pay-date" name="effective_on" type="date" required /></div>
+                        <div>
+                            <label class="label" for="pay-type">Kind of change</label>
+                            <select class="input" id="pay-type" name="change_type">
+                                @foreach ($payChangeTypes as $type)
+                                    <option @selected($type === PayChangeType::Increase)>{{ $type->value }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div><label class="label" for="pay-amount">New rate (pesos)</label><input class="input text-right tabular" id="pay-amount" name="amount" inputmode="decimal" required /></div>
+                        <div>
+                            <label class="label" for="pay-rate">Paid</label>
+                            <select class="input" id="pay-rate" name="rate_type">
+                                @foreach (RateType::cases() as $rate)
+                                    <option @selected($rate === ($pay['current']?->rate_type ?? RateType::Daily))>{{ $rate->value }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="sm:col-span-2"><label class="label" for="pay-ref">Reference</label><input class="input" id="pay-ref" name="reference" maxlength="120" placeholder="Memo or wage order number" /></div>
+                        <div class="sm:col-span-2"><label class="label" for="pay-remarks">Remarks</label><input class="input" id="pay-remarks" name="remarks" maxlength="1000" /></div>
+                        <div class="sm:col-span-2"><button class="btn-primary btn-sm">Add pay record</button></div>
+                    </form>
+                </details>
+            </section>
+
+            <section class="card overflow-hidden" id="position-history" aria-labelledby="position-title">
+                <header class="p-4"><h2 id="position-title" class="text-sm font-semibold">Promotions and demotions</h2></header>
+                @if ($positionChanges->isEmpty())
+                    <p class="px-4 pb-4 text-sm text-muted">None recorded.</p>
+                @else
+                    <ol class="divide-y divide-line border-t border-line">
+                        @foreach ($positionChanges->reverse() as $change)
+                            <li class="flex items-start justify-between gap-3 px-4 py-2.5 text-sm">
+                                <div class="min-w-0">
+                                    <p class="font-medium">{{ $change->to_position }}</p>
+                                    <p class="text-xs text-muted">{{ HrDate::format($change->effective_on) }} · {{ $change->from_position ? 'from '.$change->from_position : 'no earlier position' }}</p>
+                                    @if ($change->remarks)
+                                        <p class="text-xs text-fg-2">{{ $change->remarks }}</p>
+                                    @endif
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <span class="{{ $change->change_type === PositionChangeType::Promotion ? 'badge-success' : 'badge-warning' }}">{{ $change->change_type->value }}</span>
+                                    <form method="post" action="{{ route('positions.destroy', [$employee, $change]) }}" data-confirm="Delete this record? If it is the latest one, the position goes back to {{ $change->from_position ?: 'what it was' }}.">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button class="btn-ghost btn-sm" aria-label="Delete this record"><x-icon name="trash" class="size-3.5" /></button>
+                                    </form>
+                                </div>
+                            </li>
+                        @endforeach
+                    </ol>
+                @endif
+                <details class="border-t border-line p-4">
+                    <summary class="cursor-pointer text-sm font-medium">Record a promotion or demotion</summary>
+                    <form method="post" action="{{ route('positions.store', $employee) }}" class="mt-3 grid gap-3 sm:grid-cols-2">
+                        @csrf
+                        <div>
+                            <label class="label" for="move-type">Kind</label>
+                            <select class="input" id="move-type" name="change_type">
+                                @foreach (PositionChangeType::cases() as $type)
+                                    <option>{{ $type->value }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div><label class="label" for="move-date">Effective date</label><input class="input" id="move-date" name="effective_on" type="date" required /></div>
+                        <div class="sm:col-span-2"><label class="label" for="move-position">New position</label><input class="input" id="move-position" name="to_position" maxlength="150" required /></div>
+                        <div><label class="label" for="move-amount">New rate (optional)</label><input class="input text-right tabular" id="move-amount" name="amount" inputmode="decimal" /></div>
+                        <div>
+                            <label class="label" for="move-rate">Paid</label>
+                            <select class="input" id="move-rate" name="rate_type">
+                                @foreach (RateType::cases() as $rate)
+                                    <option @selected($rate === ($pay['current']?->rate_type ?? RateType::Daily))>{{ $rate->value }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="sm:col-span-2"><label class="label" for="move-remarks">Remarks</label><input class="input" id="move-remarks" name="remarks" maxlength="1000" /></div>
+                        <div class="sm:col-span-2"><button class="btn-primary btn-sm">Record</button></div>
+                    </form>
+                </details>
             </section>
 
             <section class="card overflow-hidden">

@@ -19,10 +19,12 @@ use App\Models\IpcrRating;
 use App\Models\ItrSubmission;
 use App\Models\LeaveSetting;
 use App\Models\NotificationSetting;
+use App\Models\PayChange;
 use App\Models\PayrollPeriod;
 use App\Models\Payslip;
 use App\Models\PayslipSetting;
 use App\Models\PdsSubmission;
+use App\Models\PositionChange;
 use App\Models\ReceivedMail;
 use App\Models\Remittance;
 use App\Models\RemittanceSetting;
@@ -32,6 +34,7 @@ use App\Models\SmtpSetting;
 use App\Models\SwornDeclaration;
 use App\Models\User;
 use App\Models\VoucherSetting;
+use App\Models\WageOrder;
 use App\Models\WellnessLeave;
 use BackedEnum;
 use Closure;
@@ -50,6 +53,9 @@ class AuditTrail
     private const AREAS = [
         Employee::class => ['employees', 'full_name'],
         EmploymentPeriod::class => ['employment-periods', 'label'],
+        WageOrder::class => ['wage-orders', 'label'],
+        PayChange::class => ['pay-changes', 'label'],
+        PositionChange::class => ['position-changes', 'label'],
         Branch::class => ['branches', 'name'],
         Application::class => ['applications', 'applicant_name'],
         WellnessLeave::class => ['wellness-leaves', 'full_name'],
@@ -108,6 +114,11 @@ class AuditTrail
         } finally {
             self::$paused = $previous;
         }
+    }
+
+    public static function isPaused(): bool
+    {
+        return self::$paused;
     }
 
     public static function created(Model $model): void

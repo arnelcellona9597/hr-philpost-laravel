@@ -24,10 +24,12 @@ use App\Http\Controllers\LoginVerificationController;
 use App\Http\Controllers\MailQueueController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PayChangeController;
 use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\PayrollImportController;
 use App\Http\Controllers\PayslipController;
 use App\Http\Controllers\PayslipSettingsController;
+use App\Http\Controllers\PositionChangeController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReceivedMailController;
 use App\Http\Controllers\ReceivedMailImportController;
@@ -39,6 +41,7 @@ use App\Http\Controllers\RequirementDeadlineController;
 use App\Http\Controllers\SetPasswordController;
 use App\Http\Controllers\SiteSettingsController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\WageOrderController;
 use App\Http\Controllers\WellnessLeaveController;
 use App\Http\Middleware\EnsureSystemAdmin;
 use App\Http\Middleware\RequireActiveSession;
@@ -87,6 +90,27 @@ Route::middleware(RequireActiveSession::class)->group(function () {
         Route::delete('/{employee}', 'destroy')->name('destroy')->whereNumber('employee');
         Route::get('/{employee}/edit', 'edit')->name('edit')->whereNumber('employee');
         Route::get('/{employee}/print', 'print')->name('print')->whereNumber('employee');
+    });
+
+    Route::prefix('employees/{employee}/pay')->name('pay.')->whereNumber(['employee', 'change'])->controller(PayChangeController::class)->group(function () {
+        Route::post('/', 'store')->name('store');
+        Route::delete('/{change}', 'destroy')->name('destroy');
+    });
+
+    Route::prefix('employees/{employee}/positions')->name('positions.')->whereNumber(['employee', 'change'])->controller(PositionChangeController::class)->group(function () {
+        Route::post('/', 'store')->name('store');
+        Route::delete('/{change}', 'destroy')->name('destroy');
+    });
+
+    Route::prefix('wage-orders')->name('wage-orders.')->whereNumber('order')->controller(WageOrderController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/', 'store')->name('store');
+        Route::get('/new', 'create')->name('create');
+        Route::get('/{order}', 'show')->name('show');
+        Route::get('/{order}/edit', 'edit')->name('edit');
+        Route::put('/{order}', 'update')->name('update');
+        Route::delete('/{order}', 'destroy')->name('destroy');
+        Route::post('/{order}/apply', 'apply')->name('apply');
     });
 
     Route::prefix('employees/{employee}/employment')->name('employment.')->whereNumber(['employee', 'period'])->controller(EmploymentPeriodController::class)->group(function () {

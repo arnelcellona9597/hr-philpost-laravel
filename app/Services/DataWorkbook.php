@@ -36,6 +36,9 @@ class DataWorkbook
     private const SORTS = [
         'employees' => ['last_name', 'first_name', 'employee_id'],
         'employment-history' => ['hired_on'],
+        'wage-orders' => ['region', 'effective_on'],
+        'pay-history' => ['employee_id', 'effective_on'],
+        'position-history' => ['employee_id', 'effective_on'],
         'branches' => ['name'],
         'holidays' => ['date'],
         'applications' => ['date_applied', 'application_id'],
@@ -175,6 +178,7 @@ class DataWorkbook
         match ($field['kind']) {
             'date' => $cell->setValueExplicit(ExcelDate::stringToExcel(substr((string) $value, 0, 10)), DataType::TYPE_NUMERIC),
             'number', 'year' => $cell->setValueExplicit((float) $value, DataType::TYPE_NUMERIC),
+            'money' => $cell->setValueExplicit((int) $value / 100, DataType::TYPE_NUMERIC),
             // Text stays text, so a value starting with "=" can never become a formula.
             default => $cell->setValueExplicit((string) $value, DataType::TYPE_STRING),
         };

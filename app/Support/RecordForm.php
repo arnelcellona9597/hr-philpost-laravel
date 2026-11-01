@@ -7,6 +7,7 @@ use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use InvalidArgumentException;
 
 /**
  * Reads a submitted form using a module's field definitions, so forms and Excel imports share one
@@ -85,6 +86,7 @@ class RecordForm
             $value = $record->getAttribute(self::column($field));
 
             $values[$field['name']] = match (true) {
+                $field['kind'] === 'money' && $value !== null => number_format($value / 100, 2, '.', ''),
                 $value instanceof BackedEnum => (string) $value->value,
                 $value instanceof DateTimeInterface => $value->format('Y-m-d'),
                 default => (string) $value,
@@ -130,6 +132,13 @@ class RecordForm
 
             case 'year':
                 return ctype_digit($raw) && (int) $raw >= 2000 && (int) $raw <= 2100 ? [(int) $raw, null] : [null, 'Enter a 4-digit year'];
+
+            case 'money':
+                try {
+                    return [Money::toCentavos($raw), null];
+                } catch (InvalidArgumentException $exception) {
+                    return [null, "{$label} {$exception->getMessage()}"];
+                }
 
             case 'date':
                 return HrDate::isValid($raw) ? [$raw, null] : [null, "{$label} must be a valid date"];

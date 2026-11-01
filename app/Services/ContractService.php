@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\Classification;
 use App\Enums\ContractStatus;
 use App\Enums\EmploymentStatus;
+use App\Enums\RateType;
 use App\Exceptions\UserFacingException;
 use App\Models\Contract;
 use App\Models\ContractSetting;
@@ -47,8 +48,19 @@ class ContractService
             'address' => (string) $employee->address,
             'term_start' => $termStart ?? '',
             'term_end' => $termEnd ?? '',
-            'daily_wage' => $last !== null ? number_format($last->daily_wage_centavos / 100, 2, '.', '') : '',
+            'daily_wage' => $this->dailyWage($employee, $last),
         ];
+    }
+
+    /**
+     * The worker's daily rate from their pay history, or else the wage on their last contract.
+     */
+    private function dailyWage(Employee $employee, ?Contract $last): string
+    {
+        $rate = app(PayHistoryService::class)->rateOn($employee);
+        $centavos = $rate?->rate_type === RateType::Daily ? $rate->amount_centavos : $last?->daily_wage_centavos;
+
+        return $centavos === null ? '' : number_format($centavos / 100, 2, '.', '');
     }
 
     /**

@@ -1,5 +1,6 @@
 @php
     use App\Support\HrDate;
+    use App\Support\Money;
     use App\Support\Names;
     use Illuminate\Support\Str;
 
@@ -65,6 +66,51 @@
                 @if ($employment['total'])
                     <p class="mt-1 font-semibold">Total service: {{ HrDate::formatSpan($employment['total']) }}</p>
                 @endif
+            @endif
+        </section>
+
+        <section class="mt-4">
+            <h2 class="mb-2 border-b border-[#999] pb-0.5 text-[13px] font-bold">Pay history</h2>
+            @if ($pay['rows'] === [])
+                <p>No pay records.</p>
+            @else
+                <table class="w-full border-collapse">
+                    <thead><tr class="bg-[#e8eef8]"><th class="{{ $cell }}">Effective</th><th class="{{ $cell }}">Rate</th><th class="{{ $cell }}">Paid</th><th class="{{ $cell }}">Change</th><th class="{{ $cell }}">Kind</th><th class="{{ $cell }}">Reference</th></tr></thead>
+                    <tbody>
+                        @foreach ($pay['rows'] as $row)
+                            @php($change = $row['change'])
+                            <tr class="break-inside-avoid">
+                                <td class="{{ $cell }} whitespace-nowrap">{{ HrDate::format($change->effective_on) }}</td>
+                                <td class="{{ $cell }} whitespace-nowrap">{{ Money::format($change->amount_centavos) }}</td>
+                                <td class="{{ $cell }}">{{ $change->rate_type->value }}</td>
+                                <td class="{{ $cell }} whitespace-nowrap">{{ $row['difference'] ? ($row['difference'] > 0 ? '+' : '−').Money::format(abs($row['difference'])) : '' }}</td>
+                                <td class="{{ $cell }}">{{ $change->change_type->value }}</td>
+                                <td class="{{ $cell }}">{{ $change->reference }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
+        </section>
+
+        <section class="mt-4">
+            <h2 class="mb-2 border-b border-[#999] pb-0.5 text-[13px] font-bold">Promotions and demotions</h2>
+            @if ($positionChanges->isEmpty())
+                <p>None recorded.</p>
+            @else
+                <table class="w-full border-collapse">
+                    <thead><tr class="bg-[#e8eef8]"><th class="{{ $cell }}">Effective</th><th class="{{ $cell }}">Kind</th><th class="{{ $cell }}">From</th><th class="{{ $cell }}">To</th></tr></thead>
+                    <tbody>
+                        @foreach ($positionChanges as $change)
+                            <tr class="break-inside-avoid">
+                                <td class="{{ $cell }} whitespace-nowrap">{{ HrDate::format($change->effective_on) }}</td>
+                                <td class="{{ $cell }}">{{ $change->change_type->value }}</td>
+                                <td class="{{ $cell }}">{{ $change->from_position }}</td>
+                                <td class="{{ $cell }}">{{ $change->to_position }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
             @endif
         </section>
 

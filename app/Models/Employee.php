@@ -172,6 +172,22 @@ class Employee extends Model
     }
 
     /**
+     * @return HasMany<PayChange, $this>
+     */
+    public function payChanges(): HasMany
+    {
+        return $this->hasMany(PayChange::class)->orderBy('effective_on');
+    }
+
+    /**
+     * @return HasMany<PositionChange, $this>
+     */
+    public function positionChanges(): HasMany
+    {
+        return $this->hasMany(PositionChange::class)->orderBy('effective_on');
+    }
+
+    /**
      * @return HasMany<Contract, $this>
      */
     public function contracts(): HasMany

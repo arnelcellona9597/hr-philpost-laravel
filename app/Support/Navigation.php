@@ -40,6 +40,7 @@ class Navigation
                     ['href' => '/certificates', 'label' => 'Certificates', 'icon' => 'award'],
                     ['href' => '/contracts', 'label' => 'Contracts', 'icon' => 'briefcase'],
                     ['href' => '/payroll', 'label' => 'Payroll', 'icon' => 'wallet'],
+                    ['href' => '/wage-orders', 'label' => 'Wage Orders', 'icon' => 'activity'],
                     ['href' => '/messages', 'label' => 'Messages', 'icon' => 'mail'],
                     ['href' => '/received-mails', 'label' => 'Received Mails', 'icon' => 'inbox'],
                     ['href' => '/remittances', 'label' => 'Remittances', 'icon' => 'landmark'],
