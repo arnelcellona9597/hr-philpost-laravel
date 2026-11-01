@@ -28,7 +28,7 @@ it('numbers a blank application ID on save, not on viewing the form', function (
     $this->get('/onboarding/new')->assertSuccessful();
 
     $this->post('/onboarding', applicantForm())->assertRedirect('/onboarding');
-    $this->post('/onboarding', applicantForm())->assertRedirect('/onboarding');
+    $this->post('/onboarding', applicantForm(['applicant_name' => 'Ben Santos']))->assertRedirect('/onboarding');
 
     expect(Application::query()->orderBy('id')->pluck('application_id')->all())->toBe(['APP-2026-001', 'APP-2026-002']);
 });
@@ -238,4 +238,26 @@ it('hires on the FDS date when converting an applicant', function () {
     $values = $this->get("/employees/new?fromApplication={$application->id}")->assertSuccessful()->viewData('values');
 
     expect($values['date_hired'])->toBe('2026-07-01');
+});
+
+it('does not add a second applicant with the same name', function (string $second) {
+    $existing = Application::factory()->create(['applicant_name' => 'Ana Reyes']);
+
+    $this->from('/onboarding/new')->post('/onboarding', applicantForm(['applicant_name' => $second]))
+        ->assertRedirect('/onboarding/new')
+        ->assertSessionHasErrors(['applicant_name' => "An applicant named Ana Reyes is already listed ({$existing->application_id}). Open that application instead of adding a second one."]);
+
+    expect(Application::query()->count())->toBe(1);
+})->with(['same' => 'Ana Reyes', 'capitals' => 'ANA REYES', 'extra spaces' => '  ana   reyes ']);
+
+it('lets an applicant be edited without clashing with itself, but not renamed to another', function () {
+    $ana = Application::factory()->create(['applicant_name' => 'Ana Reyes']);
+    $ben = Application::factory()->create(['applicant_name' => 'Ben Santos']);
+
+    $this->put("/onboarding/{$ana->id}", applicantForm(['application_id' => $ana->application_id, 'applicant_name' => 'Ana Reyes', 'position_applied' => 'Driver']))->assertSessionHasNoErrors();
+    expect($ana->fresh()->position_applied)->toBe('Driver');
+
+    $this->from("/onboarding/{$ben->id}/edit")->put("/onboarding/{$ben->id}", applicantForm(['application_id' => $ben->application_id, 'applicant_name' => 'ana reyes']))
+        ->assertSessionHasErrors('applicant_name');
+    expect($ben->fresh()->applicant_name)->toBe('Ben Santos');
 });
