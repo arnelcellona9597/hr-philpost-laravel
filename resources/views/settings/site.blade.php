@@ -39,6 +39,41 @@
                 </div>
             </fieldset>
 
+            <fieldset class="card space-y-4 p-5">
+                <legend class="px-1 text-sm font-semibold">Printed letterhead</legend>
+                <p class="text-sm text-muted">The header at the top of printed pages, such as the employee profile.</p>
+                <div>
+                    <label class="label" for="letterhead_top">First line</label>
+                    <input class="input" id="letterhead_top" name="letterhead_top" maxlength="160" value="{{ old('letterhead_top', $settings->letterhead_top) }}" placeholder="Republic of the Philippines" />
+                </div>
+                <div>
+                    <label class="label" for="letterhead_name">Office name, in bold (one line each)</label>
+                    <textarea class="input" id="letterhead_name" name="letterhead_name" rows="2" maxlength="400" placeholder="Leave blank to use the company name">{{ old('letterhead_name', $settings->letterhead_name) }}</textarea>
+                </div>
+                <div>
+                    <label class="label" for="letterhead_details">Address and contact details (one line each)</label>
+                    <textarea class="input" id="letterhead_details" name="letterhead_details" rows="2" maxlength="600">{{ old('letterhead_details', $settings->letterhead_details) }}</textarea>
+                </div>
+                <div>
+                    <label class="label" for="letterhead_section">Section label under the line</label>
+                    <input class="input" id="letterhead_section" name="letterhead_section" maxlength="160" value="{{ old('letterhead_section', $settings->letterhead_section) }}" />
+                </div>
+                <div>
+                    <span class="label">Letterhead logo</span>
+                    <div class="flex flex-wrap items-center gap-4">
+                        @if ($settings->letterhead_logo_id)
+                            <img src="{{ route('files.show', $settings->letterhead_logo_id) }}" alt="Current letterhead logo" class="h-14 w-auto max-w-56 rounded-lg border border-line bg-white object-contain p-1" />
+                        @else
+                            <span class="text-sm text-muted">None: the logo above is used.</span>
+                        @endif
+                        <input class="input max-w-sm" type="file" name="letterhead_logo" accept="image/png,image/jpeg,image/webp,image/gif" aria-label="Upload letterhead logo" />
+                        @if ($settings->letterhead_logo_id)
+                            <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="remove_letterhead_logo" value="1" class="size-4" /> Remove letterhead logo</label>
+                        @endif
+                    </div>
+                </div>
+            </fieldset>
+
             <fieldset class="card p-5">
                 <legend class="px-1 text-sm font-semibold">Color palette</legend>
                 <div class="mb-4 flex flex-wrap gap-2">

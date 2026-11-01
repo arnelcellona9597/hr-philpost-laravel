@@ -289,3 +289,30 @@ it('has no way to change the audit log', function () {
 
     expect($routes->flatMap(fn ($route) => $route->methods())->unique()->values()->all())->toBe(['GET', 'HEAD']);
 });
+
+it('saves the printed letterhead and replaces its logo', function () {
+    Storage::fake('local');
+
+    $this->put('/settings', brandingForm([
+        'letterhead_name' => "SAMPLE POSTAL CORPORATION\nSAMPLE AREA OFFICE",
+        'letterhead_details' => '1 Sample Avenue, Sample City',
+        'letterhead_section' => 'Human Resource Management Section',
+        'letterhead_logo' => UploadedFile::fake()->image('letterhead.png', 400, 100),
+    ]))->assertSessionHasNoErrors();
+
+    $settings = SiteSetting::current();
+    $first = $settings->letterhead_logo_id;
+
+    expect($settings->letterhead_name)->toBe("SAMPLE POSTAL CORPORATION\nSAMPLE AREA OFFICE")
+        ->and($settings->letterhead_section)->toBe('Human Resource Management Section')
+        ->and($first)->not->toBeNull()
+        ->and(Media::query()->find($first)->is_public)->toBeTrue();
+
+    $this->put('/settings', brandingForm(['letterhead_logo' => UploadedFile::fake()->image('new.png', 400, 100)]))->assertSessionHasNoErrors();
+    expect(Media::query()->find($first))->toBeNull();
+
+    $this->put('/settings', brandingForm(['remove_letterhead_logo' => '1']))->assertSessionHasNoErrors();
+    expect(SiteSetting::current()->letterhead_logo_id)->toBeNull();
+
+    $this->get('/settings')->assertOk()->assertSee('Printed letterhead');
+});

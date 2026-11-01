@@ -13,6 +13,7 @@ use App\Models\Media;
 use App\Models\Message;
 use App\Models\Payslip;
 use App\Models\PdsSubmission;
+use App\Models\SiteSetting;
 use App\Models\SwornDeclaration;
 use App\Models\User;
 use App\Models\WellnessLeave;
@@ -348,4 +349,23 @@ it('keeps the printed profile away from signed-out visitors', function () {
     auth()->logout();
 
     $this->get("/employees/{$employee->id}/print")->assertRedirectContains('/login');
+});
+
+it('prints the profile under the letterhead from the branding settings', function () {
+    SiteSetting::current()->update([
+        'letterhead_name' => "SAMPLE POSTAL CORPORATION\nSAMPLE AREA OFFICE",
+        'letterhead_details' => "1 Sample Avenue, Sample City\nhr@example.test",
+        'letterhead_section' => 'Human Resource Management Section',
+    ]);
+    $employee = Employee::factory()->create();
+
+    $this->get("/employees/{$employee->id}/print")->assertOk()
+        ->assertSeeInOrder(['Republic of the Philippines', 'SAMPLE POSTAL CORPORATION', 'SAMPLE AREA OFFICE', '1 Sample Avenue, Sample City', 'hr@example.test', 'Human Resource Management Section', 'EMPLOYEE PROFILE']);
+});
+
+it('falls back to the company name when no letterhead is set', function () {
+    SiteSetting::current()->update(['company_name' => 'Sample Company']);
+    $employee = Employee::factory()->create();
+
+    $this->get("/employees/{$employee->id}/print")->assertOk()->assertSee('SAMPLE COMPANY');
 });
