@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\HolidayType;
+use App\Models\Concerns\Audited;
 use Database\Factories\HolidayFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,7 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 class Holiday extends Model
 {
     /** @use HasFactory<HolidayFactory> */
-    use HasFactory;
+    use Audited, HasFactory;
 
     /**
      * Get the attributes that should be cast.

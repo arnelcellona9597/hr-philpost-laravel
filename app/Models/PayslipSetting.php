@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Audited;
 use App\Models\Concerns\IsSingleton;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 #[Fillable(['title', 'company_name', 'address_lines', 'show_logo', 'currency_symbol', 'earning_items', 'deduction_items', 'shown_fields', 'prepared_by_name', 'prepared_by_title', 'certified_by_name', 'certified_by_title', 'footer_note', 'paper_size'])]
 class PayslipSetting extends Model
 {
-    use IsSingleton;
+    use Audited, IsSingleton;
 
     /**
      * Values for the row created on a fresh install.

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Audited;
 use Database\Factories\CertificateTemplateFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class CertificateTemplate extends Model
 {
     /** @use HasFactory<CertificateTemplateFactory> */
-    use HasFactory;
+    use Audited, HasFactory;
 
     /**
      * Get the attributes that should be cast.

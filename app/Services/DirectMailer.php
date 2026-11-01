@@ -7,6 +7,7 @@ use App\Models\NotificationSetting;
 use App\Models\SmtpSetting;
 use Illuminate\Mail\Mailables\Address;
 use Illuminate\Support\Facades\Mail;
+use Symfony\Component\Mailer\Transport\Smtp\SmtpTransport;
 use Throwable;
 
 /**
@@ -37,26 +38,70 @@ class DirectMailer
         }
 
         try {
+            $this->deliver($to, $subject, $body);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Hand one email to the mail server and record how that went for the warning banner.
+     *
+     * @param  list<array{name: string, bytes: string, mime: string}>  $files
+     *
+     * @throws Throwable when the server refuses it
+     */
+    public function deliver(string $to, string $subject, string $body, ?string $senderName = null, array $files = []): void
+    {
+        try {
             if ($this->usesSavedServer()) {
                 $settings = SmtpSetting::current();
                 $sender = new Address($settings->from_address, $settings->from_name);
 
-                Mail::build(self::transportConfig($settings))->to($to)->send(new SystemMessage($subject, $body, $sender));
+                Mail::build(self::transportConfig($settings))->to($to)->send(new SystemMessage($subject, $body, $sender, $senderName, $files));
             } else {
-                Mail::to($to)->send(new SystemMessage($subject, $body));
+                Mail::to($to)->send(new SystemMessage($subject, $body, null, $senderName, $files));
             }
         } catch (Throwable $exception) {
-            report($exception);
             $this->recordFailure($exception->getMessage());
 
-            return false;
+            throw $exception;
         }
 
         if ($this->usesSavedServer()) {
             NotificationSetting::current()->forceFill(['smtp_last_error' => null, 'smtp_last_error_at' => null, 'smtp_last_ok_at' => now()])->save();
         }
+    }
 
-        return true;
+    /**
+     * Sign in to the saved mail server without sending anything. Returns the error text, or null.
+     */
+    public function verifyConnection(): ?string
+    {
+        if (! $this->usesSavedServer()) {
+            return null;
+        }
+
+        try {
+            $transport = Mail::build(self::transportConfig(SmtpSetting::current()))->getSymfonyTransport();
+
+            if ($transport instanceof SmtpTransport) {
+                $transport->start();
+                $transport->stop();
+            }
+        } catch (Throwable $exception) {
+            $this->recordFailure("Could not connect: {$exception->getMessage()}");
+
+            return $exception->getMessage();
+        }
+
+        NotificationSetting::current()->forceFill(['smtp_last_error' => null, 'smtp_last_error_at' => null])->save();
+
+        return null;
     }
 
     /**
@@ -87,6 +132,6 @@ class DirectMailer
 
     private function recordFailure(string $message): void
     {
-        NotificationSetting::current()->forceFill(['smtp_last_error' => $message, 'smtp_last_error_at' => now()])->save();
+        NotificationSetting::current()->forceFill(['smtp_last_error' => mb_substr($message, 0, 500), 'smtp_last_error_at' => now()])->save();
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\PayrollStatus;
+use App\Models\Concerns\Audited;
 use Database\Factories\PayrollPeriodFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class PayrollPeriod extends Model
 {
     /** @use HasFactory<PayrollPeriodFactory> */
-    use HasFactory;
+    use Audited, HasFactory;
 
     /**
      * Get the attributes that should be cast.

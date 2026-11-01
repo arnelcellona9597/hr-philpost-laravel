@@ -40,7 +40,7 @@ class PendingImports
      *
      * @return array{path: string, meta: PendingMeta}|null
      */
-    public function claim(string $token, int $userId, string $hint): ?array
+    public function claim(string $token, int $userId, string $hintPrefix): ?array
     {
         if (! preg_match('/^[a-f0-9]{32}$/', $token)) {
             return null;
@@ -54,7 +54,7 @@ class PendingImports
 
         $meta = json_decode((string) $disk->get($this->metaPath($token)), true);
 
-        if ($meta['user_id'] !== $userId || $meta['hint'] !== $hint || now()->getTimestamp() - $meta['created_at'] > self::LIFETIME_SECONDS) {
+        if ($meta['user_id'] !== $userId || ! str_starts_with($meta['hint'], $hintPrefix) || now()->getTimestamp() - $meta['created_at'] > self::LIFETIME_SECONDS) {
             return null;
         }
 
@@ -79,9 +79,18 @@ class PendingImports
         }
     }
 
-    public function finish(string $token): void
+    /**
+     * Remove a staged upload. An archive name keeps the workbook with the import history.
+     */
+    public function finish(string $token, ?string $archiveName = null): void
     {
-        Storage::disk('local')->delete([$this->claimedPath($token), $this->metaPath($token)]);
+        $disk = Storage::disk('local');
+
+        if ($archiveName !== null && $disk->exists($this->claimedPath($token))) {
+            rename($disk->path($this->claimedPath($token)), $disk->path(self::DIRECTORY."/{$archiveName}"));
+        }
+
+        $disk->delete([$this->claimedPath($token), $this->metaPath($token)]);
     }
 
     private function removeExpired(): void

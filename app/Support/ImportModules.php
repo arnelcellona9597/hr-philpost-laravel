@@ -15,6 +15,15 @@ use App\Enums\LeaveStatus;
 use App\Enums\OnboardingRequirement;
 use App\Enums\Region;
 use App\Enums\RequirementStatus;
+use App\Models\Application;
+use App\Models\Branch;
+use App\Models\Employee;
+use App\Models\Holiday;
+use App\Models\IpcrRating;
+use App\Models\ItrSubmission;
+use App\Models\PdsSubmission;
+use App\Models\SwornDeclaration;
+use App\Models\WellnessLeave;
 use BackedEnum;
 
 /**
@@ -34,6 +43,21 @@ class ImportModules
         'sworn-declaration' => 'sworn-declarations',
         'pds' => 'pds-submissions',
         'ipcr' => 'ipcr-ratings',
+    ];
+
+    /**
+     * The model behind each module.
+     */
+    public const MODELS = [
+        'branches' => Branch::class,
+        'holidays' => Holiday::class,
+        'employees' => Employee::class,
+        'applications' => Application::class,
+        'wellness-leaves' => WellnessLeave::class,
+        'itr-submissions' => ItrSubmission::class,
+        'sworn-declarations' => SwornDeclaration::class,
+        'pds-submissions' => PdsSubmission::class,
+        'ipcr-ratings' => IpcrRating::class,
     ];
 
     /**

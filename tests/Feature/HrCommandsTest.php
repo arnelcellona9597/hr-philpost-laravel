@@ -7,6 +7,7 @@ use App\Services\SignInService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Process;
 
 beforeEach(fn () => config(['hr.admin_password' => 'fixture-password-1']));
 
@@ -101,4 +102,13 @@ it('refuses a code when no sign-in is in progress', function () {
 
     $this->artisan('hr:issue-login-code', ['email' => 'ana@example.test'])->assertFailed();
     $this->artisan('hr:issue-login-code', ['email' => 'nobody@example.test'])->assertFailed();
+});
+
+it('reports a failed backup and never puts the database password on the command line', function () {
+    config(['database.connections.mysql.password' => 'database-secret']);
+    Process::fake(fn () => Process::result(errorOutput: 'mysqldump: not found', exitCode: 127));
+
+    $this->artisan('hr:backup')->expectsOutputToContain('mysqldump: not found')->assertFailed();
+
+    Process::assertRan(fn ($process) => str_contains(implode(' ', (array) $process->command), 'mysqldump') && ! str_contains(implode(' ', (array) $process->command), 'database-secret'));
 });

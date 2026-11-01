@@ -1,15 +1,23 @@
 <?php
 
 use App\Http\Controllers\ApplicationController;
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\AuthenticatedSessionController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\CertificateTemplateController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DataController;
+use App\Http\Controllers\EmailServerController;
+use App\Http\Controllers\EmailSettingsController;
+use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\ForgotPasswordController;
 use App\Http\Controllers\LeaveSettingsController;
 use App\Http\Controllers\LoginVerificationController;
+use App\Http\Controllers\MailQueueController;
+use App\Http\Controllers\MessageController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\PayrollImportController;
@@ -19,6 +27,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RequirementController;
 use App\Http\Controllers\RequirementDeadlineController;
 use App\Http\Controllers\SetPasswordController;
+use App\Http\Controllers\SiteSettingsController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WellnessLeaveController;
 use App\Http\Middleware\EnsureSystemAdmin;
@@ -52,8 +61,11 @@ Route::match(['get', 'post'], '/register', fn () => redirect()->route('login', [
 
 Route::get('/files/{media}', [FileController::class, 'show'])->name('files.show');
 
+// Fallback for hosts without a usable scheduler. The key travels in a header, out of access logs.
+Route::get('/internal/queue', MailQueueController::class)->middleware('throttle:auth-posts')->name('internal.queue');
+
 Route::middleware(RequireActiveSession::class)->group(function () {
-    Route::view('/', 'dashboard')->name('dashboard');
+    Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
     Route::prefix('employees')->name('employees.')->controller(EmployeeController::class)->group(function () {
@@ -190,6 +202,52 @@ Route::middleware(RequireActiveSession::class)->group(function () {
             Route::post('/commit', 'commit')->name('commit');
         });
     });
+
+    Route::prefix('messages')->name('messages.')->controller(MessageController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/', 'store')->name('store');
+        Route::get('/new', 'create')->name('create');
+        Route::post('/preview', 'preview')->name('preview');
+        Route::get('/{message}', 'show')->name('show')->whereNumber('message');
+        Route::post('/{message}/process', 'process')->name('process')->whereNumber('message');
+        Route::post('/{message}/retry', 'retry')->name('retry')->whereNumber('message');
+    });
+
+    Route::prefix('settings')->name('settings.')->group(function () {
+        Route::get('/', [SiteSettingsController::class, 'edit'])->name('site');
+        Route::put('/', [SiteSettingsController::class, 'update']);
+
+        Route::prefix('notifications')->controller(EmailSettingsController::class)->group(function () {
+            Route::get('/', 'edit')->name('notifications');
+            Route::put('/', 'update');
+            Route::post('/test', 'test')->name('notifications.test');
+            Route::post('/rotate-key', 'rotateKey')->name('notifications.rotate');
+        });
+
+        Route::prefix('templates')->name('templates.')->controller(EmailTemplateController::class)->group(function () {
+            Route::post('/', 'store')->name('store');
+            Route::get('/new', 'create')->name('create');
+            Route::get('/{template}', 'edit')->name('edit')->whereNumber('template');
+            Route::put('/{template}', 'update')->name('update')->whereNumber('template');
+            Route::delete('/{template}', 'destroy')->name('destroy')->whereNumber('template');
+        });
+
+        Route::prefix('email-server')->middleware(EnsureSystemAdmin::class)->controller(EmailServerController::class)->group(function () {
+            Route::get('/', 'edit')->name('email-server');
+            Route::put('/', 'update');
+            Route::post('/test', 'test')->name('email-server.test');
+        });
+    });
+
+    Route::prefix('data')->name('data.')->controller(DataController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/export', 'export')->name('export');
+        Route::get('/template', 'template')->name('template');
+        Route::post('/import', 'preview')->name('import');
+        Route::post('/import/commit', 'commit')->name('import.commit');
+    });
+
+    Route::get('/audit', [AuditLogController::class, 'index'])->name('audit.index');
 
     Route::prefix('notifications')->name('notifications.')->controller(NotificationController::class)->group(function () {
         Route::get('/', 'index')->name('index');

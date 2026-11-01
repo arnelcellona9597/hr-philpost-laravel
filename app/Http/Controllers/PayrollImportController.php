@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\RespondsToForms;
 use App\Models\PayrollPeriod;
 use App\Services\PayrollWorkbook;
 use App\Services\PendingImports;
+use App\Support\AuditTrail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -63,6 +64,7 @@ class PayrollImportController extends Controller
         }
 
         $imports->finish($token);
+        AuditTrail::record('import', 'payslips', "{$period->name}: {$staged['meta']['file_name']}", ['created' => $result['created'], 'updated' => $result['updated']]);
 
         return $this->flash(redirect()->route('payroll.show', $period), "Imported {$staged['meta']['file_name']}: {$result['updated']} payslip(s) updated, {$result['created']} created.");
     }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Audited;
 use Database\Factories\ItrSubmissionFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 class ItrSubmission extends ComplianceRecord
 {
     /** @use HasFactory<ItrSubmissionFactory> */
-    use HasFactory;
+    use Audited, HasFactory;
 
     public const SLUG = 'itr-submissions';
 

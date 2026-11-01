@@ -16,3 +16,9 @@ if (document.getElementById('tpl-form')) {
 if (document.getElementById('payroll-grid')) {
     import('./payroll-grid');
 }
+if (document.getElementById('compose')) {
+    import('./message-compose');
+}
+if (document.getElementById('branding-form')) {
+    import('./branding');
+}

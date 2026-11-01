@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Audited;
 use App\Models\Concerns\IsSingleton;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 #[Fillable(['itr', 'sworn', 'pds', 'ipcr_jan_jun', 'ipcr_jul_dec', 'overrides'])]
 class RequirementDeadlineSetting extends Model
 {
-    use IsSingleton;
+    use Audited, IsSingleton;
 
     /**
      * Values for the row created on a fresh install.

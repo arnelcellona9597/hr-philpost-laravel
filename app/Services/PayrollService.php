@@ -309,7 +309,7 @@ class PayrollService
     public function deleteAllPayslips(PayrollPeriod $period): void
     {
         DB::transaction(function () use ($period): void {
-            $this->lockDraft($period, 'Released payroll cannot be deleted.')->payslips()->delete();
+            $this->lockDraft($period, 'Released payroll cannot be deleted.')->payslips()->get()->each->delete();
         });
     }
 

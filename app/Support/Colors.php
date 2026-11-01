@@ -9,6 +9,16 @@ use App\Models\SiteSetting;
  */
 class Colors
 {
+    private const TEXT_COLORS = ['primary', 'secondary', 'success', 'danger'];
+
+    public const PRESETS = [
+        'Civil Blue' => ['primary' => '#1d4ed8', 'secondary' => '#475569', 'accent' => '#0d9488', 'success' => '#15803d', 'warning' => '#b45309', 'danger' => '#b91c1c'],
+        'Forest' => ['primary' => '#166534', 'secondary' => '#57534e', 'accent' => '#a16207', 'success' => '#15803d', 'warning' => '#b45309', 'danger' => '#b91c1c'],
+        'Maroon' => ['primary' => '#9f1239', 'secondary' => '#52525b', 'accent' => '#b45309', 'success' => '#15803d', 'warning' => '#a16207', 'danger' => '#dc2626'],
+        'Royal Purple' => ['primary' => '#6d28d9', 'secondary' => '#475569', 'accent' => '#0e7490', 'success' => '#15803d', 'warning' => '#b45309', 'danger' => '#be123c'],
+        'Slate & Teal' => ['primary' => '#0f766e', 'secondary' => '#334155', 'accent' => '#4338ca', 'success' => '#15803d', 'warning' => '#b45309', 'danger' => '#b91c1c'],
+    ];
+
     /**
      * Fill any missing or malformed palette entry with its default, so only hex colors reach the page.
      *
@@ -26,6 +36,31 @@ class Colors
         }
 
         return $resolved;
+    }
+
+    /**
+     * Text colours too pale to read on white.
+     *
+     * @param  array<string, string>  $palette
+     * @return list<string>
+     */
+    public static function contrastWarnings(array $palette): array
+    {
+        $warnings = [];
+
+        foreach (self::TEXT_COLORS as $key) {
+            $hex = $palette[$key] ?? null;
+
+            if (self::isHex($hex)) {
+                $ratio = self::contrastRatio($hex, '#ffffff');
+
+                if ($ratio < 3) {
+                    $warnings[] = sprintf('%s (%s) is too light to read on white (%.1f:1, needs 3:1)', $key, $hex, $ratio);
+                }
+            }
+        }
+
+        return $warnings;
     }
 
     public static function isHex(mixed $value): bool

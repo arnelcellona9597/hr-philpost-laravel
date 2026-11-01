@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\CertificateStatus;
 use App\Exceptions\UserFacingException;
+use App\Models\Concerns\Audited;
 use Database\Factories\CertificateFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Certificate extends Model
 {
     /** @use HasFactory<CertificateFactory> */
-    use HasFactory;
+    use Audited, HasFactory;
 
     private const VOID_COLUMNS = ['status', 'void_reason', 'voided_at', 'updated_at'];
 
