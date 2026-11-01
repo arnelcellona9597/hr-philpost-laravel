@@ -33,6 +33,7 @@ class ActivityFeed
         'certificate-templates' => ['certificate template', '/certificates/templates/{id}'],
         'contracts' => ['contract', '/contracts/{id}'],
         'contract-templates' => ['contract template', '/contracts/templates/{id}'],
+        'contract-scopes' => ['scope of service', '/contracts/scopes/{id}'],
         'holidays' => ['holiday', '/leave/settings'],
         'received-mails' => ['received mail', '/received-mails/{id}/edit'],
         'remittances' => ['remittance', '/remittances/{id}'],

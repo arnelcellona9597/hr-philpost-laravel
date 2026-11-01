@@ -22,6 +22,7 @@ use App\Models\Application;
 use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\CertificateTemplate;
+use App\Models\ContractScope;
 use App\Models\ContractSetting;
 use App\Models\ContractTemplate;
 use App\Models\Employee;
@@ -773,22 +774,15 @@ class DemoDataSeeder extends Seeder
         [$start, $end] = $month >= 7 ? ["{$year}-07-01", "{$year}-12-31"] : ["{$year}-01-01", "{$year}-06-30"];
         [$previousStart, $previousEnd] = $month >= 7 ? ["{$year}-01-01", "{$year}-06-30"] : [($year - 1).'-07-01', ($year - 1).'-12-31'];
         $standard = ContractTemplate::query()->firstOrFail();
-        $templates = [$standard];
-
-        foreach (['Contract of Service – Driver', 'Contract of Service – Teller'] as $name) {
-            $copy = $standard->replicate(['key']);
-            $copy->name = $name;
-            $copy->sort_order = 20 + count($templates);
-            $copy->save();
-            $templates[] = $copy;
-        }
+        $scopes = ContractScope::query()->orderBy('name')->get();
 
         $service = app(ContractService::class);
         $settings = ContractSetting::current();
-        $issue = function (ContractTemplate $template, string $from, string $to, int $count, string $wage) use ($service, $settings, $staff): array {
+        $issue = function (ContractTemplate $template, string $from, string $to, int $count, string $wage) use ($service, $settings, $staff, $scopes): array {
             $rows = array_map(fn (Employee $employee): array => [
                 'employee' => $employee->id,
                 ...$service->defaults($employee, $settings, $from, $to),
+                'scope' => $scopes[$employee->id % $scopes->count()]->id,
                 'daily_wage' => $wage,
             ], array_slice($service->candidates($from, $to), 0, $count));
 
@@ -798,9 +792,7 @@ class DemoDataSeeder extends Seeder
         // Ending within the month, so the "ending soon" notice has something to show.
         $issue($standard, HrDate::addDays($this->today, -70), HrDate::addDays($this->today, 18), 12, '450');
         $previous = $issue($standard, $previousStart, $previousEnd, 40, '440');
-        $issue($templates[1], $start, $end, 25, '470');
-        $issue($templates[2], $start, $end, 25, '460');
-        $issue($standard, $start, $end, 60, '450');
+        $issue($standard, $start, $end, 110, '450');
 
         foreach (array_slice($previous, 0, 3) as $index => $contract) {
             $service->void($contract, ['Wrong position', 'Reissued with a new wage', 'Worker declined'][$index]);

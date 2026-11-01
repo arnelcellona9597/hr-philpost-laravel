@@ -12,7 +12,7 @@ const box = document.getElementById('ed-box')
 const inspector = document.getElementById('ed-inspector')
 const warning = document.getElementById('ed-warning')
 const announce = (message) => (document.getElementById('ed-announce').textContent = message)
-const SIZES = { A4: [794, 1123], Letter: [816, 1056], Legal: [816, 1344] }
+const SIZES = { A4: [794, 1123], Letter: [816, 1056], Legal: [816, 1344], Folio: [816, 1248] }
 const ICON = {
   grip: 'M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01',
   up: 'M12 19V5M5 12l7-7 7 7',
@@ -42,6 +42,14 @@ const rich = (text) =>
     .replace(/\n/g, '<br>')
 const chip = (name) => `<span class="cert-ph">${esc(name)}</span>`
 const inline = (text, options) => (options.showPlaceholders ? rich(text).replace(PLACEHOLDER, (_, key) => chip(key)) : rich(merge(text, options.values)))
+
+// A " | " starts a new column, as in CertificateRenderer::footerText.
+function footerText(text, options) {
+  const columns = text.split(' | ')
+  if (columns.length === 1) return inline(text, options) || '&nbsp;'
+  const cells = columns.map((column) => `<td style="vertical-align:top;text-align:center;padding:0 3pt">${inline(column, options)}</td>`).join('')
+  return `<table style="width:100%;border-collapse:collapse;font-size:7.5pt;line-height:1.2"><tr>${cells}</tr></table>`
+}
 
 // The browser twin of CertificateRenderer::letterhead, using the current Branding settings.
 function renderLetterhead() {
@@ -91,7 +99,7 @@ function renderBlock(block, options) {
     case 'pageBreak':
       return '<div class="cert-pagebreak"></div>'
     case 'pageFooter':
-      return `<div class="cert-pagefooter cert-${block.align}">${inline(block.text, options) || '&nbsp;'}</div>`
+      return `<div class="cert-pagefooter cert-${block.align}">${footerText(block.text, options)}</div>`
     default:
       return ''
   }
@@ -189,7 +197,7 @@ function renderInspector() {
     case 'paragraph':
       html += field('Text', area('text', block.text, 7), 'Placeholders like {{fullName}} are filled in when issued. **bold**')
       html += field('Alignment', select('align', block.align, ALIGN4))
-      html += field('Text size', select('size', block.size, [['sm', 'Small'], ['md', 'Normal'], ['lg', 'Large']]))
+      html += field('Text size', select('size', block.size, [['xs', 'Fine print'], ['sm', 'Small'], ['md', 'Normal'], ['lg', 'Large']]))
       html += check('indent', block.indent, 'Indent the first line')
       break
     case 'footer':
@@ -197,7 +205,7 @@ function renderInspector() {
       html += field('Alignment', select('align', block.align, ALIGN3))
       break
     case 'pageFooter':
-      html += field('Text', area('text', block.text, 2), 'Printed at the bottom of every page. Placeholders work here too.')
+      html += field('Text', area('text', block.text, 3), 'Printed at the bottom of every page. Placeholders work here too. Put " | " between columns.')
       html += field('Alignment', select('align', block.align, ALIGN3))
       break
     case 'pageBreak':

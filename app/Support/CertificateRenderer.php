@@ -20,6 +20,11 @@ class CertificateRenderer
      */
     public static function html(array $blocks, array $options): string
     {
+        // The PDF engine repeats a fixed footer only from the page it appears on, so it must come first.
+        if ($options['pdf'] ?? false) {
+            usort($blocks, fn (array $a, array $b): int => ($b['type'] === 'pageFooter') <=> ($a['type'] === 'pageFooter'));
+        }
+
         $body = implode('', array_map(fn (array $block): string => self::block($block, $options), $blocks));
 
         $font = CertificateBlocks::font($options['font']);
@@ -46,9 +51,27 @@ class CertificateRenderer
             'divider' => '<hr class="cert-hr">',
             'footer' => '<p class="cert-footer cert-'.e($block['align']).'">'.self::inline($block['text'], $options).'</p>',
             'pageBreak' => '<div class="cert-pagebreak"></div>',
-            'pageFooter' => '<div class="cert-pagefooter cert-'.e($block['align']).'">'.self::inline($block['text'], $options).'</div>',
+            'pageFooter' => '<div class="cert-pagefooter cert-'.e($block['align']).'">'.self::footerText($block['text'], $options).'</div>',
             default => '',
         };
+    }
+
+    /**
+     * Footer text. A " | " starts a new column, so names and titles can sit side by side.
+     *
+     * @param  RenderOptions  $options
+     */
+    private static function footerText(string $text, array $options): string
+    {
+        $columns = explode(' | ', $text);
+
+        if (count($columns) === 1) {
+            return self::inline($text, $options);
+        }
+
+        $cells = implode('', array_map(fn (string $column): string => '<td style="vertical-align:top;text-align:center;padding:0 3pt">'.self::inline($column, $options).'</td>', $columns));
+
+        return '<table style="width:100%;border-collapse:collapse;font-size:7.5pt;line-height:1.2"><tr>'.$cells.'</tr></table>';
     }
 
     /**

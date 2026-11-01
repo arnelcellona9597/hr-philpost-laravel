@@ -19,6 +19,26 @@ form.addEventListener('change', (event) => {
   if (event.target.matches('[data-selected]')) refresh()
 })
 
+// A scope brings the office and supervisor that go with it, when it has them.
+const applyScope = (row, option) => {
+  if (option?.dataset.office) row.querySelector('[data-field=office]').value = option.dataset.office
+  if (option?.dataset.place) row.querySelector('[data-field=place_of_service]').value = option.dataset.place
+}
+
+form.addEventListener('change', (event) => {
+  if (event.target.matches('[data-field=scope]')) {
+    applyScope(event.target.closest('tr'), event.target.selectedOptions[0])
+  } else if (event.target.id === 'scope') {
+    rows.forEach((row) => {
+      const select = row.querySelector('[data-field=scope]')
+      if (!select.value) {
+        select.value = event.target.value
+        applyScope(row, event.target.selectedOptions[0])
+      }
+    })
+  }
+})
+
 form.addEventListener('submit', () => {
   const list = rows.map((row) => ({
     selected: row.querySelector('[data-selected]').checked,
