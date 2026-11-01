@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\Classification;
 use App\Enums\PayChangeType;
 use App\Enums\PositionChangeType;
 use App\Exceptions\UserFacingException;
@@ -20,7 +21,7 @@ class PositionHistoryService
     public function __construct(private readonly PayHistoryService $pay) {}
 
     /**
-     * @param  array{effective_on: string, change_type: string, to_position: string, remarks?: string|null, amount_centavos?: int, rate_type?: string}  $data
+     * @param  array{effective_on: string, change_type: string, to_position: string, to_classification?: string|null, remarks?: string|null, amount_centavos?: int, rate_type?: string, premium_percent?: float|int|string|null}  $data
      *
      * @throws UserFacingException
      */
@@ -41,11 +42,13 @@ class PositionHistoryService
             throw new UserFacingException('Enter the new position.');
         }
 
+        $classification = Classification::tryFrom((string) ($data['to_classification'] ?? ''));
+
         if (PositionChange::query()->where('employee_id', $employee->id)->where('effective_on', $data['effective_on'])->exists()) {
             throw new UserFacingException('There is already a promotion or demotion on '.HrDate::format($data['effective_on']).'. Delete it first, or choose another date.');
         }
 
-        return DB::transaction(function () use ($employee, $data, $type, $position, $user): PositionChange {
+        return DB::transaction(function () use ($employee, $data, $type, $position, $classification, $user): PositionChange {
             $before = PositionChange::query()->where('employee_id', $employee->id)->where('effective_on', '<', $data['effective_on'])->orderByDesc('effective_on')->first();
 
             $change = new PositionChange([
@@ -54,6 +57,8 @@ class PositionHistoryService
                 'change_type' => $type,
                 'from_position' => $before?->to_position ?? $employee->position,
                 'to_position' => $position,
+                'from_classification' => $classification === null ? null : ($before?->to_classification ?? $employee->classification),
+                'to_classification' => $classification,
                 'remarks' => $data['remarks'] ?? null,
             ]);
             $change->created_by = $user?->id;
@@ -65,6 +70,7 @@ class PositionHistoryService
                     'change_type' => $type === PositionChangeType::Promotion ? PayChangeType::Promotion->value : PayChangeType::Demotion->value,
                     'rate_type' => $data['rate_type'] ?? '',
                     'amount_centavos' => $data['amount_centavos'],
+                    'premium_percent' => $data['premium_percent'] ?? $this->pay->rateOn($employee, $data['effective_on'])?->premium_percent ?? 0,
                     'remarks' => "{$type->value} to {$position}",
                 ], $user);
             }
@@ -81,24 +87,41 @@ class PositionHistoryService
             $employee = $change->employee;
             $wasCurrent = $this->latest($employee)?->is($change);
             $previous = $change->from_position;
+            $previousClassification = $change->from_classification;
 
             $change->delete();
 
             if ($wasCurrent) {
-                $this->syncEmployee($employee, $previous);
+                $this->syncEmployee($employee, $previous, $previousClassification);
             }
         });
     }
 
     /**
-     * Keep the employee's Position on the latest change that has taken effect.
+     * Keep the employee's Position and Classification on the latest change that has taken effect.
      */
-    private function syncEmployee(Employee $employee, ?string $fallback = null): void
+    private function syncEmployee(Employee $employee, ?string $fallback = null, ?Classification $fallbackClassification = null): void
     {
-        $position = $this->latest($employee)?->to_position ?? $fallback;
+        $latest = $this->latest($employee);
+        $position = $latest?->to_position ?? $fallback;
+        $classification = PositionChange::query()
+            ->where('employee_id', $employee->id)
+            ->where('effective_on', '<=', HrDate::today())
+            ->whereNotNull('to_classification')
+            ->orderByDesc('effective_on')
+            ->first()?->to_classification ?? $fallbackClassification;
+        $changes = [];
 
         if ($position !== null && $position !== '' && $position !== $employee->position) {
-            $employee->update(['position' => $position]);
+            $changes['position'] = $position;
+        }
+
+        if ($classification !== null && $classification !== $employee->classification) {
+            $changes['classification'] = $classification;
+        }
+
+        if ($changes !== []) {
+            $employee->update($changes);
         }
     }
 

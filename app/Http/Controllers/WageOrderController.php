@@ -56,7 +56,7 @@ class WageOrderController extends Controller
 
         $order = WageOrder::query()->create($data);
 
-        return $this->flash(redirect()->route('wage-orders.show', $order), "Wage order {$order->order_number} was added. Check who it changes, then apply it.");
+        return $this->flash(redirect()->route('wage-orders.show', $order), "Wage order {$order->display_name} was added. Check who it changes, then apply it.");
     }
 
     public function show(WageOrder $order, PayHistoryService $pay): View
@@ -100,14 +100,20 @@ class WageOrderController extends Controller
 
         $order->delete();
 
-        return $this->flash(redirect()->route('wage-orders.index'), "Wage order {$order->order_number} was deleted.");
+        return $this->flash(redirect()->route('wage-orders.index'), "Wage order {$order->display_name} was deleted.");
     }
 
     public function apply(Request $request, WageOrder $order, PayHistoryService $pay): RedirectResponse
     {
         Gate::authorize('update', $order);
 
-        $raised = $pay->apply($order, $request->user());
+        $premium = trim((string) $request->input('premium_percent'));
+
+        if ($premium !== '' && (! is_numeric($premium) || (float) $premium < 0 || (float) $premium > 100)) {
+            return $this->flash(redirect()->route('wage-orders.show', $order), 'The premium must be a percentage from 0 to 100.', 'error');
+        }
+
+        $raised = $pay->apply($order, $request->user(), $premium === '' ? null : (float) $premium);
 
         return $this->flash(redirect()->route('wage-orders.show', $order), $raised === 0 ? 'Nobody needed a change.' : "{$raised} employee(s) now have this rate in their pay history.");
     }

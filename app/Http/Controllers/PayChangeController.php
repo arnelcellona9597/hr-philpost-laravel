@@ -27,6 +27,7 @@ class PayChangeController extends Controller
                 'change_type' => (string) $request->input('change_type'),
                 'rate_type' => (string) $request->input('rate_type'),
                 'amount_centavos' => Money::toCentavos($request->input('amount')),
+                'premium_percent' => trim((string) $request->input('premium_percent')) ?: 0,
                 'reference' => mb_substr(trim((string) $request->input('reference')), 0, 120) ?: null,
                 'remarks' => mb_substr(trim((string) $request->input('remarks')), 0, 1000) ?: null,
             ], $request->user());

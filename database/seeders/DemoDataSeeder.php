@@ -688,7 +688,15 @@ class DemoDataSeeder extends Seeder
         $year = (int) substr($this->today, 0, 4);
         $orders = [];
 
+        app(RegionalWageSeeder::class)->run();
+
         foreach (Region::cases() as $index => $region) {
+            if (isset(RegionalWageSeeder::RATES[$region->value])) {
+                array_push($orders, ...WageOrder::query()->where('region', $region->value)->orderBy('effective_on')->get());
+
+                continue;
+            }
+
             foreach ([3 => 0, 2 => 2_500, 1 => 5_000, 0 => 8_000] as $back => $raise) {
                 $orders[] = WageOrder::query()->create([
                     'region' => $region,
@@ -707,8 +715,8 @@ class DemoDataSeeder extends Seeder
         foreach ($employees as $employee) {
             $hired = $employee->date_hired?->toDateString() ?? ($year - 5).'-01-01';
             $monthly = $employee->classification === Classification::Regular;
-            $starting = $monthly ? mt_rand(18, 40) * 100_000 : 38_000;
-            $row = ['employee_id' => $employee->id, 'rate_type' => ($monthly ? RateType::Monthly : RateType::Daily)->value, 'created_at' => $now, 'updated_at' => $now];
+            $starting = $monthly ? mt_rand(18, 40) * 100_000 : 30_000;
+            $row = ['employee_id' => $employee->id, 'rate_type' => ($monthly ? RateType::Monthly : RateType::Daily)->value, 'premium_percent' => $monthly ? 0 : 2, 'created_at' => $now, 'updated_at' => $now];
             $pay[] = [...$row, 'effective_on' => $hired, 'change_type' => PayChangeType::Starting->value, 'amount_centavos' => $starting, 'reference' => null];
 
             if ($monthly && $this->roll() < 0.35 && HrDate::addYears($hired, 2) < $this->today) {
@@ -741,7 +749,7 @@ class DemoDataSeeder extends Seeder
 
         foreach ($orders as $order) {
             if ($order->effective_on->toDateString() <= $this->today) {
-                $service->apply($order);
+                $service->apply($order, null, $order->effective_on->toDateString() >= '2025-03-07' ? 15 : 2);
             }
         }
     }
