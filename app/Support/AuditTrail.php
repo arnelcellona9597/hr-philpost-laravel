@@ -20,6 +20,7 @@ use App\Models\PayrollPeriod;
 use App\Models\Payslip;
 use App\Models\PayslipSetting;
 use App\Models\PdsSubmission;
+use App\Models\ReceivedMail;
 use App\Models\RequirementDeadlineSetting;
 use App\Models\SiteSetting;
 use App\Models\SmtpSetting;
@@ -51,6 +52,7 @@ class AuditTrail
         PdsSubmission::class => ['pds-submissions', 'full_name'],
         IpcrRating::class => ['ipcr-ratings', 'full_name'],
         Holiday::class => ['holidays', 'name'],
+        ReceivedMail::class => ['received-mails', 'tracking_number'],
         User::class => ['users', 'name'],
         Certificate::class => ['certificates', 'control_number'],
         CertificateTemplate::class => ['certificate-templates', 'name'],

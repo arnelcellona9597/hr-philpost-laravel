@@ -22,3 +22,6 @@ if (document.getElementById('compose')) {
 if (document.getElementById('branding-form')) {
     import('./branding');
 }
+if (document.getElementById('mail-rows')) {
+    import('./received-mails');
+}

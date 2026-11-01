@@ -40,6 +40,7 @@ class Navigation
                     ['href' => '/certificates', 'label' => 'Certificates', 'icon' => 'award'],
                     ['href' => '/payroll', 'label' => 'Payroll', 'icon' => 'wallet'],
                     ['href' => '/messages', 'label' => 'Messages', 'icon' => 'mail'],
+                    ['href' => '/received-mails', 'label' => 'Received Mails', 'icon' => 'inbox'],
                     ['href' => '/data', 'label' => 'Import / Export', 'icon' => 'sheet'],
                 ],
             ],

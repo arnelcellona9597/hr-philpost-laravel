@@ -29,6 +29,7 @@ class ActivityFeed
         'certificates' => ['certificate', '/certificates/{id}'],
         'certificate-templates' => ['certificate template', '/certificates/templates/{id}'],
         'holidays' => ['holiday', '/leave/settings'],
+        'received-mails' => ['received mail', '/received-mails/{id}/edit'],
         'users' => ['HR account', '/users'],
         'site-settings' => ['branding settings', '/settings'],
         'leave-settings' => ['leave settings', '/leave/settings'],

@@ -27,6 +27,7 @@ use App\Models\Notification;
 use App\Models\PayrollPeriod;
 use App\Models\Payslip;
 use App\Models\PdsSubmission;
+use App\Models\ReceivedMail;
 use App\Models\RequirementDeadlineSetting;
 use App\Models\SwornDeclaration;
 use App\Models\User;
@@ -149,6 +150,7 @@ class DemoDataSeeder extends Seeder
             $this->notifications($released);
             $this->activity($staff[0], $active, $released);
             $this->importHistory($staff[0]);
+            $this->receivedMails($branches, $staff[0]);
         }));
 
         $this->command?->info("Added {$this->employeeCount} demo employees and their records.");
@@ -647,6 +649,49 @@ class DemoDataSeeder extends Seeder
                 'created_at' => now()->subHours($hoursAgo),
                 'updated_at' => now()->subHours($hoursAgo),
             ])->save();
+        }
+    }
+
+    /**
+     * About three months of incoming mail, a dozen or so pieces on each working day.
+     *
+     * @param  Collection<int, Branch>  $branches
+     */
+    private function receivedMails(Collection $branches, User $staff): void
+    {
+        $offices = $branches->map(fn (Branch $branch): string => mb_strtoupper(str_replace(' Post Office', '', $branch->name)))->all();
+        $rows = [];
+
+        for ($back = 90; $back >= 0; $back--) {
+            $day = HrDate::addDays($this->today, -$back);
+
+            if (HrDate::dayOfWeek($day) === 0 || HrDate::dayOfWeek($day) === 6) {
+                continue;
+            }
+
+            for ($piece = mt_rand(8, 16); $piece > 0; $piece--) {
+                $name = $this->pick(self::LAST_NAMES);
+                $rows[] = [
+                    'received_on' => $day,
+                    'tracking_number' => $this->chance(0.05) ? '#'.mt_rand(100, 999) : sprintf('RL %03d %03d %03d ZZ', mt_rand(0, 999), mt_rand(0, 999), mt_rand(0, 999)),
+                    'post_office' => $this->pick($offices),
+                    'description' => $this->pick([
+                        'DTR for wages for the period of '.date('F', strtotime($day)).' 1-15, '.substr($day, 0, 4),
+                        "Leave application of {$this->pick(['Mr.', 'Ms.'])} {$name}",
+                        'Statement of absences as of '.date('F Y', strtotime($day)),
+                        "Assumption to duty of {$this->pick(['Mr.', 'Ms.'])} {$name}",
+                    ]),
+                    'remarks' => null,
+                    'received_by' => $staff->name,
+                    'created_by' => $staff->id,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+        }
+
+        foreach (array_chunk($rows, 500) as $chunk) {
+            ReceivedMail::query()->insert($chunk);
         }
     }
 

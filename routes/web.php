@@ -25,6 +25,8 @@ use App\Http\Controllers\PayrollImportController;
 use App\Http\Controllers\PayslipController;
 use App\Http\Controllers\PayslipSettingsController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReceivedMailController;
+use App\Http\Controllers\ReceivedMailImportController;
 use App\Http\Controllers\RequirementController;
 use App\Http\Controllers\RequirementDeadlineController;
 use App\Http\Controllers\SetPasswordController;
@@ -244,6 +246,24 @@ Route::middleware(RequireActiveSession::class)->group(function () {
             Route::get('/', 'edit')->name('email-server');
             Route::put('/', 'update');
             Route::post('/test', 'test')->name('email-server.test');
+        });
+    });
+
+    Route::prefix('received-mails')->name('received-mails.')->group(function () {
+        Route::controller(ReceivedMailController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('/', 'store')->name('store');
+            Route::get('/new', 'create')->name('create');
+            Route::get('/export', 'export')->name('export');
+            Route::get('/print', 'print')->name('print');
+            Route::get('/{mail}/edit', 'edit')->name('edit')->whereNumber('mail');
+            Route::put('/{mail}', 'update')->name('update')->whereNumber('mail');
+            Route::delete('/{mail}', 'destroy')->name('destroy')->whereNumber('mail');
+        });
+
+        Route::controller(ReceivedMailImportController::class)->group(function () {
+            Route::post('/import', 'preview')->name('import');
+            Route::post('/import/commit', 'commit')->name('import.commit');
         });
     });
 
