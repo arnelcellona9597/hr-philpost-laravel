@@ -8,6 +8,7 @@ use App\Enums\EmploymentStatus;
 use App\Enums\RateType;
 use App\Exceptions\UserFacingException;
 use App\Models\Contract;
+use App\Models\ContractScope;
 use App\Models\ContractSetting;
 use App\Models\ContractTemplate;
 use App\Models\DocumentSequence;
@@ -41,10 +42,13 @@ class ContractService
         $employee->loadMissing('station');
         $last = Contract::query()->where('employee_id', $employee->id)->where('status', ContractStatus::Valid->value)->orderByDesc('term_end')->first();
 
+        $scope = $last?->scope ?? ContractScope::query()->where('active', true)->where('position', $employee->position)->orderBy('name')->first();
+
         return [
+            'scope' => $scope?->id,
             'position' => (string) $employee->position,
-            'office' => (string) $employee->station?->name,
-            'place_of_service' => $last?->place_of_service ?: (string) ($settings->default_place_of_service ?: $employee->station?->name),
+            'office' => $last?->office ?: ($scope?->office ?: (string) $employee->station?->name),
+            'place_of_service' => $last?->place_of_service ?: ($scope?->place_of_service ?: (string) ($settings->default_place_of_service ?: $employee->station?->name)),
             'address' => (string) $employee->address,
             'term_start' => $termStart ?? '',
             'term_end' => $termEnd ?? '',
@@ -93,7 +97,8 @@ class ContractService
     public function compose(ContractTemplate $template, Employee $employee, array $terms, string $issuedDate, ?string $controlNumber): array
     {
         $site = SiteSetting::current();
-        $values = ContractBlocks::values($employee, $terms, ContractSetting::current(), $issuedDate, $controlNumber, $site->company_name);
+        $scope = ($terms['contract_scope_id'] ?? null) ? ContractScope::query()->find($terms['contract_scope_id']) : null;
+        $values = ContractBlocks::values($employee, $terms, ContractSetting::current(), $issuedDate, $controlNumber, $site->company_name, $scope);
 
         return [
             'blocks' => CertificateBlocks::merge(CertificateBlocks::sanitize($template->blocks, ContractBlocks::fields()), $values),
@@ -152,11 +157,12 @@ class ContractService
         }
 
         // Layout errors surface before a number is claimed.
-        CertificateBlocks::sanitize($template->blocks, ContractBlocks::fields());
+        $blocks = CertificateBlocks::sanitize($template->blocks, ContractBlocks::fields());
+        $needsScope = str_contains((string) json_encode($blocks), '{{scopeOfService}}');
 
         $settings = ContractSetting::current();
 
-        return DB::transaction(function () use ($user, $template, $rows, $issuedDate, $settings): array {
+        return DB::transaction(function () use ($user, $template, $rows, $issuedDate, $settings, $needsScope): array {
             $employees = Employee::query()->with('station')->whereIn('id', array_filter(array_map(fn (array $row): int => (int) ($row['employee'] ?? 0), $rows)))->lockForUpdate()->get()->keyBy('id');
             $prepared = [];
             $errors = [];
@@ -171,6 +177,11 @@ class ContractService
                     }
 
                     $terms = $this->terms($row, $settings);
+
+                    if ($needsScope && $terms['contract_scope_id'] === null) {
+                        throw new InvalidArgumentException('needs a scope of service.');
+                    }
+
                     $this->assertNoOverlap($employee, $terms, $prepared);
                     $prepared[] = [$employee, $terms];
                 } catch (InvalidArgumentException $exception) {
@@ -289,6 +300,7 @@ class ContractService
             'second_wage_from' => $second > 0 ? $secondFrom : null,
             'wage_order' => ($text('wage_order', 255) ?: (string) $settings->wage_order) ?: null,
             'premium_percent' => $premium,
+            'contract_scope_id' => ContractScope::query()->whereKey((int) ($row['scope'] ?? 0))->value('id'),
         ];
     }
 

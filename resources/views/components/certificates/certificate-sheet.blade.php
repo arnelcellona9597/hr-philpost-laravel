@@ -2,7 +2,7 @@
 @props(['paperSize' => 'A4', 'margin' => 'normal', 'void' => false, 'print' => false])
 
 @php
-    [$width, $height] = ['A4' => ['210mm', '297mm'], 'Letter' => ['8.5in', '11in'], 'Legal' => ['8.5in', '14in']][$paperSize] ?? ['210mm', '297mm'];
+    [$width, $height] = ['A4' => ['210mm', '297mm'], 'Letter' => ['8.5in', '11in'], 'Legal' => ['8.5in', '14in'], 'Folio' => ['8.5in', '13in']][$paperSize] ?? ['210mm', '297mm'];
     $padding = ['narrow' => 50, 'normal' => 72, 'wide' => 96][$margin] ?? 72;
 @endphp
 

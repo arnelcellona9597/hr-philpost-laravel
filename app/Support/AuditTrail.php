@@ -9,6 +9,7 @@ use App\Models\Certificate;
 use App\Models\CertificateTemplate;
 use App\Models\Concerns\IsSingleton;
 use App\Models\Contract;
+use App\Models\ContractScope;
 use App\Models\ContractSetting;
 use App\Models\ContractTemplate;
 use App\Models\EmailTemplate;
@@ -71,6 +72,7 @@ class AuditTrail
         CertificateTemplate::class => ['certificate-templates', 'name'],
         Contract::class => ['contracts', 'control_number'],
         ContractTemplate::class => ['contract-templates', 'name'],
+        ContractScope::class => ['contract-scopes', 'name'],
         PayrollPeriod::class => ['payroll-periods', 'name'],
         Payslip::class => ['payslips', 'full_name'],
         EmailTemplate::class => ['email-templates', 'name'],

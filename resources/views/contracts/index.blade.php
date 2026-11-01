@@ -6,6 +6,7 @@
     <x-slot:actions>
         <a class="btn-secondary" href="{{ route('contracts.settings') }}"><x-icon name="settings" /> Officials and wages</a>
         <a class="btn-secondary" href="{{ route('contracts.templates.index') }}"><x-icon name="edit" /> Templates</a>
+        <a class="btn-secondary" href="{{ route('contracts.scopes.index') }}"><x-icon name="clipboard" /> Scopes of service</a>
         <a class="btn-primary" href="{{ route('contracts.create') }}"><x-icon name="plus" /> Issue contracts</a>
     </x-slot:actions>
 

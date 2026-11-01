@@ -68,6 +68,15 @@
                     <input class="input" id="second_wage_from" name="second_wage_from" type="date" value="{{ old('second_wage_from') }}" />
                 </div>
                 <div class="sm:col-span-2 lg:col-span-4">
+                    <label class="label" for="scope">Scope of service for everyone without one</label>
+                    <select class="input" id="scope" name="scope">
+                        <option value="">Choose in each row</option>
+                        @foreach ($scopes as $scope)
+                            <option value="{{ $scope->id }}" data-office="{{ $scope->office }}" data-place="{{ $scope->place_of_service }}">{{ $scope->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="sm:col-span-2 lg:col-span-4">
                     <label class="label" for="wage_order">Wage order reference</label>
                     <input class="input" id="wage_order" name="wage_order" maxlength="255" value="{{ old('wage_order', $settings->wage_order) }}" />
                 </div>
@@ -80,9 +89,10 @@
                             <tr>
                                 <th class="w-8"><input type="checkbox" id="select-all" class="size-4" checked aria-label="Select all" /></th>
                                 <th class="min-w-44">Worker</th>
+                                <th class="min-w-56">Scope of service</th>
                                 <th class="min-w-44">Position</th>
                                 <th class="min-w-44">Office</th>
-                                <th class="min-w-44">Place of service</th>
+                                <th class="min-w-44">Supervisor (place of service)</th>
                                 <th class="min-w-56">Address</th>
                                 <th class="w-28 text-right">Daily wage</th>
                             </tr>
@@ -92,7 +102,15 @@
                                 <tr data-row data-employee="{{ $row['employee']->id }}">
                                     <td><input type="checkbox" data-selected class="size-4" @checked($row['checked']) aria-label="Issue for {{ $row['employee']->full_name }}" /></td>
                                     <td class="font-medium">{{ $row['employee']->full_name }}<span class="block font-mono text-[11px] text-muted">{{ $row['employee']->employee_id }}</span></td>
-                                    @foreach (['position' => 'Position', 'office' => 'Office', 'place_of_service' => 'Place of service', 'address' => 'Address'] as $field => $label)
+                                    <td class="!px-1">
+                                        <select class="input py-1" data-field="scope" aria-label="Scope of service for {{ $row['employee']->full_name }}">
+                                            <option value="">Choose…</option>
+                                            @foreach ($scopes as $scope)
+                                                <option value="{{ $scope->id }}" data-office="{{ $scope->office }}" data-place="{{ $scope->place_of_service }}" @selected($scope->id === $row['scope'])>{{ $scope->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </td>
+                                    @foreach (['position' => 'Position', 'office' => 'Office', 'place_of_service' => 'Supervisor', 'address' => 'Address'] as $field => $label)
                                         <td class="!px-1"><input class="input py-1" data-field="{{ $field }}" value="{{ $row[$field] }}" aria-label="{{ $label }} for {{ $row['employee']->full_name }}" /></td>
                                     @endforeach
                                     <td class="!px-1"><input class="input py-1 text-right tabular" data-field="daily_wage" inputmode="decimal" value="{{ $row['daily_wage'] }}" aria-label="Daily wage for {{ $row['employee']->full_name }}" /></td>

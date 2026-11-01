@@ -71,6 +71,14 @@ class Contract extends Model
     }
 
     /**
+     * @return BelongsTo<ContractScope, $this>
+     */
+    public function scope(): BelongsTo
+    {
+        return $this->belongsTo(ContractScope::class, 'contract_scope_id');
+    }
+
+    /**
      * @return BelongsTo<Employee, $this>
      */
     public function employee(): BelongsTo

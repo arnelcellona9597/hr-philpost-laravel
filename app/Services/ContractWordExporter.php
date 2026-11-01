@@ -27,7 +27,7 @@ class ContractWordExporter
 
     private const TITLE_POINTS = ['md' => 16, 'lg' => 20, 'xl' => 24];
 
-    private const TEXT_POINTS = ['sm' => 10.5, 'md' => 12, 'lg' => 13.5];
+    private const TEXT_POINTS = ['xs' => 9.5, 'sm' => 10.5, 'md' => 12, 'lg' => 13.5];
 
     /**
      * The .docx file as bytes.
@@ -119,7 +119,7 @@ class ContractWordExporter
                 break;
 
             case 'pageFooter':
-                $section->addFooter()->addText($this->plain($block['text']), ['size' => 9, 'color' => '444444'], ['alignment' => self::ALIGN[$block['align']] ?? Jc::CENTER]);
+                $this->pageFooter($section, $block);
                 break;
         }
     }
@@ -142,6 +142,31 @@ class ContractWordExporter
 
         foreach (array_filter(array_map('trim', explode("\n", $block['lines']))) as $line) {
             $section->addText($this->plain($line), ['size' => 10, 'color' => '333333'], $align);
+        }
+    }
+
+    /**
+     * @param  Block  $block
+     */
+    private function pageFooter(Section $section, array $block): void
+    {
+        $footer = $section->addFooter();
+        $columns = explode(' | ', $block['text']);
+
+        if (count($columns) === 1) {
+            $footer->addText($this->plain($block['text']), ['size' => 9, 'color' => '444444'], ['alignment' => self::ALIGN[$block['align']] ?? Jc::CENTER]);
+
+            return;
+        }
+
+        $row = $footer->addTable()->addRow();
+
+        foreach ($columns as $column) {
+            $cell = $row->addCell((int) (9000 / count($columns)));
+
+            foreach (explode("\n", $column) as $line) {
+                $cell->addText($this->plain($line), ['size' => 7.5], ['alignment' => Jc::CENTER, 'spaceAfter' => 0]);
+            }
         }
     }
 

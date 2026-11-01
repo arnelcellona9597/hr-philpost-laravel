@@ -25,6 +25,7 @@
             .cert-t-xl { font-size: 24pt; }
             .cert-wide { letter-spacing: .12em; }
             .cert-p { margin: 0 0 10pt; }
+            .cert-s-xs { font-size: 9.5pt; line-height: 1.28; margin-bottom: 6pt; }
             .cert-s-sm { font-size: 10.5pt; }
             .cert-s-md { font-size: {{ $compact ? 11 : 12 }}pt; }
             .cert-s-lg { font-size: 13.5pt; }

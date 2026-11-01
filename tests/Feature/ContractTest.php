@@ -6,6 +6,7 @@ use App\Enums\EmploymentStatus;
 use App\Enums\Gender;
 use App\Exceptions\UserFacingException;
 use App\Models\Contract;
+use App\Models\ContractScope;
 use App\Models\ContractSetting;
 use App\Models\ContractTemplate;
 use App\Models\Employee;
@@ -13,6 +14,7 @@ use App\Models\User;
 use App\Services\ContractService;
 use App\Services\ContractWordExporter;
 use App\Support\CertificateBlocks;
+use App\Support\CertificateRenderer;
 use App\Support\ContractBlocks;
 use App\Support\DefaultContractTemplate;
 
@@ -42,6 +44,7 @@ function contractRow(Employee $employee, array $overrides = []): array
         'term_start' => '2026-07-01',
         'term_end' => '2026-12-31',
         'daily_wage' => '450',
+        'scope' => ContractScope::query()->where('key', 'letter-carrier')->value('id'),
         ...$overrides,
     ];
 }
@@ -51,7 +54,7 @@ beforeEach(function () {
     signIn($this->hr);
     $this->travelTo('2026-06-20 10:00:00');
     $this->template = ContractTemplate::query()->firstOrFail();
-    ContractSetting::current()->update(['area_director_name' => 'Ana R. Reyes', 'adfin_chief_name' => 'Ben T. Santos', 'hrm_chief_name' => 'Carla M. Lim', 'budget_officer_name' => 'Dan P. Cruz', 'wage_order' => 'Wage Order No. 1']);
+    ContractSetting::current()->update(['area_director_name' => 'Ana R. Reyes', 'adfin_chief_name' => 'Ben T. Santos', 'hrm_chief_name' => 'Carla M. Lim', 'budget_officer_name' => 'Dan P. Cruz', 'wage_order' => 'RB XI-24 tranche 2']);
 });
 
 it('installs the standard contract with placeholders only', function () {
@@ -59,7 +62,8 @@ it('installs the standard contract with placeholders only', function () {
         ->and(CertificateBlocks::unknownPlaceholders(DefaultContractTemplate::blocks(), ContractBlocks::fields()))->toBe([]);
 
     $json = json_encode($this->template->blocks);
-    expect($json)->toContain('{{fullNameUpper}}')->toContain('{{remuneration}}')->toContain('{{areaDirectorInitials}}');
+    expect($json)->toContain('{{fullNameUpper}}')->toContain('{{remuneration}}')->toContain('{{scopeOfService}}')->toContain('{{hrmChief}}')
+        ->not->toContain('CONCEPCION')->not->toContain('SUMUGAT');
 });
 
 it('issues a contract with the person, the wages and the officials merged in and frozen', function () {
@@ -74,8 +78,8 @@ it('issues a contract with the person, the wages and the officials merged in and
         ->and($contract->premium_percent)->toBe(15);
 
     $text = json_encode($contract->content['blocks'], JSON_UNESCAPED_UNICODE);
-    expect($text)->toContain('MAYLIN')->toContain('Four Hundred Fifty Pesos (₱450.00) per day')->toContain('Four Hundred Seventy Pesos (₱470.00) per day starting October 1, 2026')
-        ->toContain('Wage Order No. 1')->toContain('premium of 15%')->toContain('Ana R. Reyes')->toContain('Initials: AR  BS  CL  DC')
+    expect($text)->toContain('MAYLIN')->toContain('Four Hundred Fifty Pesos (₱ 450.00) from July 1, 2026 to September 30, 2026, effective October 1, 2026, the new minimum wage rate as per Wage Order No. RB XI-24 tranche 2 is Four Hundred Seventy Pesos (₱ 470.00) and Fifteen percent (15%) premium')
+        ->toContain('6.1 Attends to the receiving, sorting')->toContain('Ana R. Reyes')
         ->not->toContain('{{');
 
     ContractSetting::current()->update(['area_director_name' => 'Someone Else']);
@@ -208,8 +212,8 @@ it('builds a Word file that opens and carries the contract text', function () {
     $footer = $zip->getFromName('word/footer1.xml');
     $zip->close();
 
-    expect($document)->toContain('CONTRACT OF SERVICE')->toContain('MAYLIN')->toContain('Four Hundred Fifty Pesos')->toContain('ACKNOWLEDGEMENT')->toContain('w:br w:type="page"')->not->toContain('{{')
-        ->and($footer)->toContain('Initials: AR  BS  CL  DC');
+    expect($document)->toContain('CONTRACT OF SERVICE')->toContain('MAYLIN')->toContain('Four Hundred Fifty Pesos')->toContain('A C K N O W L E D G E M E N T')->not->toContain('{{')
+        ->and($footer)->toContain('Ben T. Santos')->toContain('Service Contractor')->toContain('Carla M. Lim');
 
     $response = $this->get("/contracts/{$contract->id}/docx")->assertOk();
     expect($response->headers->get('Content-Disposition'))->toContain('COS-2026-0001')->toContain('.docx')
@@ -238,7 +242,7 @@ it('serves the page, the print view and the PDF', function () {
     $contract = app(ContractService::class)->issue($this->hr, $this->template->id, $employee->id, contractRow($employee), '2026-06-20');
 
     $this->get("/contracts/{$contract->id}")->assertOk()->assertSee('COS-2026-0001')->assertSee('CONTRACT OF SERVICE');
-    $this->get("/contracts/{$contract->id}/print")->assertOk()->assertSee('cert-pagebreak', false);
+    $this->get("/contracts/{$contract->id}/print")->assertOk()->assertSee('cert-pagefooter', false);
     $pdf = $this->get("/contracts/{$contract->id}/pdf")->assertOk();
     expect($pdf->headers->get('Content-Type'))->toBe('application/pdf')->and(substr($pdf->getContent(), 0, 4))->toBe('%PDF');
 });
@@ -289,7 +293,7 @@ it('shows contracts on the worker profile and counts those ending soon', functio
 });
 
 it('edits templates with the shared editor, including the new blocks', function () {
-    $this->get("/contracts/templates/{$this->template->id}")->assertOk()->assertSee('Page footer')->assertSee('Page break')->assertSee('areaDirectorInitials');
+    $this->get("/contracts/templates/{$this->template->id}")->assertOk()->assertSee('Page footer')->assertSee('Page break')->assertSee('scopeOfService');
 
     $blocks = [...$this->template->blocks, ['id' => 'zz1', 'type' => 'pageBreak'], ['id' => 'zz2', 'type' => 'pageFooter', 'text' => 'Page of {{controlNumber}}', 'align' => 'right']];
     $this->put("/contracts/templates/{$this->template->id}", ['name' => 'Contract of Service', 'prefix' => 'cos', 'blocks' => json_encode($blocks), 'paper_size' => 'Legal', 'font' => 'sans', 'margin' => 'narrow', 'active' => '1'])->assertSessionHasNoErrors();
@@ -349,4 +353,87 @@ it('uses the chosen font in the Word file', function () {
     $zip->close();
 
     expect($styles)->toContain('Georgia');
+});
+
+it('installs the 27 scopes of service, with no names of people', function () {
+    expect(ContractScope::query()->count())->toBe(27)
+        ->and(ContractScope::query()->where('key', 'letter-carrier')->sole()->items)->toHaveCount(9)
+        ->and(ContractScope::query()->where('key', 'counter-teller')->sole()->items)->toHaveCount(10);
+
+    $this->get('/contracts/scopes')->assertOk()->assertSee('Letter Carrier')->assertSee('Budget Clerk')->assertSee('MOSS Staff');
+});
+
+it('puts the chosen scope into the contract and freezes it', function () {
+    $employee = cosEmployee();
+    $scope = ContractScope::query()->where('key', 'budget-clerk')->sole();
+
+    $contract = app(ContractService::class)->issue($this->hr, $this->template->id, $employee->id, contractRow($employee, ['scope' => $scope->id]), '2026-06-20');
+    $text = json_encode($contract->content['blocks'], JSON_UNESCAPED_UNICODE);
+
+    expect($contract->contract_scope_id)->toBe($scope->id)
+        ->and($text)->toContain('6.1 Processing of all claims')->toContain('6.4 Performs other duties')->not->toContain('6.5 ');
+
+    $scope->update(['items' => ['Changed later.']]);
+    $scope->delete();
+
+    expect(json_encode($contract->fresh()->content['blocks'], JSON_UNESCAPED_UNICODE))->toContain('6.1 Processing of all claims');
+});
+
+it('refuses a contract with no scope, and uses the shared one for rows without their own', function () {
+    $employee = cosEmployee();
+
+    expect(fn () => app(ContractService::class)->issue($this->hr, $this->template->id, $employee->id, contractRow($employee, ['scope' => null]), '2026-06-20'))
+        ->toThrow(UserFacingException::class, 'needs a scope of service');
+
+    $scope = ContractScope::query()->where('key', 'driver-courier')->sole();
+    $this->post('/contracts', ['template' => $this->template->id, 'issued_date' => '2026-06-20', 'term_start' => '2026-07-01', 'term_end' => '2026-12-31', 'scope' => $scope->id, 'grid' => json_encode([['selected' => true, ...contractRow($employee, ['scope' => ''])]])])->assertSessionHasNoErrors();
+
+    expect(Contract::query()->sole()->contract_scope_id)->toBe($scope->id);
+});
+
+it('suggests the scope, office and supervisor that match the position', function () {
+    $scope = ContractScope::query()->where('key', 'budget-clerk')->sole();
+    $defaults = app(ContractService::class)->defaults(cosEmployee(['position' => 'Budget Clerk']), ContractSetting::current());
+
+    expect($defaults['scope'])->toBe($scope->id)
+        ->and($defaults['office'])->toBe($scope->office)
+        ->and($defaults['place_of_service'])->toBe($scope->place_of_service);
+
+    $this->get('/contracts/new?term_start=2027-01-01&term_end=2027-06-30')->assertOk()->assertSee('Budget Clerk')->assertSee('Choose in each row');
+});
+
+it('writes one rate with its premium when the wage does not change', function () {
+    $employee = cosEmployee();
+    $contract = app(ContractService::class)->issue($this->hr, $this->template->id, $employee->id, contractRow($employee, ['daily_wage' => '460']), '2026-06-20');
+
+    expect(json_encode($contract->content['blocks'], JSON_UNESCAPED_UNICODE))->toContain('fixed daily wage of Four Hundred Sixty Pesos (₱ 460.00) and Fifteen percent (15%) premium in Philippine Currency');
+});
+
+it('edits, adds, duplicates and deletes scopes', function () {
+    $scope = ContractScope::query()->where('key', 'budget-clerk')->sole();
+
+    $this->get("/contracts/scopes/{$scope->id}")->assertOk()->assertSee('Processing of all claims');
+    $this->put("/contracts/scopes/{$scope->id}", ['name' => 'Budget Clerk', 'items' => "First duty;\n\n  Second duty.  ", 'active' => '1'])->assertRedirect('/contracts/scopes');
+    expect($scope->fresh()->items)->toBe(['First duty;', 'Second duty.']);
+
+    $this->post('/contracts/scopes', ['name' => 'Budget Clerk', 'items' => 'x'])->assertSessionHasErrors('name');
+    $this->post('/contracts/scopes', ['name' => 'Mail Runner', 'items' => ''])->assertSessionHasErrors('items');
+    $this->post('/contracts/scopes', ['name' => 'Mail Runner', 'items' => 'Runs mail.', 'active' => '1'])->assertRedirect('/contracts/scopes');
+    $this->post("/contracts/scopes/{$scope->id}/duplicate")->assertRedirect();
+    expect(ContractScope::query()->where('name', 'Budget Clerk (copy)')->exists())->toBeTrue();
+
+    $this->delete("/contracts/scopes/{$scope->id}")->assertRedirect('/contracts/scopes');
+    expect(ContractScope::query()->whereKey($scope->id)->exists())->toBeFalse();
+});
+
+it('prints on 8.5 by 13 paper with the footer in columns on every page', function () {
+    $employee = cosEmployee();
+    $contract = app(ContractService::class)->issue($this->hr, $this->template->id, $employee->id, contractRow($employee), '2026-06-20');
+
+    expect($contract->content['paperSize'])->toBe('Folio');
+    $this->get("/contracts/{$contract->id}/print")->assertOk()->assertSee('8.5in 13in', false)->assertSee('cert-pagefooter', false);
+
+    $body = CertificateRenderer::html($contract->content['blocks'], ['companyName' => 'x', 'font' => 'arial', 'pdf' => true]);
+
+    expect(strpos($body, 'cert-pagefooter'))->toBeLessThan(strpos($body, 'CONTRACT OF SERVICE'));
 });

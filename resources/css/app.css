@@ -620,6 +620,7 @@
 .cert .cert-t-xl { font-size: 24pt; }
 .cert .cert-wide { letter-spacing: 0.12em; }
 .cert .cert-p { margin: 0 0 10pt; }
+.cert .cert-s-xs { font-size: 9.5pt; line-height: 1.28; margin-bottom: 6pt; }
 .cert .cert-s-sm { font-size: 10.5pt; }
 .cert .cert-s-md { font-size: 12pt; }
 .cert .cert-s-lg { font-size: 13.5pt; }
