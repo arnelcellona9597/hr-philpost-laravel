@@ -13,6 +13,9 @@ use App\Enums\HolidayType;
 use App\Enums\IpcrPeriod;
 use App\Enums\LeaveStatus;
 use App\Enums\OnboardingRequirement;
+use App\Enums\PayChangeType;
+use App\Enums\PositionChangeType;
+use App\Enums\RateType;
 use App\Enums\Region;
 use App\Enums\RequirementStatus;
 use App\Models\Application;
@@ -22,8 +25,11 @@ use App\Models\EmploymentPeriod;
 use App\Models\Holiday;
 use App\Models\IpcrRating;
 use App\Models\ItrSubmission;
+use App\Models\PayChange;
 use App\Models\PdsSubmission;
+use App\Models\PositionChange;
 use App\Models\SwornDeclaration;
+use App\Models\WageOrder;
 use App\Models\WellnessLeave;
 use BackedEnum;
 
@@ -54,6 +60,9 @@ class ImportModules
         'holidays' => Holiday::class,
         'employees' => Employee::class,
         'employment-history' => EmploymentPeriod::class,
+        'wage-orders' => WageOrder::class,
+        'pay-history' => PayChange::class,
+        'position-history' => PositionChange::class,
         'applications' => Application::class,
         'wellness-leaves' => WellnessLeave::class,
         'itr-submissions' => ItrSubmission::class,
@@ -74,6 +83,9 @@ class ImportModules
             self::holidays(),
             self::employees(),
             self::employmentHistory(),
+            self::wageOrders(),
+            self::payHistory(),
+            self::positionHistory(),
             self::applications(),
             self::wellnessLeaves(),
             ...self::compliance(),
@@ -219,6 +231,58 @@ class ImportModules
             self::field('position', 'Position / Designation', 'text', ['width' => 26]),
             self::field('station', 'Station / Division / Unit', 'branch', ['width' => 26]),
             self::select('classification', 'Classification', Classification::class),
+            self::field('remarks', 'Remarks', 'textarea', ['width' => 30]),
+        ]);
+    }
+
+    /**
+     * The general minimum wage of each region, from each wage order.
+     *
+     * @return Module
+     */
+    private static function wageOrders(): array
+    {
+        return self::module('wage-orders', 'Wage Orders', 'Wage Orders', ['region', 'sector', 'effective_on'], [
+            self::select('region', 'Region', Region::class, ['required' => true]),
+            self::field('order_number', 'Wage Order No.', 'text', ['required' => true, 'width' => 20]),
+            self::field('sector', 'Sector', 'text', ['required' => true, 'width' => 22, 'help' => 'For example Non-agriculture, Agriculture, or Retail and service.']),
+            self::field('daily_rate_centavos', 'Daily Minimum Wage', 'money', ['required' => true, 'width' => 16]),
+            self::field('effective_on', 'Effective Date', 'date', ['required' => true]),
+            self::field('remarks', 'Remarks', 'textarea', ['width' => 30]),
+        ]);
+    }
+
+    /**
+     * Every pay rate an employee has had, oldest first.
+     *
+     * @return Module
+     */
+    private static function payHistory(): array
+    {
+        return self::module('pay-history', 'Pay History', 'Pay History', ['employee_id', 'effective_on'], [
+            self::field('employee', 'Employee ID', 'employee', ['required' => true]),
+            self::field('effective_on', 'Effective Date', 'date', ['required' => true]),
+            self::select('change_type', 'Change Type', PayChangeType::class, ['required' => true, 'width' => 16]),
+            self::select('rate_type', 'Rate Type', RateType::class, ['required' => true]),
+            self::field('amount_centavos', 'Rate', 'money', ['required' => true]),
+            self::field('reference', 'Reference', 'text', ['width' => 22, 'help' => 'The wage order or memo behind this change.']),
+            self::field('remarks', 'Remarks', 'textarea', ['width' => 30]),
+        ]);
+    }
+
+    /**
+     * Promotions and demotions.
+     *
+     * @return Module
+     */
+    private static function positionHistory(): array
+    {
+        return self::module('position-history', 'Promotions', 'Promotions and Demotions', ['employee_id', 'effective_on'], [
+            self::field('employee', 'Employee ID', 'employee', ['required' => true]),
+            self::field('effective_on', 'Effective Date', 'date', ['required' => true]),
+            self::select('change_type', 'Change Type', PositionChangeType::class, ['required' => true]),
+            self::field('from_position', 'From Position', 'text', ['width' => 26]),
+            self::field('to_position', 'To Position', 'text', ['required' => true, 'width' => 26]),
             self::field('remarks', 'Remarks', 'textarea', ['width' => 30]),
         ]);
     }

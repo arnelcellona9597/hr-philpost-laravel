@@ -16,6 +16,9 @@ class ActivityFeed
     private const AREAS = [
         'employees' => ['employee', '/employees/{id}'],
         'employment-periods' => ['employment period', null],
+        'wage-orders' => ['wage order', '/wage-orders/{id}'],
+        'pay-changes' => ['pay record', null],
+        'position-changes' => ['promotion or demotion', null],
         'branches' => ['branch', '/branches/{id}'],
         'applications' => ['applicant', '/onboarding/{id}'],
         'wellness-leaves' => ['wellness leave', '/leave/{id}'],

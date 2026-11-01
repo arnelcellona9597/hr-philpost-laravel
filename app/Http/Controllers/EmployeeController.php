@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\Classification;
 use App\Enums\EmploymentStatus;
+use App\Enums\PayChangeType;
 use App\Exceptions\UserFacingException;
 use App\Http\Controllers\Concerns\RespondsToForms;
 use App\Models\Application;
@@ -19,6 +20,7 @@ use App\Services\DuplicateFinder;
 use App\Services\EmploymentHistoryService;
 use App\Services\LeaveService;
 use App\Services\MediaStore;
+use App\Services\PayHistoryService;
 use App\Support\Choices;
 use App\Support\EmployeeSearch;
 use App\Support\HrDate;
@@ -110,7 +112,7 @@ class EmployeeController extends Controller
         return $this->flash(redirect()->route('employees.show', $employee), "Employee {$employee->full_name} was added.".($similar > 0 ? ' Someone with the same name and birth date, email or ID number already exists; check Import / Export → duplicates.' : ''));
     }
 
-    public function show(Employee $employee, LeaveService $leave, EmploymentHistoryService $history, Request $request): View
+    public function show(Employee $employee, LeaveService $leave, EmploymentHistoryService $history, PayHistoryService $pay, Request $request): View
     {
         Gate::authorize('view', $employee);
 
@@ -132,6 +134,9 @@ class EmployeeController extends Controller
             'allowance' => $allowance,
             'remaining' => $allowance - $leave->usedInYear($employee, $year),
             'employment' => $history->summary($employee),
+            'pay' => $pay->summary($employee),
+            'positionChanges' => $employee->positionChanges()->get(),
+            'payChangeTypes' => PayChangeType::cases(),
             'branches' => Choices::branches(),
             'classifications' => array_column(Classification::cases(), 'value'),
             'leaves' => $employee->wellnessLeaves()->orderByDesc('inclusive_date_from')->limit(8)->get(),
@@ -144,7 +149,7 @@ class EmployeeController extends Controller
         ]);
     }
 
-    public function print(Employee $employee, EmploymentHistoryService $history): View
+    public function print(Employee $employee, EmploymentHistoryService $history, PayHistoryService $pay): View
     {
         Gate::authorize('view', $employee);
 
@@ -154,6 +159,8 @@ class EmployeeController extends Controller
             'employee' => $employee,
             'fields' => ImportModules::find('employees')['fields'],
             'employment' => $history->summary($employee),
+            'pay' => $pay->summary($employee),
+            'positionChanges' => $employee->positionChanges()->get(),
             'site' => SiteSetting::current(),
         ]);
     }
