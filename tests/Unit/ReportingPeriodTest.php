@@ -46,3 +46,32 @@ it('has no percentage change without an earlier value', function () {
     expect(ReportingPeriod::percentChange(5, 0))->toBeNull()
         ->and(ReportingPeriod::percentChange(15, 10))->toEqual(50.0);
 });
+
+it('uses a chosen date range and compares it with the equal span before it', function () {
+    expect(ReportingPeriod::resolve('this-year', '2026-11-15', '2026-09-01', '2026-10-15'))->toMatchArray([
+        'key' => 'custom',
+        'from' => '2026-09-01',
+        'to' => '2026-10-15',
+        'prevFrom' => '2026-07-18',
+        'prevTo' => '2026-08-31',
+        'bucket' => 'day',
+    ]);
+});
+
+it('picks a bucket that fits the length of the chosen range', function (string $from, string $to, string $bucket) {
+    expect(ReportingPeriod::resolve(null, '2026-11-15', $from, $to)['bucket'])->toBe($bucket);
+})->with([
+    ['2026-10-01', '2026-10-31', 'day'],
+    ['2026-01-01', '2026-10-31', 'week'],
+    ['2022-01-01', '2026-10-31', 'month'],
+]);
+
+it('ignores a chosen range that is backwards, invalid or longer than ten years', function (?string $from, ?string $to) {
+    expect(ReportingPeriod::resolve('last-month', '2026-11-15', $from, $to)['key'])->toBe('last-month');
+})->with([
+    ['2026-10-15', '2026-09-01'],
+    ['2026-02-30', '2026-03-01'],
+    ['2010-01-01', '2026-10-01'],
+    ['2026-09-01', null],
+    ['', ''],
+]);

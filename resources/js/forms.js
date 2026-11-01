@@ -31,6 +31,121 @@ document.querySelectorAll('select[data-searchable]').forEach((select) => {
   })
 })
 
+// One searchable employee field: type to filter, pick from the list. The original <select> stays in the
+// form, hidden, as the value that is submitted, so old input, prefill and the live preview keep working.
+document.querySelectorAll('select[data-combobox]').forEach((select) => {
+  const options = [...select.options].filter((option) => option.value !== '')
+  const wrap = document.createElement('div')
+  wrap.className = 'relative'
+  const input = document.createElement('input')
+  const list = document.createElement('ul')
+  const listId = `${select.id || 'combo'}-list`
+  input.type = 'text'
+  input.className = 'input'
+  input.id = select.id
+  input.autocomplete = 'off'
+  input.placeholder = 'Type a name or employee ID…'
+  input.required = select.required
+  input.setAttribute('role', 'combobox')
+  input.setAttribute('aria-autocomplete', 'list')
+  input.setAttribute('aria-expanded', 'false')
+  input.setAttribute('aria-controls', listId)
+  list.id = listId
+  list.setAttribute('role', 'listbox')
+  list.hidden = true
+  list.className = 'absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-line bg-surface py-1 shadow-elev-2'
+  select.removeAttribute('id')
+  select.required = false
+  select.hidden = true
+  select.before(wrap)
+  wrap.append(input, list)
+  wrap.append(select)
+
+  let matches = []
+  let active = -1
+  const chosen = () => select.selectedOptions[0]?.value ? select.selectedOptions[0] : null
+  const sync = () => {
+    input.value = chosen()?.text ?? ''
+    input.setCustomValidity('')
+  }
+  const close = () => {
+    list.hidden = true
+    input.setAttribute('aria-expanded', 'false')
+    input.removeAttribute('aria-activedescendant')
+  }
+  const highlight = () => {
+    ;[...list.children].forEach((item, index) => {
+      item.setAttribute('aria-selected', index === active ? 'true' : 'false')
+      item.classList.toggle('bg-surface-2', index === active)
+      if (index === active) {
+        input.setAttribute('aria-activedescendant', item.id)
+        item.scrollIntoView({ block: 'nearest' })
+      }
+    })
+  }
+  const choose = (option) => {
+    select.value = option.value
+    sync()
+    close()
+    select.dispatchEvent(new Event('change', { bubbles: true }))
+  }
+  const show = () => {
+    const query = input.value.trim().toLowerCase()
+    matches = options.filter((option) => !query || option.text.toLowerCase().includes(query)).slice(0, 50)
+    list.replaceChildren(...matches.map((option, index) => {
+      const item = document.createElement('li')
+      item.id = `${listId}-${index}`
+      item.setAttribute('role', 'option')
+      item.className = 'cursor-pointer px-3 py-1.5 text-sm hover:bg-surface-2'
+      item.textContent = option.text
+      item.addEventListener('mousedown', (event) => {
+        event.preventDefault()
+        choose(option)
+      })
+      return item
+    }))
+    if (!matches.length) {
+      const none = document.createElement('li')
+      none.className = 'px-3 py-1.5 text-sm text-muted'
+      none.textContent = 'No employee matches'
+      list.replaceChildren(none)
+    }
+    active = matches.length ? 0 : -1
+    list.hidden = false
+    input.setAttribute('aria-expanded', 'true')
+    highlight()
+  }
+
+  sync()
+  input.addEventListener('focus', () => input.select())
+  input.addEventListener('input', () => {
+    if (chosen()) {
+      select.value = ''
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+    input.setCustomValidity(input.required ? 'Pick an employee from the list.' : '')
+    show()
+  })
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      if (list.hidden) return show()
+      active = (active + (event.key === 'ArrowDown' ? 1 : -1) + matches.length) % Math.max(matches.length, 1)
+      highlight()
+    } else if (event.key === 'Enter' && !list.hidden && matches[active]) {
+      event.preventDefault()
+      choose(matches[active])
+    } else if (event.key === 'Escape' && !list.hidden) {
+      event.preventDefault()
+      close()
+    }
+  })
+  input.addEventListener('blur', () => {
+    close()
+    if (input.value.trim() === '' && chosen()) sync()
+  })
+})
+
 // Resend countdown and auto-submit on the email code step.
 const resend = document.getElementById('resend')
 if (resend && !resend.disabled) {
@@ -129,6 +244,17 @@ document.querySelectorAll('tr[data-href]').forEach((row) => {
 // Filters that apply as soon as they change.
 document.querySelectorAll('form[data-autosubmit] select, select[data-autosubmit]').forEach((select) => {
   select.addEventListener('change', () => select.form?.requestSubmit())
+})
+
+// A dashboard date range replaces the preset, and a preset replaces the range.
+document.querySelectorAll('form[data-autosubmit]').forEach((form) => {
+  const dates = [...form.querySelectorAll('[data-range-date]')]
+  const period = form.querySelector('select[name=period]')
+  if (!dates.length || !period) return
+  period.addEventListener('change', () => dates.forEach((input) => { input.value = '' }), { capture: true })
+  dates.forEach((input) => input.addEventListener('change', () => {
+    if (dates.every((date) => date.value)) form.requestSubmit()
+  }))
 })
 
 // Close a deadline popover with Escape.

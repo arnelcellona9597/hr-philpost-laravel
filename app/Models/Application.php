@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['application_id', 'applicant_name', 'email', 'position_applied', 'station_id', 'replacement', 'date_applied', 'start_ojt', 'application_status', 'req_pds', 'req_specimen_sign', 'req_sworn_declaration', 'req_tin_verification', 'req_police_clearance', 'req_medical_lab', 'req_landbank_account', 'req_assumption_of_duty', 'req_driver_license', 'req_or_cr', 'date_submitted', 'remarks', 'employee_id'])]
+#[Fillable(['application_id', 'applicant_name', 'email', 'position_applied', 'station_id', 'replacement', 'date_applied', 'start_ojt', 'fds_date', 'application_status', 'req_pds', 'req_specimen_sign', 'req_sworn_declaration', 'req_tin_verification', 'req_police_clearance', 'req_medical_lab', 'req_landbank_account', 'req_assumption_of_duty', 'req_driver_license', 'req_or_cr', 'date_submitted', 'remarks', 'employee_id'])]
 class Application extends Model
 {
     /** @use HasFactory<ApplicationFactory> */
@@ -48,6 +48,7 @@ class Application extends Model
         return [
             'date_applied' => 'date:Y-m-d',
             'start_ojt' => 'date:Y-m-d',
+            'fds_date' => 'date:Y-m-d',
             'application_status' => ApplicationStatus::class,
             'req_pds' => RequirementStatus::class,
             'req_specimen_sign' => RequirementStatus::class,

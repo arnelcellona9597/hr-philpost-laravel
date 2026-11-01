@@ -284,3 +284,12 @@ it('stores the status as a real enum', function () {
 
     expect(WellnessLeave::query()->firstOrFail()->status)->toBe(LeaveStatus::Pending);
 });
+
+it('files leave from one searchable employee field', function () {
+    $employee = Employee::factory()->create(['first_name' => 'Searchable', 'last_name' => 'Person']);
+
+    $page = $this->get('/leave/new?employee='.$employee->id)->assertSuccessful();
+    $html = $page->getContent();
+
+    expect([substr_count($html, 'name="employee"'), str_contains($html, 'data-combobox'), str_contains($html, 'data-searchable'), str_contains($html, 'Person, Searchable')])->toBe([1, true, false, true]);
+});

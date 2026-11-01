@@ -81,10 +81,21 @@
         <div class="col-span-2 min-w-0 sm:col-span-1">
             <label class="label !mb-1 text-xs" for="period">Period</label>
             <select class="input py-1.5 sm:min-w-40" id="period" name="period">
+                @if ($isCustom)
+                    <option value="custom" selected>Custom range</option>
+                @endif
                 @foreach ($periods as $key => $label)
                     <option value="{{ $key }}" @selected($key === $period['key'])>{{ $label }}</option>
                 @endforeach
             </select>
+        </div>
+        <div class="min-w-0">
+            <label class="label !mb-1 text-xs" for="from">From</label>
+            <input class="input py-1.5" id="from" name="from" type="date" value="{{ $isCustom ? $period['from'] : '' }}" data-range-date />
+        </div>
+        <div class="min-w-0">
+            <label class="label !mb-1 text-xs" for="to">To</label>
+            <input class="input py-1.5" id="to" name="to" type="date" value="{{ $isCustom ? $period['to'] : '' }}" data-range-date />
         </div>
         <div class="min-w-0">
             <label class="label !mb-1 text-xs" for="branch">Branch</label>
@@ -105,7 +116,7 @@
             </select>
         </div>
         <noscript><button class="btn-secondary">Apply</button></noscript>
-        @if ($branchId || $classification || $period['key'] !== Reporting::DEFAULT)
+        @if ($branchId || $classification || $isCustom || $period['key'] !== Reporting::DEFAULT)
             <a href="{{ route('dashboard') }}" class="btn-ghost btn-sm mb-0.5">Reset</a>
         @endif
         <p class="col-span-2 text-xs text-muted sm:ml-auto sm:text-right">
@@ -115,7 +126,7 @@
     </form>
 
     <section aria-label="Key figures" class="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:gap-4 lg:grid-cols-3 2xl:grid-cols-6">
-        <x-stat-card label="Active employees" :value="$active" icon="users" tone="primary" :note="($headcount['total'] ? round($active / $headcount['total'] * 1000) / 10 : 0).'% of '.number_format($headcount['total']).' records'" :href="$link('/employees', ['status' => 'Active'])" />
+        <x-stat-card label="Active employees" :value="$active" icon="users" tone="primary" :note="($headcount['total'] ? round($active / $headcount['total'] * 1000) / 10 : 0).'% of '.number_format($headcount['total']).' records'.($headcount['asOf'] ? ' · as of '.HrDate::format($headcount['asOf']) : '')" :href="$link('/employees', ['status' => 'Active'])" />
         <x-stat-card label="New hires" :value="$hires" icon="userPlus" tone="success" :delta="['pct' => Reporting::percentChange($hires, $movement['prevHires']), 'label' => $period['prevLabel']]" :spark="$sparkHires" :spark-slot="1" :href="$link('/employees', ['hiredFrom' => $period['from'], 'hiredTo' => $period['to']])" />
         <x-stat-card label="Separations" :value="$separations" icon="userMinus" tone="danger" :delta="['pct' => Reporting::percentChange($separations, $movement['prevSeparations']), 'label' => $period['prevLabel'], 'invert' => true]" :spark="$sparkSeparations" :spark-slot="2" :href="$link('/employees', ['status' => ['Resigned', 'Retired', 'Terminated']])" />
         <x-stat-card label="Leave days filed" :value="$movement['leaveDays']" icon="calendar" tone="warning" :delta="['pct' => Reporting::percentChange($movement['leaveDays'], $movement['prevLeaveDays']), 'label' => $period['prevLabel']]" :note="$movement['leaveFilings'].' filing'.($movement['leaveFilings'] === 1 ? '' : 's').' · '.$movement['pendingLeave'].' pending'" :href="route('leave.index', ['year' => substr($period['to'], 0, 4)])" />

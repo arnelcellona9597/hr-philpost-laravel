@@ -11,6 +11,7 @@ use App\Models\Payslip;
 use App\Models\User;
 use App\Models\WellnessLeave;
 use App\Services\DashboardStats;
+use App\Services\EmploymentHistoryService;
 use App\Support\ReportingPeriod;
 
 beforeEach(function () {
@@ -94,4 +95,52 @@ it('hides account changes from HR Staff in the activity feed', function () {
     User::factory()->create(['name' => 'Hidden Account']);
 
     $this->get('/')->assertDontSee('Hidden Account');
+});
+
+it('changes the dashboard to follow a chosen date range', function () {
+    $branch = Branch::factory()->create();
+    $hired = Employee::factory()->create(['station_id' => $branch->id, 'first_name' => 'Inrange', 'date_hired' => '2026-09-10', 'employment_status' => EmploymentStatus::Active]);
+    Employee::factory()->create(['station_id' => $branch->id, 'first_name' => 'Zzfarout', 'date_hired' => '2026-02-10', 'employment_status' => EmploymentStatus::Active]);
+
+    $range = $this->get('/?from=2026-09-01&to=2026-10-15')->assertOk()->assertSee('Custom range');
+    $stats = app(DashboardStats::class);
+    $movement = $stats->period(ReportingPeriod::resolve(null, null, '2026-09-01', '2026-10-15'), '2025-11-01', null, null);
+
+    expect(array_sum($movement['hiresByDay']))->toBe(1)
+        ->and($range->viewData('period')['key'])->toBe('custom')
+        ->and($range->viewData('recentHires')->pluck('first_name')->all())->toBe(['Inrange'])
+        ->and($hired->id)->toBeGreaterThan(0);
+
+    $this->get('/?from=2026-10-15&to=2026-09-01')->assertOk()->assertDontSee('Custom range');
+});
+
+it('counts headcount as of the end of a chosen range from the employment history', function () {
+    $stayed = Employee::factory()->create(['date_hired' => '2020-01-01', 'classification' => Classification::Regular, 'employment_status' => EmploymentStatus::Active]);
+    $left = Employee::factory()->create(['date_hired' => '2021-01-01', 'last_day_of_service' => '2026-10-20', 'classification' => Classification::Cos, 'employment_status' => EmploymentStatus::Resigned]);
+    $later = Employee::factory()->create(['date_hired' => '2026-11-01', 'classification' => Classification::Regular, 'employment_status' => EmploymentStatus::Active]);
+
+    $stats = app(DashboardStats::class);
+    $onOct15 = $stats->employees(null, null, '2026-10-15');
+    $onNov10 = $stats->employees(null, null, '2026-11-10');
+    $today = $stats->employees(null, null);
+
+    expect($onOct15['total'])->toBe(2)
+        ->and($onOct15['byStatus'])->toBe(['Active' => 2])
+        ->and($onNov10['byStatus'])->toBe(['Active' => 2, 'Resigned' => 1])
+        ->and($onNov10['total'])->toBe(3)
+        ->and($today['byStatus'])->toBe(['Active' => 2, 'Resigned' => 1])
+        ->and($onOct15['asOf'])->toBe('2026-10-15')
+        ->and($stats->employees(null, 'COS', '2026-10-15')['total'])->toBe(1)
+        ->and($stayed->id + $left->id + $later->id)->toBeGreaterThan(0);
+});
+
+it('uses the period that was current on the date for someone hired again', function () {
+    $employee = Employee::factory()->create(['date_hired' => '2022-01-01', 'last_day_of_service' => '2023-06-30', 'employment_status' => EmploymentStatus::Resigned]);
+    app(EmploymentHistoryService::class)->rehire($employee, '2026-03-01', null);
+
+    $stats = app(DashboardStats::class);
+
+    expect($stats->employees(null, null, '2025-01-01')['byStatus'])->toBe(['Resigned' => 1])
+        ->and($stats->employees(null, null, '2022-06-01')['byStatus'])->toBe(['Active' => 1])
+        ->and($stats->employees(null, null, '2021-01-01')['total'])->toBe(0);
 });
