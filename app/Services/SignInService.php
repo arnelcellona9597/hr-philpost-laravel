@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\Hash;
  */
 class SignInService
 {
+    public const NOT_SENT = 'The code could not be emailed. Try again in a few minutes, or ask your System Admin for help.';
+
     public const CODE_TTL_MINUTES = 10;
 
     public const MAX_ATTEMPTS = 5;
@@ -26,6 +28,12 @@ class SignInService
     public const MAX_PASSWORD_FAILURES = 5;
 
     public const LOCK_MINUTES = 15;
+
+    /**
+     * Whether the last code reached the mail server. The sign-in carries on either way, because
+     * hr:issue-login-code can still give a new code for it.
+     */
+    public bool $codeWasSent = true;
 
     public function __construct(protected DirectMailer $mailer) {}
 
@@ -189,6 +197,10 @@ class SignInService
         $challenge->forceFill(['send_count' => $challenge->send_count + 1])->save();
 
         $this->sendCode($challenge->user, $code);
+
+        if (! $this->codeWasSent) {
+            throw new UserFacingException(self::NOT_SENT);
+        }
     }
 
     public function cancel(?string $key): void
@@ -251,7 +263,7 @@ class SignInService
 
     private function sendCode(User $user, string $code): void
     {
-        $this->mailer->send(
+        $this->codeWasSent = $this->mailer->send(
             $user->email,
             "Your sign-in code: {$code}",
             "Your sign-in verification code is:\n\n{$code}\n\nIt expires in 10 minutes. If you did not try to sign in, change your password and tell your System Admin.",

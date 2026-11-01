@@ -600,3 +600,75 @@
     box-shadow: none !important;
   }
 }
+
+/* Certificate text. Units are points so the screen and print match the PDF. */
+.cert { color: #111; line-height: 1.5; font-size: 12pt; }
+.cert.cert-serif { font-family: 'Times New Roman', Times, 'Liberation Serif', serif; }
+.cert.cert-sans { font-family: 'DejaVu Sans', 'Inter Variable', Arial, sans-serif; font-size: 11pt; }
+.cert * { box-sizing: border-box; }
+.cert .cert-left { text-align: left; }
+.cert .cert-center { text-align: center; }
+.cert .cert-right { text-align: right; }
+.cert .cert-justify { text-align: justify; }
+.cert .cert-header { display: flex; align-items: center; gap: 12pt; margin-bottom: 4pt; }
+.cert .cert-header.cert-center { flex-direction: column; gap: 6pt; }
+.cert .cert-logo { max-height: 56pt; max-width: 120pt; object-fit: contain; }
+.cert .cert-company { font-weight: 700; font-size: 14pt; line-height: 1.25; }
+.cert .cert-lines { font-size: 10pt; color: #333; line-height: 1.35; }
+.cert .cert-title { font-weight: 700; margin: 0; line-height: 1.2; }
+.cert .cert-t-md { font-size: 16pt; }
+.cert .cert-t-lg { font-size: 20pt; }
+.cert .cert-t-xl { font-size: 24pt; }
+.cert .cert-wide { letter-spacing: 0.12em; }
+.cert .cert-p { margin: 0 0 10pt; }
+.cert .cert-s-sm { font-size: 10.5pt; }
+.cert .cert-s-md { font-size: 12pt; }
+.cert .cert-s-lg { font-size: 13.5pt; }
+.cert.cert-sans .cert-s-md { font-size: 11pt; }
+.cert .cert-indent { text-indent: 36pt; }
+.cert .cert-details { border-collapse: collapse; margin: 0 0 10pt; }
+.cert .cert-details th { text-align: left; font-weight: 700; padding: 2pt 16pt 2pt 0; vertical-align: top; white-space: nowrap; }
+.cert .cert-details td { padding: 2pt 0; }
+.cert .cert-signatory { display: flex; gap: 24pt; margin-top: 4pt; }
+.cert .cert-signatory.cert-left { justify-content: flex-start; }
+.cert .cert-signatory.cert-center { justify-content: center; }
+.cert .cert-signatory.cert-right { justify-content: flex-end; }
+.cert .cert-signatory.cert-center .cert-signer,
+.cert .cert-signatory.cert-right .cert-signer { text-align: center; }
+.cert .cert-signer { width: 180pt; }
+.cert .cert-sig-label { font-size: 10.5pt; margin-bottom: 28pt; text-align: left; }
+.cert .cert-sig-line { border-top: 1px solid #111; margin-top: 30pt; }
+.cert .cert-sig-label + .cert-sig-line { margin-top: 0; }
+.cert .cert-sig-name { font-weight: 700; text-transform: uppercase; margin-top: 3pt; }
+.cert .cert-sig-title { font-size: 10.5pt; }
+.cert .cert-hr { border: 0; border-top: 1px solid #333; margin: 6pt 0; }
+.cert .cert-footer { font-size: 9pt; color: #444; margin: 0 0 4pt; }
+.cert .cert-pagebreak { height: 0; margin: 14pt 0; border-top: 1px dashed #9aa3b2; }
+.cert .cert-pagefooter { margin: 10pt 0 0; padding-top: 3pt; border-top: 1px solid #ccc; font-size: 9pt; color: #444; }
+@media print {
+  .cert .cert-pagebreak { margin: 0; border: 0; break-after: page; }
+  .cert .cert-pagefooter { position: fixed; right: 0; bottom: 0; left: 0; margin: 0; background: #fff; }
+}
+.cert .cert-ph { background: #e8f0fb; color: #00539b; border-radius: 3px; padding: 0 3px; font-family: ui-monospace, monospace; font-size: 0.85em; white-space: nowrap; }
+.cert .cert-ph::before { content: '{{'; }
+.cert .cert-ph::after { content: '}}'; }
+
+/* Certificate template editor. */
+#ed-paper .ed-block { position: relative; border-radius: 3px; outline: 1px dashed transparent; outline-offset: 3px; cursor: pointer; transition: outline-color 120ms ease, background-color 120ms ease; }
+#ed-paper .ed-block:hover { outline-color: #b9c4d3; }
+#ed-paper .ed-block[aria-current='true'] { outline: 2px solid var(--brand-primary); background: rgb(0 83 155 / 0.03); }
+#ed-paper .ed-block:focus-visible { outline: 2px solid var(--brand-primary); }
+#ed-paper .ed-tools { position: absolute; top: -32px; right: -4px; z-index: 5; display: none; gap: 2px; padding: 2px; border-radius: 8px; background: #fff; box-shadow: 0 2px 8px rgb(15 20 28 / 0.18); font-family: var(--font-sans); }
+#ed-paper .ed-block:hover .ed-tools,
+#ed-paper .ed-block[aria-current='true'] .ed-tools,
+#ed-paper .ed-block:focus-within .ed-tools { display: flex; }
+#ed-paper .ed-tools button { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 6px; color: #454d5c; }
+#ed-paper .ed-tools button:hover { background: #f0f2f5; color: #0f141c; }
+#ed-paper .ed-tools [data-drag] { cursor: grab; touch-action: none; }
+#ed-paper .ed-tools svg { width: 15px; height: 15px; }
+#ed-paper .ed-empty { font-family: var(--font-sans); font-size: 12px; color: #8d95a3; text-align: center; padding: 4px; }
+.ed-palette { touch-action: none; cursor: grab; }
+.ed-mode[aria-checked='true'] { background: var(--primary-soft); color: var(--primary-ink); font-weight: 600; }
+#ed-indicator { position: absolute; left: 0; right: 0; height: 3px; border-radius: 3px; background: var(--brand-primary); box-shadow: 0 0 0 3px rgb(0 83 155 / 0.15); pointer-events: none; z-index: 6; }
+#ed-ghost { position: fixed; z-index: 80; pointer-events: none; padding: 6px 10px; border-radius: 8px; background: var(--surface); color: var(--fg); border: 1px solid var(--border-strong); box-shadow: var(--elev-pop); font-size: 13px; font-weight: 500; transform: translate(12px, 8px); }
+body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; user-select: none; }

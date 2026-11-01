@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ThemeMode;
+use App\Models\Concerns\Audited;
 use App\Models\Concerns\IsSingleton;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -11,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['company_name', 'tagline', 'logo_id', 'palette', 'default_theme'])]
 class SiteSetting extends Model
 {
-    use IsSingleton;
+    use Audited, IsSingleton;
 
     public const DEFAULT_PALETTE = [
         'primary' => '#00539b',

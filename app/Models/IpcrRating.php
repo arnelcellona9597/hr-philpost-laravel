@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\IpcrPeriod;
+use App\Models\Concerns\Audited;
 use App\Support\IpcrScale;
 use Database\Factories\IpcrRatingFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -12,7 +13,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 class IpcrRating extends ComplianceRecord
 {
     /** @use HasFactory<IpcrRatingFactory> */
-    use HasFactory;
+    use Audited, HasFactory;
 
     public const SLUG = 'ipcr-ratings';
 

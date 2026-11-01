@@ -40,7 +40,9 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerate();
         $request->session()->put(['login.challenge' => $challenge, 'login.next' => SafeRedirect::path($request->input('next'))]);
 
-        return redirect()->route('login.verify');
+        $redirect = redirect()->route('login.verify');
+
+        return $signIn->codeWasSent ? $redirect : $redirect->withErrors(['code' => SignInService::NOT_SENT]);
     }
 
     public function destroy(Request $request): RedirectResponse

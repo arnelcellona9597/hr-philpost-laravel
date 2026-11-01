@@ -1,18 +1,42 @@
 <?php
 
 use App\Http\Controllers\ApplicationController;
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\AuthenticatedSessionController;
 use App\Http\Controllers\BranchController;
+use App\Http\Controllers\CertificateController;
+use App\Http\Controllers\CertificateTemplateController;
+use App\Http\Controllers\ContractController;
+use App\Http\Controllers\ContractSettingsController;
+use App\Http\Controllers\ContractTemplateController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DataController;
+use App\Http\Controllers\EmailServerController;
+use App\Http\Controllers\EmailSettingsController;
+use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\EmploymentPeriodController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\ForgotPasswordController;
 use App\Http\Controllers\LeaveSettingsController;
 use App\Http\Controllers\LoginVerificationController;
+use App\Http\Controllers\MailQueueController;
+use App\Http\Controllers\MessageController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PayrollController;
+use App\Http\Controllers\PayrollImportController;
+use App\Http\Controllers\PayslipController;
+use App\Http\Controllers\PayslipSettingsController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReceivedMailController;
+use App\Http\Controllers\ReceivedMailImportController;
+use App\Http\Controllers\RemittanceController;
+use App\Http\Controllers\RemittanceImportController;
+use App\Http\Controllers\RemittanceSettingsController;
 use App\Http\Controllers\RequirementController;
 use App\Http\Controllers\RequirementDeadlineController;
 use App\Http\Controllers\SetPasswordController;
+use App\Http\Controllers\SiteSettingsController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WellnessLeaveController;
 use App\Http\Middleware\EnsureSystemAdmin;
@@ -46,8 +70,11 @@ Route::match(['get', 'post'], '/register', fn () => redirect()->route('login', [
 
 Route::get('/files/{media}', [FileController::class, 'show'])->name('files.show');
 
+// Fallback for hosts without a usable scheduler. The key travels in a header, out of access logs.
+Route::get('/internal/queue', MailQueueController::class)->middleware('throttle:auth-posts')->name('internal.queue');
+
 Route::middleware(RequireActiveSession::class)->group(function () {
-    Route::view('/', 'dashboard')->name('dashboard');
+    Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
     Route::prefix('employees')->name('employees.')->controller(EmployeeController::class)->group(function () {
@@ -58,6 +85,13 @@ Route::middleware(RequireActiveSession::class)->group(function () {
         Route::put('/{employee}', 'update')->name('update')->whereNumber('employee');
         Route::delete('/{employee}', 'destroy')->name('destroy')->whereNumber('employee');
         Route::get('/{employee}/edit', 'edit')->name('edit')->whereNumber('employee');
+    });
+
+    Route::prefix('employees/{employee}/employment')->name('employment.')->whereNumber(['employee', 'period'])->controller(EmploymentPeriodController::class)->group(function () {
+        Route::post('/', 'hire')->name('hire');
+        Route::post('/separate', 'separate')->name('separate');
+        Route::put('/{period}', 'update')->name('update');
+        Route::delete('/{period}', 'destroy')->name('destroy');
     });
 
     Route::prefix('branches')->name('branches.')->controller(BranchController::class)->group(function () {
@@ -122,6 +156,191 @@ Route::middleware(RequireActiveSession::class)->group(function () {
             });
         });
     });
+
+    Route::prefix('certificates')->name('certificates.')->group(function () {
+        Route::prefix('templates')->name('templates.')->controller(CertificateTemplateController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('/', 'store')->name('store');
+            Route::get('/{template}', 'edit')->name('edit')->whereNumber('template');
+            Route::put('/{template}', 'update')->name('update')->whereNumber('template');
+            Route::delete('/{template}', 'destroy')->name('destroy')->whereNumber('template');
+            Route::post('/{template}/duplicate', 'duplicate')->name('duplicate')->whereNumber('template');
+            Route::post('/{template}/toggle', 'toggle')->name('toggle')->whereNumber('template');
+        });
+
+        Route::controller(CertificateController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('/', 'store')->name('store');
+            Route::get('/new', 'create')->name('create');
+            Route::get('/preview', 'preview')->name('preview');
+            Route::get('/{certificate}', 'show')->name('show')->whereNumber('certificate');
+            Route::delete('/{certificate}', 'destroy')->name('destroy')->whereNumber('certificate');
+            Route::post('/{certificate}/void', 'void')->name('void')->whereNumber('certificate');
+            Route::get('/{certificate}/pdf', 'pdf')->name('pdf')->whereNumber('certificate');
+            Route::get('/{certificate}/print', 'print')->name('print')->whereNumber('certificate');
+        });
+    });
+
+    Route::prefix('payroll')->name('payroll.')->group(function () {
+        Route::get('/settings', [PayslipSettingsController::class, 'edit'])->name('settings');
+        Route::put('/settings', [PayslipSettingsController::class, 'update']);
+
+        Route::prefix('payslips/{payslip}')->name('payslips.')->whereNumber('payslip')->controller(PayslipController::class)->group(function () {
+            Route::get('/', 'show')->name('show');
+            Route::put('/', 'update')->name('update');
+            Route::delete('/', 'destroy')->name('destroy');
+            Route::post('/resend', 'resend')->name('resend');
+            Route::get('/print', 'print')->name('print');
+            Route::get('/pdf', 'pdf')->name('pdf');
+        });
+
+        Route::controller(PayrollController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('/', 'store')->name('store');
+            Route::get('/new', 'create')->name('create');
+
+            Route::prefix('{period}')->whereNumber('period')->group(function () {
+                Route::get('/', 'show')->name('show');
+                Route::put('/', 'update')->name('update');
+                Route::delete('/', 'destroy')->name('destroy');
+                Route::get('/edit', 'edit')->name('edit');
+                Route::post('/generate', 'generate')->name('generate');
+                Route::put('/grid', 'saveGrid')->name('grid');
+                Route::post('/release', 'release')->name('release');
+                Route::delete('/payslips', 'destroyPayslips')->name('payslips.destroy');
+                Route::get('/print', 'print')->name('print');
+                Route::get('/export', 'export')->name('export');
+            });
+        });
+
+        Route::prefix('{period}/import')->name('import.')->whereNumber('period')->controller(PayrollImportController::class)->group(function () {
+            Route::post('/', 'store')->name('store');
+            Route::post('/commit', 'commit')->name('commit');
+        });
+    });
+
+    Route::prefix('messages')->name('messages.')->controller(MessageController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/', 'store')->name('store');
+        Route::get('/new', 'create')->name('create');
+        Route::post('/preview', 'preview')->name('preview');
+        Route::get('/{message}', 'show')->name('show')->whereNumber('message');
+        Route::post('/{message}/process', 'process')->name('process')->whereNumber('message');
+        Route::post('/{message}/retry', 'retry')->name('retry')->whereNumber('message');
+    });
+
+    Route::prefix('settings')->name('settings.')->group(function () {
+        Route::get('/', [SiteSettingsController::class, 'edit'])->name('site');
+        Route::put('/', [SiteSettingsController::class, 'update']);
+
+        Route::prefix('notifications')->controller(EmailSettingsController::class)->group(function () {
+            Route::get('/', 'edit')->name('notifications');
+            Route::put('/', 'update');
+            Route::post('/test', 'test')->name('notifications.test');
+            Route::post('/rotate-key', 'rotateKey')->name('notifications.rotate');
+        });
+
+        Route::prefix('templates')->name('templates.')->controller(EmailTemplateController::class)->group(function () {
+            Route::post('/', 'store')->name('store');
+            Route::get('/new', 'create')->name('create');
+            Route::get('/{template}', 'edit')->name('edit')->whereNumber('template');
+            Route::put('/{template}', 'update')->name('update')->whereNumber('template');
+            Route::delete('/{template}', 'destroy')->name('destroy')->whereNumber('template');
+        });
+
+        Route::prefix('email-server')->middleware(EnsureSystemAdmin::class)->controller(EmailServerController::class)->group(function () {
+            Route::get('/', 'edit')->name('email-server');
+            Route::put('/', 'update');
+            Route::post('/test', 'test')->name('email-server.test');
+        });
+    });
+
+    Route::prefix('received-mails')->name('received-mails.')->group(function () {
+        Route::controller(ReceivedMailController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('/', 'store')->name('store');
+            Route::get('/new', 'create')->name('create');
+            Route::get('/export', 'export')->name('export');
+            Route::get('/print', 'print')->name('print');
+            Route::get('/{mail}/edit', 'edit')->name('edit')->whereNumber('mail');
+            Route::put('/{mail}', 'update')->name('update')->whereNumber('mail');
+            Route::delete('/{mail}', 'destroy')->name('destroy')->whereNumber('mail');
+        });
+
+        Route::controller(ReceivedMailImportController::class)->group(function () {
+            Route::post('/import', 'preview')->name('import');
+            Route::post('/import/commit', 'commit')->name('import.commit');
+        });
+    });
+
+    Route::prefix('contracts')->name('contracts.')->group(function () {
+        Route::controller(ContractSettingsController::class)->group(function () {
+            Route::get('/settings', 'edit')->name('settings');
+            Route::put('/settings', 'update');
+        });
+
+        Route::prefix('templates')->name('templates.')->controller(ContractTemplateController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('/', 'store')->name('store');
+            Route::get('/{template}', 'edit')->name('edit')->whereNumber('template');
+            Route::put('/{template}', 'update')->name('update')->whereNumber('template');
+            Route::post('/{template}/duplicate', 'duplicate')->name('duplicate')->whereNumber('template');
+            Route::post('/{template}/toggle', 'toggle')->name('toggle')->whereNumber('template');
+            Route::delete('/{template}', 'destroy')->name('destroy')->whereNumber('template');
+        });
+
+        Route::controller(ContractController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::get('/new', 'create')->name('create');
+            Route::post('/', 'store')->name('store');
+            Route::post('/download', 'download')->name('download');
+            Route::get('/{contract}', 'show')->name('show')->whereNumber('contract');
+            Route::get('/{contract}/print', 'print')->name('print')->whereNumber('contract');
+            Route::get('/{contract}/pdf', 'pdf')->name('pdf')->whereNumber('contract');
+            Route::get('/{contract}/docx', 'docx')->name('docx')->whereNumber('contract');
+            Route::post('/{contract}/void', 'void')->name('void')->whereNumber('contract');
+            Route::delete('/{contract}', 'destroy')->name('destroy')->whereNumber('contract');
+        });
+    });
+
+    Route::prefix('remittances')->name('remittances.')->group(function () {
+        Route::controller(RemittanceSettingsController::class)->group(function () {
+            Route::get('/settings', 'edit')->name('settings');
+            Route::put('/settings/voucher', 'updateVoucher')->name('settings.voucher');
+            Route::put('/settings/{kind}', 'update')->name('settings.update');
+        });
+
+        Route::controller(RemittanceImportController::class)->group(function () {
+            Route::post('/import', 'preview')->name('import');
+            Route::post('/import/commit', 'commit')->name('import.commit');
+        });
+
+        Route::controller(RemittanceController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('/', 'store')->name('store');
+            Route::get('/{remittance}', 'show')->name('show')->whereNumber('remittance');
+            Route::put('/{remittance}', 'update')->name('update')->whereNumber('remittance');
+            Route::delete('/{remittance}', 'destroy')->name('destroy')->whereNumber('remittance');
+            Route::post('/{remittance}/missing', 'addMissing')->name('missing')->whereNumber('remittance');
+            Route::put('/{remittance}/voucher-details', 'voucherDetails')->name('voucher-details')->whereNumber('remittance');
+            Route::post('/{remittance}/finalize', 'finalize')->name('finalize')->whereNumber('remittance');
+            Route::post('/{remittance}/reopen', 'reopen')->name('reopen')->whereNumber('remittance');
+            Route::get('/{remittance}/export', 'export')->name('export')->whereNumber('remittance');
+            Route::get('/{remittance}/print', 'print')->name('print')->whereNumber('remittance');
+            Route::get('/{remittance}/voucher', 'voucher')->name('voucher')->whereNumber('remittance');
+            Route::get('/{remittance}/voucher.pdf', 'voucherPdf')->name('voucher.pdf')->whereNumber('remittance');
+        });
+    });
+
+    Route::prefix('data')->name('data.')->controller(DataController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/export', 'export')->name('export');
+        Route::get('/template', 'template')->name('template');
+        Route::post('/import', 'preview')->name('import');
+        Route::post('/import/commit', 'commit')->name('import.commit');
+    });
+
+    Route::get('/audit', [AuditLogController::class, 'index'])->name('audit.index');
 
     Route::prefix('notifications')->name('notifications.')->controller(NotificationController::class)->group(function () {
         Route::get('/', 'index')->name('index');

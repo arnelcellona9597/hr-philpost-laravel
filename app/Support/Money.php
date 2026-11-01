@@ -60,4 +60,70 @@ class Money
     {
         return ($centavos < 0 ? '−' : '').$symbol.number_format(abs($centavos) / 100, 2);
     }
+
+    /**
+     * 2584128 becomes "Twenty Five Thousand Eight Hundred Forty One Pesos and 28/100 Only", as written on vouchers.
+     */
+    public static function words(int $centavos): string
+    {
+        $pesos = intdiv(abs($centavos), 100);
+        $cents = abs($centavos) % 100;
+
+        return self::spell($pesos).' '.($pesos === 1 ? 'Peso' : 'Pesos')." and {$cents}/100 Only";
+    }
+
+    /**
+     * 45000 becomes "Four Hundred Fifty Pesos"; centavos are added only when there are some.
+     */
+    public static function pesosInWords(int $centavos): string
+    {
+        $pesos = intdiv(abs($centavos), 100);
+        $cents = abs($centavos) % 100;
+
+        return self::spell($pesos).' '.($pesos === 1 ? 'Peso' : 'Pesos').($cents > 0 ? " and {$cents}/100" : '');
+    }
+
+    private static function spell(int $number): string
+    {
+        if ($number === 0) {
+            return 'Zero';
+        }
+
+        $ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+        $tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+        $below1000 = function (int $part) use ($ones, $tens): string {
+            $words = [];
+
+            if ($part >= 100) {
+                $words[] = $ones[intdiv($part, 100)].' Hundred';
+                $part %= 100;
+            }
+
+            if ($part >= 20) {
+                $words[] = $tens[intdiv($part, 10)];
+                $part %= 10;
+            }
+
+            if ($part > 0) {
+                $words[] = $ones[$part];
+            }
+
+            return implode(' ', $words);
+        };
+
+        $words = [];
+
+        foreach ([1_000_000_000_000 => 'Trillion', 1_000_000_000 => 'Billion', 1_000_000 => 'Million', 1_000 => 'Thousand'] as $size => $name) {
+            if ($number >= $size) {
+                $words[] = $below1000(intdiv($number, $size)).' '.$name;
+                $number %= $size;
+            }
+        }
+
+        if ($number > 0) {
+            $words[] = $below1000($number);
+        }
+
+        return implode(' ', $words);
+    }
 }

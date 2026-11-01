@@ -7,6 +7,7 @@ it('lists modules in import order', function () {
         'branches',
         'holidays',
         'employees',
+        'employment-history',
         'applications',
         'wellness-leaves',
         'itr-submissions',

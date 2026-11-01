@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\LeaveStatus;
+use App\Models\Concerns\Audited;
 use Database\Factories\WellnessLeaveFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class WellnessLeave extends Model
 {
     /** @use HasFactory<WellnessLeaveFactory> */
-    use HasFactory;
+    use Audited, HasFactory;
 
     /**
      * Get the attributes that should be cast.

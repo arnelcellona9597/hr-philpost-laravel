@@ -9,6 +9,9 @@ use App\Enums\EducationalAttainment;
 use App\Enums\EmploymentStatus;
 use App\Enums\Gender;
 use App\Enums\Region;
+use App\Models\Concerns\Audited;
+use App\Services\EmploymentHistoryService;
+use App\Services\LeaveService;
 use App\Support\HrDate;
 use App\Support\Names;
 use Database\Factories\EmployeeFactory;
@@ -23,7 +26,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Employee extends Model
 {
     /** @use HasFactory<EmployeeFactory> */
-    use HasFactory;
+    use Audited, HasFactory;
 
     /**
      * Keep the stored "LAST, First M. Ext." copy used for sorting, searching and labels in step.
@@ -32,6 +35,13 @@ class Employee extends Model
     {
         static::saving(function (Employee $employee): void {
             $employee->full_name = Names::lastFirst($employee->last_name, $employee->first_name, $employee->middle_name, $employee->extension);
+        });
+
+        // The latest employment period follows whatever is saved on the record.
+        static::saved(function (Employee $employee): void {
+            if ($employee->wasRecentlyCreated || $employee->wasChanged(['date_hired', 'last_day_of_service', 'employment_status', 'position', 'station_id', 'classification'])) {
+                app(EmploymentHistoryService::class)->syncPeriodFromEmployee($employee);
+            }
         });
     }
 
@@ -73,6 +83,27 @@ class Employee extends Model
             $this->date_hired?->toDateString(),
             $this->last_day_of_service?->toDateString(),
         )));
+    }
+
+    /**
+     * Wellness leave days counted against an employee's allowance for a year.
+     */
+    public function wellnessDaysUsedIn(int $year): int
+    {
+        return $this->wellnessLeaves()
+            ->whereIn('status', LeaveService::COUNTED)
+            ->get()
+            ->sum(fn (WellnessLeave $leave): int => (int) ($leave->days_by_year[$year] ?? 0));
+    }
+
+    /**
+     * Every time the person was employed, oldest first.
+     *
+     * @return HasMany<EmploymentPeriod, $this>
+     */
+    public function employmentPeriods(): HasMany
+    {
+        return $this->hasMany(EmploymentPeriod::class)->orderBy('hired_on');
     }
 
     /**
@@ -140,6 +171,14 @@ class Employee extends Model
     }
 
     /**
+     * @return HasMany<Contract, $this>
+     */
+    public function contracts(): HasMany
+    {
+        return $this->hasMany(Contract::class);
+    }
+
+    /**
      * @return HasMany<Certificate, $this>
      */
     public function certificates(): HasMany
@@ -168,6 +207,7 @@ class Employee extends Model
             $this->ipcrRatings(),
             $this->payslips(),
             $this->certificates(),
+            $this->contracts(),
             $this->applications(),
         ])->sum(fn (HasMany $records): int => $records->count());
 

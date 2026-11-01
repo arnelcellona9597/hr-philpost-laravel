@@ -225,13 +225,18 @@ it('shows System Admins the whole audit log', function () {
 });
 
 it('applies the same audit rule to list queries', function () {
+    $staff = staff();
+    $admin = systemAdmin();
+    $disabled = User::factory()->disabled()->create();
+    AuditLog::query()->delete();
+
     AuditLog::factory()->create();
     AuditLog::factory()->forUsers()->create();
     AuditLog::factory()->forSmtpSettings()->create();
 
-    expect(AuditLog::query()->visibleTo(staff())->count())->toBe(1)
-        ->and(AuditLog::query()->visibleTo(systemAdmin())->count())->toBe(3)
-        ->and(AuditLog::query()->visibleTo(User::factory()->disabled()->create())->count())->toBe(0);
+    expect(AuditLog::query()->visibleTo($staff)->count())->toBe(1)
+        ->and(AuditLog::query()->visibleTo($admin)->count())->toBe(3)
+        ->and(AuditLog::query()->visibleTo($disabled)->count())->toBe(0);
 });
 
 it('makes the audit log immutable', function () {

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\Classification;
 use App\Enums\EmploymentStatus;
 use App\Exceptions\UserFacingException;
 use App\Http\Controllers\Concerns\RespondsToForms;
@@ -13,6 +14,7 @@ use App\Models\LeaveSetting;
 use App\Models\Media;
 use App\Models\RequirementDeadlineSetting;
 use App\Services\ApplicationService;
+use App\Services\EmploymentHistoryService;
 use App\Services\LeaveService;
 use App\Services\MediaStore;
 use App\Support\Choices;
@@ -20,6 +22,7 @@ use App\Support\EmployeeSearch;
 use App\Support\HrDate;
 use App\Support\ImportModules;
 use App\Support\RecordForm;
+use App\Support\RecordRules;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -103,7 +106,7 @@ class EmployeeController extends Controller
         return $this->flash(redirect()->route('employees.show', $employee), "Employee {$employee->full_name} was added.");
     }
 
-    public function show(Employee $employee, LeaveService $leave, Request $request): View
+    public function show(Employee $employee, LeaveService $leave, EmploymentHistoryService $history, Request $request): View
     {
         Gate::authorize('view', $employee);
 
@@ -124,8 +127,12 @@ class EmployeeController extends Controller
             'year' => $year,
             'allowance' => $allowance,
             'remaining' => $allowance - $leave->usedInYear($employee, $year),
+            'employment' => $history->summary($employee),
+            'branches' => Choices::branches(),
+            'classifications' => array_column(Classification::cases(), 'value'),
             'leaves' => $employee->wellnessLeaves()->orderByDesc('inclusive_date_from')->limit(8)->get(),
             'certificates' => $employee->certificates()->latest()->limit(10)->get(),
+            'contracts' => $employee->contracts()->latest('term_start')->limit(10)->get(),
             'requirements' => $requirements,
             'requirementYears' => collect($requirements)->flatten()->pluck('year')->unique()->sortDesc()->values(),
             'deadlineSettings' => RequirementDeadlineSetting::current()->toArray(),
@@ -207,19 +214,7 @@ class EmployeeController extends Controller
             'employee_id' => 'That Employee ID is already used.',
         ], $employee);
 
-        $data = $parsed['data'];
-        $hired = $data['date_hired'] ?? null;
-        $lastDay = $data['last_day_of_service'] ?? null;
-
-        if (($data['date_of_birth'] ?? '') > HrDate::today()) {
-            $parsed['errors']['date_of_birth'] = 'Date of birth cannot be in the future';
-        }
-
-        if ($hired !== null && $lastDay !== null && $lastDay < $hired) {
-            $parsed['errors']['last_day_of_service'] = 'Last day of service cannot be before the date hired';
-        }
-
-        return $parsed;
+        return [...$parsed, 'errors' => [...$parsed['errors'], ...RecordRules::errors('employees', $parsed['data']), ...app(EmploymentHistoryService::class)->employeeProblems($employee, $parsed['data'])]];
     }
 
     /**

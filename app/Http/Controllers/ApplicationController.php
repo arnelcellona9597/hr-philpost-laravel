@@ -18,6 +18,7 @@ use App\Support\Choices;
 use App\Support\HrDate;
 use App\Support\ImportModules;
 use App\Support\RecordForm;
+use App\Support\RecordRules;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -216,14 +217,7 @@ class ApplicationController extends Controller
     {
         $parsed = RecordForm::parse($request, $fields, 'applications', ['application_id' => 'That Application ID is already used.'], $application);
 
-        $applied = $parsed['data']['date_applied'] ?? null;
-        $ojt = $parsed['data']['start_ojt'] ?? null;
-
-        if ($applied !== null && $ojt !== null && $ojt < $applied) {
-            $parsed['errors']['start_ojt'] = 'Start OJT cannot be before the date applied';
-        }
-
-        return $parsed;
+        return [...$parsed, 'errors' => [...$parsed['errors'], ...RecordRules::errors('applications', $parsed['data'])]];
     }
 
     /**
