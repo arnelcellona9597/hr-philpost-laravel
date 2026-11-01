@@ -2,10 +2,8 @@
 @props(['site'])
 
 @php
-    $top = $site->letterhead_top ?: 'Republic of the Philippines';
-    $name = array_filter(array_map(trim(...), explode("\n", (string) ($site->letterhead_name ?: mb_strtoupper($site->company_name)))));
-    $details = array_filter(array_map(trim(...), explode("\n", (string) $site->letterhead_details)));
-    $logoId = $site->letterhead_logo_id ?: $site->logo_id;
+    $letterhead = $site->letterhead();
+    ['top' => $top, 'name' => $name, 'details' => $details, 'logoId' => $logoId] = $letterhead;
 @endphp
 
 <header class="text-[#111418]">
@@ -24,9 +22,9 @@
         @endif
     </div>
     <div class="border-t-[3px] border-[#111418]"></div>
-    @if ($site->letterhead_section)
+    @if ($letterhead['section'] !== '')
         <div class="flex justify-end">
-            <p class="bg-[#111418] px-6 py-0.5 text-[12px] font-bold text-white [print-color-adjust:exact]">{{ $site->letterhead_section }}</p>
+            <p class="bg-[#111418] px-6 py-0.5 text-[12px] font-bold text-white [print-color-adjust:exact]">{{ $letterhead['section'] }}</p>
         </div>
     @endif
 </header>

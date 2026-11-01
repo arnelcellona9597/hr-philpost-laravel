@@ -50,6 +50,24 @@ class SiteSetting extends Model
     }
 
     /**
+     * The printed letterhead with its fallbacks: the company name and the main logo.
+     *
+     * @return array{top: string, name: list<string>, details: list<string>, section: string, logoId: int|null}
+     */
+    public function letterhead(): array
+    {
+        $lines = fn (string $text): array => array_values(array_filter(array_map(trim(...), explode("\n", $text))));
+
+        return [
+            'top' => $this->letterhead_top ?: 'Republic of the Philippines',
+            'name' => $lines((string) ($this->letterhead_name ?: mb_strtoupper($this->company_name))),
+            'details' => $lines((string) $this->letterhead_details),
+            'section' => (string) $this->letterhead_section,
+            'logoId' => $this->letterhead_logo_id ?: $this->logo_id,
+        ];
+    }
+
+    /**
      * @return BelongsTo<Media, $this>
      */
     public function logo(): BelongsTo

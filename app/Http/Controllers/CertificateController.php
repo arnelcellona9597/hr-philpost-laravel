@@ -176,10 +176,13 @@ class CertificateController extends Controller
      */
     private function renderHtml(array $content): string
     {
+        $letterheadLogo = CertificateRenderer::letterheadLogoId($content['blocks']);
+
         return CertificateRenderer::html($content['blocks'], [
             'companyName' => $content['companyName'],
             'font' => $content['font'],
             'logoUrl' => $content['logoId'] ? route('files.show', $content['logoId'], false) : null,
+            'letterheadLogoUrl' => $letterheadLogo ? route('files.show', $letterheadLogo, false) : null,
         ]);
     }
 }
