@@ -3,12 +3,18 @@
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\AuthenticatedSessionController;
 use App\Http\Controllers\BranchController;
+use App\Http\Controllers\CertificateController;
+use App\Http\Controllers\CertificateTemplateController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\ForgotPasswordController;
 use App\Http\Controllers\LeaveSettingsController;
 use App\Http\Controllers\LoginVerificationController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PayrollController;
+use App\Http\Controllers\PayrollImportController;
+use App\Http\Controllers\PayslipController;
+use App\Http\Controllers\PayslipSettingsController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RequirementController;
 use App\Http\Controllers\RequirementDeadlineController;
@@ -120,6 +126,68 @@ Route::middleware(RequireActiveSession::class)->group(function () {
                 Route::put('/{record}', 'update')->name('update')->whereNumber('record');
                 Route::delete('/{record}', 'destroy')->name('destroy')->whereNumber('record');
             });
+        });
+    });
+
+    Route::prefix('certificates')->name('certificates.')->group(function () {
+        Route::prefix('templates')->name('templates.')->controller(CertificateTemplateController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('/', 'store')->name('store');
+            Route::get('/{template}', 'edit')->name('edit')->whereNumber('template');
+            Route::put('/{template}', 'update')->name('update')->whereNumber('template');
+            Route::delete('/{template}', 'destroy')->name('destroy')->whereNumber('template');
+            Route::post('/{template}/duplicate', 'duplicate')->name('duplicate')->whereNumber('template');
+            Route::post('/{template}/toggle', 'toggle')->name('toggle')->whereNumber('template');
+        });
+
+        Route::controller(CertificateController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('/', 'store')->name('store');
+            Route::get('/new', 'create')->name('create');
+            Route::get('/preview', 'preview')->name('preview');
+            Route::get('/{certificate}', 'show')->name('show')->whereNumber('certificate');
+            Route::delete('/{certificate}', 'destroy')->name('destroy')->whereNumber('certificate');
+            Route::post('/{certificate}/void', 'void')->name('void')->whereNumber('certificate');
+            Route::get('/{certificate}/pdf', 'pdf')->name('pdf')->whereNumber('certificate');
+            Route::get('/{certificate}/print', 'print')->name('print')->whereNumber('certificate');
+        });
+    });
+
+    Route::prefix('payroll')->name('payroll.')->group(function () {
+        Route::get('/settings', [PayslipSettingsController::class, 'edit'])->name('settings');
+        Route::put('/settings', [PayslipSettingsController::class, 'update']);
+
+        Route::prefix('payslips/{payslip}')->name('payslips.')->whereNumber('payslip')->controller(PayslipController::class)->group(function () {
+            Route::get('/', 'show')->name('show');
+            Route::put('/', 'update')->name('update');
+            Route::delete('/', 'destroy')->name('destroy');
+            Route::post('/resend', 'resend')->name('resend');
+            Route::get('/print', 'print')->name('print');
+            Route::get('/pdf', 'pdf')->name('pdf');
+        });
+
+        Route::controller(PayrollController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('/', 'store')->name('store');
+            Route::get('/new', 'create')->name('create');
+
+            Route::prefix('{period}')->whereNumber('period')->group(function () {
+                Route::get('/', 'show')->name('show');
+                Route::put('/', 'update')->name('update');
+                Route::delete('/', 'destroy')->name('destroy');
+                Route::get('/edit', 'edit')->name('edit');
+                Route::post('/generate', 'generate')->name('generate');
+                Route::put('/grid', 'saveGrid')->name('grid');
+                Route::post('/release', 'release')->name('release');
+                Route::delete('/payslips', 'destroyPayslips')->name('payslips.destroy');
+                Route::get('/print', 'print')->name('print');
+                Route::get('/export', 'export')->name('export');
+            });
+        });
+
+        Route::prefix('{period}/import')->name('import.')->whereNumber('period')->controller(PayrollImportController::class)->group(function () {
+            Route::post('/', 'store')->name('store');
+            Route::post('/commit', 'commit')->name('commit');
         });
     });
 

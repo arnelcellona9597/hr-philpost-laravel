@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Enums\MessageCategory;
 use App\Enums\MessageStatus;
 use App\Enums\RecipientStatus;
-use App\Models\Branch;
 use App\Models\EmailTemplate;
 use App\Models\Employee;
 use App\Models\Message;
@@ -43,10 +42,25 @@ class MessageQueue
      */
     public function queueOne(array $template, MessageCategory $category, array $recipient, array $context, string $audience, array $related, ?User $sentBy, bool $automatic = true): Message
     {
-        $employee = $recipient['employee'] ?? null;
-        $email = $recipient['email'] ?? $employee?->email;
-        $values = [...$this->mergeValues($employee), ...array_filter($context, fn (mixed $value): bool => $value !== null)];
-        $deliverable = filled($email) && GovId::validateEmail($email) === null;
+        return $this->queueMany($template, $category, [[...$recipient, 'context' => $context]], $audience, $related, $sentBy, $automatic);
+    }
+
+    /**
+     * Queue one message to many recipients, each with their own merged text. Recipients with no
+     * valid address are recorded as skipped.
+     *
+     * @param  array{subject: string, body: string}  $template
+     * @param  list<array{email?: string|null, name?: string|null, employee?: Employee|null, context?: array<string, string|int|float|null>, payslip_id?: int|null}>  $recipients
+     * @param  array{collection: string, id: int}  $related
+     */
+    public function queueMany(array $template, MessageCategory $category, array $recipients, string $audience, array $related, ?User $sentBy, bool $automatic = true): Message
+    {
+        $isDeliverable = function (array $recipient): bool {
+            $email = $recipient['email'] ?? ($recipient['employee'] ?? null)?->email;
+
+            return filled($email) && GovId::validateEmail($email) === null;
+        };
+        $skipped = count(array_filter($recipients, fn (array $recipient): bool => ! $isDeliverable($recipient)));
 
         $message = new Message([
             'subject' => $template['subject'],
@@ -60,19 +74,26 @@ class MessageQueue
             'sent_by_name' => $sentBy?->name ?? 'System',
         ]);
         $message->forceFill([
-            'status' => $deliverable ? MessageStatus::Queued : MessageStatus::Failed,
-            'total' => 1,
-            'skipped' => $deliverable ? 0 : 1,
+            'status' => $skipped < count($recipients) ? MessageStatus::Queued : MessageStatus::Failed,
+            'total' => count($recipients),
+            'skipped' => $skipped,
         ])->save();
 
-        $row = $message->recipients()->make([
-            'name' => $recipient['name'] ?? $employee?->full_name,
-            'email' => $email,
-            'employee_id' => $employee?->id,
-            'subject' => MergeTemplate::render($template['subject'], $values),
-            'body' => MergeTemplate::render($template['body'], $values),
-        ]);
-        $row->forceFill(['status' => $deliverable ? RecipientStatus::Queued : RecipientStatus::Skipped])->save();
+        foreach ($recipients as $recipient) {
+            $employee = $recipient['employee'] ?? null;
+            $context = array_filter($recipient['context'] ?? [], fn (mixed $value): bool => $value !== null);
+            $values = [...$this->mergeValues($employee), ...$context];
+
+            $row = $message->recipients()->make([
+                'name' => $recipient['name'] ?? $employee?->full_name,
+                'email' => $recipient['email'] ?? $employee?->email,
+                'employee_id' => $employee?->id,
+                'subject' => MergeTemplate::render($template['subject'], $values),
+                'body' => MergeTemplate::render($template['body'], $values),
+                'payslip_id' => $recipient['payslip_id'] ?? null,
+            ]);
+            $row->forceFill(['status' => $isDeliverable($recipient) ? RecipientStatus::Queued : RecipientStatus::Skipped])->save();
+        }
 
         return $message;
     }
@@ -94,7 +115,7 @@ class MessageQueue
             'fullName' => $employee->full_name,
             'employeeId' => $employee->employee_id,
             'position' => (string) $employee->position,
-            'station' => (string) Branch::query()->whereKey($employee->station_id)->value('name'),
+            'station' => (string) $employee->station?->name,
         ];
     }
 }

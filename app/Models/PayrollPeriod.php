@@ -38,6 +38,20 @@ class PayrollPeriod extends Model
     }
 
     /**
+     * A period goes only after its payslips do, and released payroll stays for the record.
+     */
+    public function deleteBlocker(): ?string
+    {
+        if ($this->isReleased()) {
+            return 'Released payroll cannot be deleted.';
+        }
+
+        $payslips = $this->payslips()->count();
+
+        return $payslips > 0 ? "This period still has {$payslips} payslip(s). Delete them first." : null;
+    }
+
+    /**
      * @return BelongsTo<User, $this>
      */
     public function releasedBy(): BelongsTo

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\CertificateStatus;
+use App\Exceptions\UserFacingException;
 use Database\Factories\CertificateFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,6 +15,24 @@ class Certificate extends Model
 {
     /** @use HasFactory<CertificateFactory> */
     use HasFactory;
+
+    private const VOID_COLUMNS = ['status', 'void_reason', 'voided_at', 'updated_at'];
+
+    /**
+     * Issued certificates are records: they can be voided, and nothing else about them changes.
+     */
+    protected static function booted(): void
+    {
+        static::updating(function (Certificate $certificate): void {
+            if (array_diff(array_keys($certificate->getDirty()), self::VOID_COLUMNS) !== []) {
+                throw new UserFacingException('An issued certificate cannot be changed. Void it and issue a new one instead.');
+            }
+
+            if ($certificate->getOriginal('status') === CertificateStatus::Void && $certificate->isDirty(self::VOID_COLUMNS)) {
+                throw new UserFacingException('A voided certificate cannot be made valid again. Issue a new one instead.');
+            }
+        });
+    }
 
     /**
      * Get the attributes that should be cast.

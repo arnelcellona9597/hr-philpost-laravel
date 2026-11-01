@@ -29,6 +29,16 @@ class CertificateTemplate extends Model
     }
 
     /**
+     * Issued certificates point at their template, so it stays for the record.
+     */
+    public function deleteBlocker(): ?string
+    {
+        return $this->certificates()->exists()
+            ? 'Certificates were issued from this template, so it is kept for the record. Make it inactive instead.'
+            : null;
+    }
+
+    /**
      * @return HasMany<Certificate, $this>
      */
     public function certificates(): HasMany
