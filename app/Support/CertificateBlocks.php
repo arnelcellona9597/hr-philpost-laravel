@@ -2,11 +2,15 @@
 
 namespace App\Support;
 
+use App\Enums\Classification;
 use App\Enums\EmploymentStatus;
 use App\Enums\Gender;
+use App\Enums\RateType;
 use App\Exceptions\UserFacingException;
+use App\Models\ContractSetting;
 use App\Models\Employee;
 use App\Models\EmploymentPeriod;
+use App\Services\PayHistoryService;
 use DateTimeImmutable;
 use DateTimeZone;
 use Illuminate\Support\Str;
@@ -39,8 +43,9 @@ class CertificateBlocks
     public const DEFAULT_PURPOSE = 'whatever legal purpose it may serve';
 
     public const BLOCK_TYPES = [
-        ['type' => 'header', 'label' => 'Letterhead', 'description' => 'Logo, company name and address lines', 'icon' => 'building'],
-        ['type' => 'title', 'label' => 'Title', 'description' => 'e.g. CERTIFICATE OF EMPLOYMENT', 'icon' => 'file'],
+        ['type' => 'letterhead', 'label' => 'Office letterhead', 'description' => 'The letterhead set under Branding & Theme', 'icon' => 'building'],
+        ['type' => 'header', 'label' => 'Simple header', 'description' => 'Logo, company name and address lines', 'icon' => 'building'],
+        ['type' => 'title', 'label' => 'Title', 'description' => 'e.g. CERTIFICATION', 'icon' => 'file'],
         ['type' => 'paragraph', 'label' => 'Paragraph', 'description' => 'Text with {{placeholders}}; **bold**', 'icon' => 'edit'],
         ['type' => 'details', 'label' => 'Details table', 'description' => 'Employee details as label: value rows', 'icon' => 'sheet'],
         ['type' => 'signatory', 'label' => 'Signatories', 'description' => 'Up to 4 names with titles and signature lines', 'icon' => 'user'],
@@ -69,14 +74,19 @@ class CertificateBlocks
         'fullNameUpper' => ['label' => 'Full name (capitals)', 'sample' => 'JUAN A. DELA CRUZ'],
         'firstName' => ['label' => 'First name', 'sample' => 'Juan'],
         'lastName' => ['label' => 'Last name', 'sample' => 'Dela Cruz'],
+        'lastNameTitle' => ['label' => 'Last name (Dela Cruz, even if stored in capitals)', 'sample' => 'Dela Cruz'],
         'honorific' => ['label' => 'Mr. / Ms.', 'sample' => 'Mr.'],
+        'honorificUpper' => ['label' => 'MR. / MS.', 'sample' => 'MR.'],
         'pronoun' => ['label' => 'he / she', 'sample' => 'he'],
         'pronounCap' => ['label' => 'He / She', 'sample' => 'He'],
         'possessive' => ['label' => 'his / her', 'sample' => 'his'],
+        'possessiveCap' => ['label' => 'His / Her', 'sample' => 'His'],
         'employeeId' => ['label' => 'Employee ID', 'sample' => 'EMP-0001'],
         'position' => ['label' => 'Position', 'sample' => 'Administrative Officer IV'],
+        'positionWithArticle' => ['label' => 'Position with a / an', 'sample' => 'an Administrative Officer IV'],
         'station' => ['label' => 'Station / branch', 'sample' => 'PENRO Batangas'],
         'classification' => ['label' => 'Classification', 'sample' => 'Regular'],
+        'engagementType' => ['label' => 'Contract of Service (COS) worker / Service Contractor', 'sample' => 'Contract of Service (COS) worker'],
         'employmentStatus' => ['label' => 'Employment status', 'sample' => 'Active'],
         'dateHired' => ['label' => 'Date hired', 'sample' => 'March 5, 2018'],
         'lastDayOfService' => ['label' => 'Last day of service', 'sample' => 'September 30, 2026'],
@@ -89,8 +99,16 @@ class CertificateBlocks
         'issuedDate' => ['label' => 'Date issued', 'sample' => 'October 4, 2026'],
         'issuedDay' => ['label' => 'Day issued (e.g. 4th)', 'sample' => '4th'],
         'issuedMonthYear' => ['label' => 'Month and year issued', 'sample' => 'October 2026'],
+        'issuedMonth' => ['label' => 'Month issued', 'sample' => 'October'],
+        'issuedYear' => ['label' => 'Year issued', 'sample' => '2026'],
+        'dailyWage' => ['label' => 'Daily wage (figures, from Compensation History)', 'sample' => 'Php540.00'],
+        'dailyWageWords' => ['label' => 'Daily wage (words)', 'sample' => 'Five Hundred Forty Pesos'],
+        'premiumWords' => ['label' => 'Premium (words and figures)', 'sample' => 'fifteen percent (15%)'],
+        'compensationClause' => ['label' => 'Wage sentence, starting with a space', 'sample' => ' with a daily wage rate of Five Hundred Forty Pesos (Php540.00) plus a premium equivalent of fifteen percent (15%) to his daily wage rate'],
         'controlNumber' => ['label' => 'Control number', 'sample' => 'COE-2026-0001'],
         'companyName' => ['label' => 'Company name', 'sample' => 'HR Management System'],
+        'hrmChief' => ['label' => 'HRM Chief (name, from Officials and wages)', 'sample' => 'Juana S. Santos'],
+        'hrmChiefTitle' => ['label' => 'HRM Chief (title)', 'sample' => 'Chief, Human Resource Management Section'],
     ];
 
     private const MAX_TEXT = 3000;
@@ -103,8 +121,9 @@ class CertificateBlocks
     public static function newBlock(string $type): array
     {
         $block = match ($type) {
+            'letterhead' => [],
             'header' => ['showLogo' => true, 'companyName' => '', 'lines' => '', 'align' => 'center'],
-            'title' => ['text' => 'CERTIFICATE OF EMPLOYMENT', 'size' => 'lg', 'align' => 'center', 'wide' => true],
+            'title' => ['text' => 'CERTIFICATION', 'size' => 'lg', 'align' => 'center', 'wide' => true],
             'paragraph' => ['text' => 'Type your text here. Use {{fullName}} and other placeholders.', 'align' => 'justify', 'size' => 'md', 'indent' => true],
             'details' => ['fields' => ['fullName', 'position', 'station', 'dateHired']],
             'signatory' => ['align' => 'right', 'signers' => [['label' => '', 'name' => '', 'title' => 'HR Officer']]],
@@ -261,20 +280,26 @@ class CertificateBlocks
         $hired = $employee->date_hired?->toDateString();
         $lastDay = $employee->last_day_of_service?->toDateString();
         $periods = $employee->employmentPeriods()->get();
+        $officials = ContractSetting::current();
 
         return [
             'fullName' => $fullName,
             'fullNameUpper' => mb_strtoupper($fullName),
             'firstName' => trim((string) $employee->first_name),
             'lastName' => trim((string) $employee->last_name),
+            'lastNameTitle' => mb_convert_case(trim((string) $employee->last_name), MB_CASE_TITLE),
             'honorific' => $female ? 'Ms.' : 'Mr.',
+            'honorificUpper' => $female ? 'MS.' : 'MR.',
             'pronoun' => $female ? 'she' : 'he',
             'pronounCap' => $female ? 'She' : 'He',
             'possessive' => $female ? 'her' : 'his',
+            'possessiveCap' => $female ? 'Her' : 'His',
             'employeeId' => (string) $employee->employee_id,
             'position' => (string) $employee->position,
+            'positionWithArticle' => self::withArticle((string) $employee->position),
             'station' => (string) $employee->station?->name,
             'classification' => (string) $employee->classification?->value,
+            'engagementType' => self::engagementType($employee),
             'employmentStatus' => (string) $employee->employment_status?->value,
             'dateHired' => self::longDate($hired),
             'lastDayOfService' => self::longDate($lastDay),
@@ -291,9 +316,71 @@ class CertificateBlocks
             'issuedDate' => self::longDate($issuedDate),
             'issuedDay' => self::ordinal((int) substr($issuedDate, 8, 2)),
             'issuedMonthYear' => self::date($issuedDate)->format('F Y'),
+            'issuedMonth' => self::date($issuedDate)->format('F'),
+            'issuedYear' => self::date($issuedDate)->format('Y'),
+            ...self::wageValues($employee, $issuedDate, $female ? 'her' : 'his'),
             'controlNumber' => (string) $controlNumber,
             'companyName' => $companyName,
+            'hrmChief' => (string) $officials->hrm_chief_name,
+            'hrmChiefTitle' => (string) ($officials->hrm_chief_title ?: ContractSetting::OFFICIALS['hrm_chief']),
         ];
+    }
+
+    /**
+     * The wage in force on the date issued, from the employee's Compensation History.
+     *
+     * @return array{dailyWage: string, dailyWageWords: string, premiumWords: string, compensationClause: string}
+     */
+    private static function wageValues(Employee $employee, string $issuedDate, string $possessive): array
+    {
+        $rate = app(PayHistoryService::class)->rateOn($employee, $issuedDate);
+        $amount = $rate === null ? '' : 'Php'.number_format($rate->amount_centavos / 100, 2);
+        $words = $rate === null ? '' : self::hyphenate(Money::pesosInWords($rate->amount_centavos));
+        $premium = $rate === null || (float) $rate->premium_percent <= 0 ? '' : self::percentInWords((float) $rate->premium_percent);
+
+        $clause = match (true) {
+            $rate === null => '',
+            $rate->rate_type === RateType::Monthly => " with a monthly salary of {$words} ({$amount})",
+            $premium === '' => " with a daily wage rate of {$words} ({$amount})",
+            default => " with a daily wage rate of {$words} ({$amount}) plus a premium equivalent of {$premium} to {$possessive} daily wage rate",
+        };
+
+        return ['dailyWage' => $amount, 'dailyWageWords' => $words, 'premiumWords' => $premium, 'compensationClause' => $clause];
+    }
+
+    /**
+     * "Twenty Five" becomes "Twenty-Five", as formal letters write it.
+     */
+    private static function hyphenate(string $words): string
+    {
+        return preg_replace('/\b(Twenty|Thirty|Forty|Fifty|Sixty|Seventy|Eighty|Ninety) (One|Two|Three|Four|Five|Six|Seven|Eight|Nine)\b/', '$1-$2', $words);
+    }
+
+    /**
+     * 15 becomes "fifteen percent (15%)". A part of a percent stays in figures.
+     */
+    private static function percentInWords(float $percent): string
+    {
+        $figure = rtrim(rtrim(number_format($percent, 2, '.', ''), '0'), '.');
+        $words = floor($percent) === $percent ? mb_strtolower(self::hyphenate(Money::numberInWords((int) $percent))) : $figure;
+
+        return "{$words} percent ({$figure}%)";
+    }
+
+    private static function withArticle(string $position): string
+    {
+        $position = trim($position);
+
+        return $position === '' ? '' : (preg_match('/^[aeiou]/i', $position) ? 'an ' : 'a ').$position;
+    }
+
+    private static function engagementType(Employee $employee): string
+    {
+        return match ($employee->classification) {
+            Classification::Cos => 'Contract of Service (COS) worker',
+            Classification::Contractual => 'Service Contractor',
+            default => 'regular employee',
+        };
     }
 
     /**
@@ -360,6 +447,7 @@ class CertificateBlocks
         $type = $block['type'] ?? null;
 
         return match ($type) {
+            'letterhead' => ['type' => $type],
             'header' => [
                 'type' => $type,
                 'showLogo' => self::bool($block['showLogo'] ?? null),

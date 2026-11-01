@@ -83,6 +83,14 @@ class Money
         return self::spell($pesos).' '.($pesos === 1 ? 'Peso' : 'Pesos').($cents > 0 ? " and {$cents}/100" : '');
     }
 
+    /**
+     * 15 becomes "Fifteen".
+     */
+    public static function numberInWords(int $number): string
+    {
+        return self::spell($number);
+    }
+
     private static function spell(int $number): string
     {
         if ($number === 0) {

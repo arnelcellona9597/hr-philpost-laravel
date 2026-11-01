@@ -62,6 +62,7 @@ class CertificateTemplateController extends Controller
                 'blocks' => is_array($posted) ? $posted : CertificateBlocks::sanitize($template->blocks ?: CertificateBlocks::starterLayout()),
                 'companyName' => $site->company_name,
                 'logoUrl' => $site->logo_id ? route('files.show', $site->logo_id, false) : null,
+                'letterhead' => [...$site->letterhead(), 'logoUrl' => $site->letterhead()['logoId'] ? route('files.show', $site->letterhead()['logoId'], false) : null],
                 'blockTypes' => CertificateBlocks::BLOCK_TYPES,
                 'newBlocks' => array_combine(
                     array_column(CertificateBlocks::BLOCK_TYPES, 'type'),

@@ -1,14 +1,19 @@
 <?php
 
+use App\Enums\Classification;
 use App\Enums\EmploymentStatus;
 use App\Enums\Gender;
+use App\Enums\RateType;
 use App\Enums\Role;
 use App\Exceptions\UserFacingException;
 use App\Models\Branch;
 use App\Models\Certificate;
 use App\Models\CertificateTemplate;
+use App\Models\ContractSetting;
 use App\Models\DocumentSequence;
 use App\Models\Employee;
+use App\Models\PayChange;
+use App\Models\SiteSetting;
 use App\Models\User;
 use App\Services\CertificateService;
 use App\Services\PdfRenderer;
@@ -57,9 +62,9 @@ it('numbers certificates per prefix and year and freezes the merged text', funct
     expect($certificate->control_number)->toBe('COE-2026-0001')
         ->and($certificate->employee_name)->toBe('Maria S. Reyes')
         ->and($certificate->issued_by)->toBe($this->hr->id)
-        ->and(certificateText($certificate))->toContain('**Ms. MARIA S. REYES**')
+        ->and(certificateText($certificate))->toContain('**MS. MARIA S. REYES**')
         ->toContain('housing loan')
-        ->toContain('Issued this 4th day of October 2026.')
+        ->toContain('Issued this 4th day of October, 2026 at Davao City, Philippines.')
         ->not->toContain('{{');
 
     $next = app(CertificateService::class)->issue($this->hr, certificateTemplate()->id, $employee->id, null, '2027-01-02');
@@ -79,12 +84,12 @@ it('never reuses a number after the highest certificate is deleted', function ()
         ->and(DocumentSequence::query()->where('scope', 'certificate:COE:2026')->value('last_number'))->toBe(2);
 });
 
-it('writes the separation wording and the length of service for former employees', function () {
+it('writes the period of engagement for former employees', function () {
     $employee = certificateEmployee(['employment_status' => EmploymentStatus::Resigned, 'last_day_of_service' => '2026-09-05']);
 
     $certificate = app(CertificateService::class)->issue($this->hr, certificateTemplate('coe-separated')->id, $employee->id, null, '2026-10-04');
 
-    expect(certificateText($certificate))->toContain('until she resigned on September 5, 2026, a total service of 8 years and 6 months.');
+    expect(certificateText($certificate))->toContain('was engaged as a')->toContain('to September 5, 2026**.');
 });
 
 it('ignores computed fields sent by the client', function () {
@@ -206,4 +211,77 @@ it('gives unique numbers across a run of issues', function () {
     $numbers = collect(range(1, 5))->map(fn (): string => app(CertificateService::class)->issue($this->hr, certificateTemplate()->id, $employee->id, null, '2026-10-04')->control_number);
 
     expect($numbers->unique())->toHaveCount(5);
+});
+
+it('writes the wage sentence from the Compensation History, like the office samples', function () {
+    $employee = certificateEmployee(['classification' => Classification::Cos, 'position' => 'Sorter/Encoder', 'date_hired' => '2026-01-05']);
+    PayChange::factory()->create(['employee_id' => $employee->id, 'effective_on' => '2026-01-05', 'amount_centavos' => 52_500, 'premium_percent' => 15]);
+
+    $text = certificateText(app(CertificateService::class)->issue($this->hr, certificateTemplate('coe-active')->id, $employee->id, null, '2026-10-04'));
+
+    expect($text)
+        ->toContain('has been hired as a Contract of Service (COS) worker of the Philippine Postal Corporation, Area 7, Eastern Mindanao, and currently assigned as Sorter/Encoder')
+        ->toContain('effective **January 5, 2026 to present** with a daily wage rate of Five Hundred Twenty-Five Pesos (Php525.00) plus a premium equivalent of fifteen percent (15%) to her daily wage rate.')
+        ->toContain('Her contract is renewable every six (6) months based on her performance.')
+        ->toContain('for **whatever legal purpose it may serve**.');
+});
+
+it('leaves the wage out when there is no rate, and calls a contractor a Service Contractor', function () {
+    $employee = certificateEmployee(['classification' => Classification::Contractual, 'date_hired' => '2026-01-05']);
+
+    $text = certificateText(app(CertificateService::class)->issue($this->hr, certificateTemplate('coe-newly-hired')->id, $employee->id, null, '2026-10-04'));
+
+    expect($text)->toContain('hired as a Service Contractor')->toContain('effective **January 5, 2026**. Her contract')->not->toContain('wage rate');
+});
+
+it('uses a monthly salary sentence for monthly-paid staff', function () {
+    $employee = certificateEmployee();
+    PayChange::factory()->create(['employee_id' => $employee->id, 'effective_on' => '2020-01-01', 'rate_type' => RateType::Monthly, 'amount_centavos' => 2_500_000]);
+
+    expect(certificateText(app(CertificateService::class)->issue($this->hr, certificateTemplate('coe-active')->id, $employee->id, null, '2026-10-04')))
+        ->toContain('with a monthly salary of Twenty-Five Thousand Pesos (Php25,000.00).');
+});
+
+it('uses the wage in force on the date issued', function () {
+    $employee = certificateEmployee();
+    PayChange::factory()->create(['employee_id' => $employee->id, 'effective_on' => '2026-01-01', 'amount_centavos' => 51_000, 'premium_percent' => 2]);
+    PayChange::factory()->create(['employee_id' => $employee->id, 'effective_on' => '2026-11-01', 'amount_centavos' => 54_000, 'premium_percent' => 15]);
+
+    expect(certificateText(app(CertificateService::class)->issue($this->hr, certificateTemplate('coe-active')->id, $employee->id, null, '2026-10-04')))
+        ->toContain('Five Hundred Ten Pesos (Php510.00) plus a premium equivalent of two percent (2%)');
+});
+
+it('signs with the HRM Chief from the settings and writes a proper-case last name', function () {
+    ContractSetting::current()->update(['hrm_chief_name' => 'Sample T. Chief', 'hrm_chief_title' => 'Acting Chief, HRM Section']);
+    $employee = certificateEmployee(['last_name' => 'REYES']);
+
+    $certificate = app(CertificateService::class)->issue($this->hr, certificateTemplate('coe-active')->id, $employee->id, null, '2026-10-04');
+
+    expect(json_encode($certificate->content['blocks']))->toContain('Sample T. Chief')->toContain('Acting Chief, HRM Section')
+        ->and(certificateText($certificate))->toContain('request of Ms. Reyes for');
+});
+
+it('freezes the office letterhead on an issued certificate and shows it in the PDF', function () {
+    SiteSetting::current()->update(['letterhead_name' => "SAMPLE POSTAL CORPORATION\nSAMPLE AREA", 'letterhead_details' => '1 Sample Avenue', 'letterhead_section' => 'Human Resource Management Section']);
+    $certificate = app(CertificateService::class)->issue($this->hr, certificateTemplate()->id, certificateEmployee()->id, null, '2026-10-04');
+
+    $this->get("/certificates/{$certificate->id}")->assertOk()->assertSee('SAMPLE AREA')->assertSee('1 Sample Avenue')->assertSee('Human Resource Management Section');
+
+    SiteSetting::current()->update(['letterhead_name' => 'CHANGED LATER']);
+
+    $this->get("/certificates/{$certificate->id}")->assertSee('SAMPLE AREA')->assertDontSee('CHANGED LATER');
+    expect(substr($this->get("/certificates/{$certificate->id}/pdf")->assertOk()->getContent(), 0, 4))->toBe('%PDF');
+});
+
+it('offers every template when issuing, and templates can be edited', function () {
+    $this->get('/certificates/new')->assertOk()->assertSee('COE – Current Worker')->assertSee('COE – Newly Hired')->assertSee('COE – Resigned / Separated');
+
+    $template = certificateTemplate();
+    $page = $this->get("/certificates/templates/{$template->id}")->assertOk()->assertSee('Office letterhead')->assertSee('compensationClause');
+    $blocks = $page->viewData('editor')['blocks'];
+    $blocks[5]['text'] = 'Edited wording for {{fullName}}.';
+
+    $this->put("/certificates/templates/{$template->id}", ['name' => $template->name, 'prefix' => 'COE', 'blocks' => json_encode($blocks), 'font' => 'sans', 'active' => '1'])->assertSessionHasNoErrors();
+
+    expect(certificateText(app(CertificateService::class)->issue($this->hr, $template->id, certificateEmployee()->id, null, '2026-10-04')))->toContain('Edited wording for Maria S. Reyes.');
 });

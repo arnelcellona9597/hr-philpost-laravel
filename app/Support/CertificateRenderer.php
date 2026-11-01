@@ -8,7 +8,7 @@ namespace App\Support;
  *
  * @phpstan-import-type Block from CertificateBlocks
  *
- * @phpstan-type RenderOptions array{companyName: string, font: string, logoUrl?: string|null, logoSize?: array{0: float, 1: float}|null, values?: array<string, string>, pdf?: bool}
+ * @phpstan-type RenderOptions array{companyName: string, font: string, logoUrl?: string|null, logoSize?: array{0: float, 1: float}|null, letterheadLogoUrl?: string|null, letterheadLogoSize?: array{0: float, 1: float}|null, values?: array<string, string>, pdf?: bool}
  */
 class CertificateRenderer
 {
@@ -32,6 +32,7 @@ class CertificateRenderer
     private static function block(array $block, array $options): string
     {
         return match ($block['type']) {
+            'letterhead' => self::letterhead($block, $options),
             'header' => self::header($block, $options),
             // Not a heading: the certificate sits inside pages that already have their own.
             'title' => '<div class="cert-title cert-'.e($block['align']).' cert-t-'.e($block['size']).($block['wide'] ? ' cert-wide' : '').'">'.self::inline($block['text'], $options).'</div>',
@@ -45,6 +46,53 @@ class CertificateRenderer
             'pageFooter' => '<div class="cert-pagefooter cert-'.e($block['align']).'">'.self::inline($block['text'], $options).'</div>',
             default => '',
         };
+    }
+
+    /**
+     * The office letterhead frozen on the certificate, in tables because the PDF engine has no flexbox.
+     *
+     * @param  Block  $block
+     * @param  RenderOptions  $options
+     */
+    private static function letterhead(array $block, array $options): string
+    {
+        $text = '<div style="font-size:10pt">'.e($block['top'] ?? '').'</div>';
+
+        foreach ($block['name'] ?? [] as $line) {
+            $text .= '<div style="font-size:12pt;font-weight:bold;line-height:1.2">'.e($line).'</div>';
+        }
+
+        foreach ($block['details'] ?? [] as $line) {
+            $text .= '<div style="font-size:8.5pt">'.e($line).'</div>';
+        }
+
+        $logo = '';
+
+        if ($options['letterheadLogoUrl'] ?? null) {
+            $size = ($options['letterheadLogoSize'] ?? null) ? 'width:'.$options['letterheadLogoSize'][0].'pt;height:'.$options['letterheadLogoSize'][1].'pt' : 'max-height:60pt;max-width:190pt';
+            $logo = '<img src="'.e($options['letterheadLogoUrl']).'" alt="" style="'.$size.'">';
+        }
+
+        $section = trim((string) ($block['section'] ?? '')) === '' ? '' : '<table style="width:100%;border-collapse:collapse"><tr><td></td><td style="width:1%;white-space:nowrap;background:#111418;color:#fff;font-size:9.5pt;font-weight:bold;padding:2pt 16pt;-webkit-print-color-adjust:exact;print-color-adjust:exact">'.e($block['section']).'</td></tr></table>';
+
+        return '<table style="width:100%;border-collapse:collapse"><tr><td style="vertical-align:bottom;padding:0 0 4pt">'.$text.'</td><td style="vertical-align:bottom;text-align:right;padding:0 0 4pt">'.$logo.'</td></tr></table>'
+            .'<div style="border-top:2.5pt solid #111418"></div>'.$section;
+    }
+
+    /**
+     * The logo saved on a certificate's letterhead, so each caller can give its own URL for it.
+     *
+     * @param  list<Block>  $blocks
+     */
+    public static function letterheadLogoId(array $blocks): ?int
+    {
+        foreach ($blocks as $block) {
+            if ($block['type'] === 'letterhead') {
+                return $block['logoId'] ?? null;
+            }
+        }
+
+        return null;
     }
 
     /**

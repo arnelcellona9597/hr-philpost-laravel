@@ -30,7 +30,10 @@ class CertificateService
         $values = CertificateBlocks::values($employee->loadMissing('station'), $issuedDate, $purpose, $controlNumber, $site->company_name);
 
         return [
-            'blocks' => CertificateBlocks::merge(CertificateBlocks::sanitize($template->blocks), $values),
+            'blocks' => array_map(
+                fn (array $block): array => $block['type'] === 'letterhead' ? [...$block, ...$site->letterhead()] : $block,
+                CertificateBlocks::merge(CertificateBlocks::sanitize($template->blocks), $values),
+            ),
             'paperSize' => $template->paper_size,
             'font' => $template->font,
             'margin' => $template->margin,

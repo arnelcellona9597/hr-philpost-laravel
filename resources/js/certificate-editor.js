@@ -43,8 +43,23 @@ const rich = (text) =>
 const chip = (name) => `<span class="cert-ph">${esc(name)}</span>`
 const inline = (text, options) => (options.showPlaceholders ? rich(text).replace(PLACEHOLDER, (_, key) => chip(key)) : rich(merge(text, options.values)))
 
+// The browser twin of CertificateRenderer::letterhead, using the current Branding settings.
+function renderLetterhead() {
+  const letterhead = data.letterhead
+  const text = [
+    `<div style="font-size:10pt">${esc(letterhead.top)}</div>`,
+    ...letterhead.name.map((line) => `<div style="font-size:12pt;font-weight:bold;line-height:1.2">${esc(line)}</div>`),
+    ...letterhead.details.map((line) => `<div style="font-size:8.5pt">${esc(line)}</div>`),
+  ].join('')
+  const logo = letterhead.logoUrl ? `<img src="${esc(letterhead.logoUrl)}" alt="" style="max-height:60pt;max-width:190pt">` : ''
+  const section = letterhead.section ? `<table style="width:100%;border-collapse:collapse"><tr><td></td><td style="width:1%;white-space:nowrap;background:#111418;color:#fff;font-size:9.5pt;font-weight:bold;padding:2pt 16pt">${esc(letterhead.section)}</td></tr></table>` : ''
+  return `<table style="width:100%;border-collapse:collapse"><tr><td style="vertical-align:bottom;padding:0 0 4pt">${text}</td><td style="vertical-align:bottom;text-align:right;padding:0 0 4pt">${logo}</td></tr></table><div style="border-top:2.5pt solid #111418"></div>${section}`
+}
+
 function renderBlock(block, options) {
   switch (block.type) {
+    case 'letterhead':
+      return data.letterhead ? renderLetterhead() : ''
     case 'header': {
       const name = block.companyName.trim() ? inline(block.companyName, options) : esc(data.companyName)
       const logo = block.showLogo && data.logoUrl ? `<img class="cert-logo" src="${esc(data.logoUrl)}" alt="">` : ''
@@ -147,7 +162,7 @@ const area = (key, value, rows = 5) => `<textarea class="input mt-1 font-[inheri
 const check = (key, checked, label) => `<label class="mb-3 flex items-center gap-2 text-sm"><input type="checkbox" class="size-4 accent-[var(--primary)]" data-key="${key}"${checked ? ' checked' : ''}> ${label}</label>`
 const ALIGN3 = [['left', 'Left'], ['center', 'Center'], ['right', 'Right']]
 const ALIGN4 = [...ALIGN3, ['justify', 'Justified']]
-const NOT_IN_DETAILS = ['fullNameUpper', 'honorific', 'pronoun', 'pronounCap', 'possessive', 'separation']
+const NOT_IN_DETAILS = ['fullNameUpper', 'lastNameTitle', 'honorific', 'honorificUpper', 'pronoun', 'pronounCap', 'possessive', 'possessiveCap', 'positionWithArticle', 'separation', 'compensationClause', 'premiumWords']
 
 function renderInspector() {
   const block = selectedBlock()
@@ -189,6 +204,9 @@ function renderInspector() {
       break
     case 'spacer':
       html += field('Height', select('size', block.size, [['sm', 'Small'], ['md', 'Medium'], ['lg', 'Large'], ['xl', 'Extra large']]))
+      break
+    case 'letterhead':
+      html += '<p class="text-sm text-muted">The office letterhead. Change its wording and logo under Branding &amp; Theme.</p>'
       break
     case 'divider':
       html += '<p class="text-sm text-muted">A thin line across the page.</p>'

@@ -3,40 +3,48 @@
 namespace App\Support;
 
 /**
- * The starter certificates, created once on an empty install. HR edits them from there.
+ * The starter certificates, in the office's own wording. HR edits them from there. The signatory comes
+ * from Officials and wages, so no real name is kept in the code.
  *
  * @phpstan-import-type Block from CertificateBlocks
  */
 class DefaultCertificateTemplates
 {
-    private const REQUEST = 'This certification is issued upon the request of {{honorific}} {{lastName}} for {{purpose}}.';
+    private const CERTIFY = '**THIS IS TO CERTIFY** that **{{honorificUpper}} {{fullNameUpper}}**';
+
+    private const OFFICE = 'the Philippine Postal Corporation, Area 7, Eastern Mindanao';
+
+    private const RENEWABLE = '{{possessiveCap}} contract is renewable every six (6) months based on {{possessive}} performance.';
 
     /**
-     * @return list<array{key: string, name: string, description: string, sort_order: int, blocks: list<Block>}>
+     * @return list<array{key: string, name: string, description: string, sort_order: int, font: string, blocks: list<Block>}>
      */
     public static function all(): array
     {
         return [
             [
                 'key' => 'coe-active',
-                'name' => 'Certificate of Employment',
-                'description' => 'For current employees: loans, bank, visa, scholarship and other general purposes.',
+                'name' => 'COE – Current Worker',
+                'description' => 'For workers in service, for loans, bank accounts and other purposes. Shows the current wage.',
                 'sort_order' => 10,
-                'blocks' => self::layout('This is to certify that **{{honorific}} {{fullNameUpper}}** is a {{classification}} employee of {{companyName}}, presently holding the position of **{{position}}** at {{station}}. {{pronounCap}} has been with the office since {{dateHired}} up to the present.'),
+                'font' => 'sans',
+                'blocks' => self::layout(self::CERTIFY.' has been hired as a {{engagementType}} of '.self::OFFICE.', and currently assigned as {{position}} under the {{station}}, effective **{{dateHired}} to present**{{compensationClause}}. '.self::RENEWABLE),
             ],
             [
                 'key' => 'coe-newly-hired',
-                'name' => 'Certificate of Employment – Newly Hired',
-                'description' => 'For new employees who need proof of employment (e.g. payroll account, government IDs).',
+                'name' => 'COE – Newly Hired',
+                'description' => 'For new workers who need proof of employment, such as for a payroll bank account.',
                 'sort_order' => 20,
-                'blocks' => self::layout('This is to certify that **{{honorific}} {{fullNameUpper}}** has been hired by {{companyName}} as **{{position}}** ({{classification}}) assigned at {{station}}, effective {{dateHired}}.'),
+                'font' => 'sans',
+                'blocks' => self::layout(self::CERTIFY.' has been hired as a {{engagementType}} of '.self::OFFICE.', employed as {{position}} under the {{station}}, effective **{{dateHired}}**{{compensationClause}}. '.self::RENEWABLE),
             ],
             [
                 'key' => 'coe-separated',
-                'name' => 'Certificate of Employment – Resigned / Separated',
-                'description' => 'For former employees (resigned, retired or terminated): dates and length of service.',
+                'name' => 'COE – Resigned / Separated',
+                'description' => 'For former workers: position and period of engagement.',
                 'sort_order' => 30,
-                'blocks' => self::layout('This is to certify that **{{honorific}} {{fullNameUpper}}** was employed by {{companyName}} as **{{position}}** ({{classification}}) at {{station}} from {{dateHired}} until {{pronoun}} {{separation}} on {{lastDayOfService}}, a total service of {{lengthOfService}}.'),
+                'font' => 'sans',
+                'blocks' => self::layout(self::CERTIFY.' was engaged as a {{engagementType}} at '.self::OFFICE.', designated as **{{positionWithArticle}}** under the {{station}}, for the period **{{dateHired}}, to {{lastDayOfService}}**.'),
             ],
         ];
     }
@@ -47,19 +55,18 @@ class DefaultCertificateTemplates
     private static function layout(string $body): array
     {
         return CertificateBlocks::sanitize([
-            ['type' => 'header', 'showLogo' => true, 'companyName' => '', 'lines' => '', 'align' => 'center'],
-            ['type' => 'divider'],
+            ['type' => 'letterhead'],
             ['type' => 'spacer', 'size' => 'lg'],
-            ['type' => 'title', 'text' => 'CERTIFICATE OF EMPLOYMENT', 'size' => 'lg', 'align' => 'center', 'wide' => true],
+            ['type' => 'title', 'text' => 'CERTIFICATION', 'size' => 'lg', 'align' => 'center', 'wide' => true],
             ['type' => 'spacer', 'size' => 'lg'],
-            ['type' => 'paragraph', 'text' => '**TO WHOM IT MAY CONCERN:**', 'align' => 'left', 'size' => 'md', 'indent' => false],
+            ['type' => 'paragraph', 'text' => 'TO WHOM IT MAY CONCERN:', 'align' => 'left', 'size' => 'md', 'indent' => false],
             self::paragraph($body),
-            self::paragraph(self::REQUEST),
-            self::paragraph('Issued this {{issuedDay}} day of {{issuedMonthYear}}.'),
+            self::paragraph('This Certification is issued upon the request of {{honorific}} {{lastNameTitle}} for **{{purpose}}**.'),
+            self::paragraph('Issued this {{issuedDay}} day of {{issuedMonth}}, {{issuedYear}} at Davao City, Philippines.'),
             ['type' => 'spacer', 'size' => 'xl'],
-            ['type' => 'signatory', 'align' => 'right', 'signers' => [['label' => '', 'name' => '', 'title' => 'Human Resource Officer']]],
-            ['type' => 'spacer', 'size' => 'xl'],
-            ['type' => 'footer', 'text' => 'Control No. {{controlNumber}} · Not valid without the official dry seal.', 'align' => 'left'],
+            ['type' => 'signatory', 'align' => 'right', 'signers' => [['label' => '', 'name' => '{{hrmChief}}', 'title' => '{{hrmChiefTitle}}']]],
+            ['type' => 'spacer', 'size' => 'lg'],
+            ['type' => 'footer', 'text' => 'Control No. {{controlNumber}}', 'align' => 'left'],
         ]);
     }
 
