@@ -21,7 +21,7 @@ class DuplicateFinder
 
     private const MAX_GROUPS = 200;
 
-    private const NUMBERS = ['tin' => 'TIN', 'sss' => 'SSS number', 'philhealth' => 'PhilHealth number', 'pagibig' => 'Pag-IBIG number'];
+    private const NUMBERS = ['tin' => 'TIN', 'sss' => 'SSS number', 'philhealth' => 'PhilHealth number', 'pagibig' => 'Pag-IBIG number', 'bank_account_number' => 'bank account number'];
 
     /**
      * @return list<Group>

@@ -23,7 +23,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['employee_id', 'profile_picture_id', 'last_name', 'first_name', 'middle_name', 'extension', 'gender', 'date_of_birth', 'civil_status', 'religion', 'blood_type', 'professional_eligibility', 'contact_number', 'email', 'address', 'educational_attainment', 'courses', 'year_level_earned_units', 'academic_honors', 'classification', 'employment_status', 'station_id', 'region', 'position', 'nature_of_work', 'driver_license_number', 'date_hired', 'last_day_of_service', 'remarks', 'sss', 'pagibig', 'tin', 'philhealth', 'emergency_contact_name', 'emergency_relationship', 'emergency_contact_number', 'emergency_address'])]
+#[Fillable(['employee_id', 'profile_picture_id', 'last_name', 'first_name', 'middle_name', 'extension', 'gender', 'date_of_birth', 'civil_status', 'religion', 'blood_type', 'professional_eligibility', 'contact_number', 'email', 'address', 'educational_attainment', 'courses', 'year_level_earned_units', 'academic_honors', 'classification', 'employment_status', 'station_id', 'region', 'position', 'nature_of_work', 'driver_license_number', 'date_hired', 'last_day_of_service', 'remarks', 'sss', 'pagibig', 'tin', 'philhealth', 'bank_name', 'bank_branch', 'bank_account_name', 'bank_account_number', 'emergency_contact_name', 'emergency_relationship', 'emergency_contact_number', 'emergency_address'])]
 class Employee extends Model
 {
     /** @use HasFactory<EmployeeFactory> */

@@ -369,3 +369,26 @@ it('falls back to the company name when no letterhead is set', function () {
 
     $this->get("/employees/{$employee->id}/print")->assertOk()->assertSee('SAMPLE COMPANY');
 });
+
+it('stores bank account details and shows them on the profile and printout', function () {
+    $bank = ['bank_name' => 'Sample Bank', 'bank_branch' => 'Sample City', 'bank_account_name' => 'Juan Dela Cruz', 'bank_account_number' => '0012-3456 78'];
+
+    $this->post('/employees', employeeForm($bank))->assertRedirect();
+
+    $employee = Employee::query()->where('employee_id', 'EMP-1')->sole();
+
+    expect($employee->only(array_keys($bank)))->toBe($bank);
+
+    $this->get("/employees/{$employee->id}")->assertOk()->assertSee('Bank Account')->assertSee('0012-3456 78');
+    $this->get("/employees/{$employee->id}/print")->assertOk()->assertSee('Sample Bank')->assertSee('0012-3456 78');
+    $this->get("/employees/{$employee->id}/edit")->assertOk()->assertSee('name="bank_account_number"', false);
+    expect(searchIds('0012-3456'))->toBe(['EMP-1']);
+});
+
+it('leaves bank details optional and refuses a malformed account number', function (string $number) {
+    $this->from('/employees/new')->post('/employees', employeeForm(['bank_account_number' => $number]))
+        ->assertSessionHasErrors(['bank_account_number' => 'Enter the bank account number using digits, spaces and hyphens only']);
+
+    expect(Employee::query()->count())->toBe(0);
+    $this->post('/employees', employeeForm())->assertSessionHasNoErrors();
+})->with(['letters' => 'ABC123', 'symbols' => '12/34']);

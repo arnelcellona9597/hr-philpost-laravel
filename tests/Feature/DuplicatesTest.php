@@ -110,3 +110,9 @@ it('puts the applicant before the application ID so it can stay in view', functi
 
     $this->get('/onboarding')->assertOk()->assertSeeInOrder(['Applicant', 'App ID'])->assertSee('sticky left-0', false);
 });
+
+it('treats a shared bank account as a duplicate', function () {
+    Employee::factory()->count(2)->create(['bank_account_number' => '1234567890', 'email' => null]);
+
+    expect(app(DuplicateFinder::class)->groups('employees')[0]['reason'])->toContain('Same bank account number');
+});

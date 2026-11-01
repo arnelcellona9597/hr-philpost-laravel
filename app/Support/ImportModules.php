@@ -155,6 +155,7 @@ class ImportModules
         $education = ['section' => 'Education'];
         $employment = ['section' => 'Employment'];
         $governmentIds = ['section' => 'Government IDs'];
+        $bank = ['section' => 'Bank Account'];
         $emergency = ['section' => 'Emergency Contact'];
 
         return self::module('employees', 'Employees', 'Employees', ['employee_id'], [
@@ -191,6 +192,10 @@ class ImportModules
             self::field('pagibig', 'Pag-IBIG Number', 'govId', ['idKind' => 'pagibig'] + $governmentIds),
             self::field('tin', 'TIN Number', 'govId', ['idKind' => 'tin'] + $governmentIds),
             self::field('philhealth', 'PhilHealth Number', 'govId', ['idKind' => 'philhealth'] + $governmentIds),
+            self::field('bank_name', 'Bank Name', 'text', ['width' => 24] + $bank),
+            self::field('bank_branch', 'Bank Branch', 'text', ['width' => 24] + $bank),
+            self::field('bank_account_name', 'Bank Account Name', 'text', ['width' => 28] + $bank),
+            self::field('bank_account_number', 'Bank Account Number', 'text', ['width' => 22, 'help' => 'Digits, spaces and hyphens only.'] + $bank),
             self::field('emergency_contact_name', 'Emergency Contact Person', 'text', ['width' => 24] + $emergency),
             self::field('emergency_relationship', 'Relationship', 'text', $emergency),
             self::field('emergency_contact_number', 'Emergency Contact Number', 'phone', $emergency),

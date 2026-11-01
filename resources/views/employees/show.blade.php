@@ -60,7 +60,7 @@
                         @foreach ($sectionFields as $field)
                             <div @class(['sm:col-span-2 lg:col-span-3' => $field['kind'] === 'textarea' || Str::contains($field['name'], 'address')])>
                                 <dt class="text-xs text-muted">{{ $field['label'] }}</dt>
-                                <dd @class(['mt-0.5 text-sm', 'font-mono' => $field['kind'] === 'govId'])>{{ $employee->fieldText($field) }}</dd>
+                                <dd @class(['mt-0.5 text-sm', 'font-mono' => $field['kind'] === 'govId' || $field['name'] === 'bank_account_number'])>{{ $employee->fieldText($field) }}</dd>
                             </div>
                         @endforeach
                     </dl>

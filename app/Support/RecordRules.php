@@ -16,6 +16,8 @@ class RecordRules
 {
     private const RECEIVED_AFTER_SUBMITTED = ['date_submitted', 'date_received', 'Date received cannot be before the date submitted'];
 
+    private const BANK_ACCOUNT = '/^\d[\d -]*\d$/';
+
     /**
      * Pairs of date columns that must stay in order, with the message for the later one.
      */
@@ -48,6 +50,10 @@ class RecordRules
 
         if ($module === 'employees' && ($values['date_of_birth'] ?? '') > HrDate::today()) {
             $errors['date_of_birth'] = 'Date of birth cannot be in the future';
+        }
+
+        if ($module === 'employees' && filled($values['bank_account_number'] ?? null) && ! preg_match(self::BANK_ACCOUNT, (string) $values['bank_account_number'])) {
+            $errors['bank_account_number'] = 'Enter the bank account number using digits, spaces and hyphens only';
         }
 
         return $errors;
@@ -83,7 +89,7 @@ class RecordRules
         $columns = array_merge(...array_map(fn (array $rule): array => array_slice($rule, 0, 2), self::DATE_ORDER[$module] ?? [[]]));
         $values = [];
 
-        foreach ([...$columns, 'date_of_birth'] as $column) {
+        foreach ([...$columns, 'date_of_birth', 'bank_account_number'] as $column) {
             $value = $model->getAttribute($column);
             $values[$column] = $value instanceof DateTimeInterface ? $value->format('Y-m-d') : $value;
         }
