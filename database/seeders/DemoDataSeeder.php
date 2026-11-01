@@ -421,6 +421,7 @@ class DemoDataSeeder extends Seeder
                 'replacement' => $this->chance(0.3) ? $this->pick(self::FEMALE_NAMES).' '.$this->pick(self::LAST_NAMES) : null,
                 'date_applied' => $applied,
                 'start_ojt' => in_array($status, ['For OJT', 'Hired'], true) ? HrDate::addDays($applied, mt_rand(10, 30)) : null,
+                'fds_date' => in_array($status, ['For OJT', 'Hired'], true) ? HrDate::addDays($applied, mt_rand(31, 60)) : (mt_rand(0, 3) === 0 ? HrDate::addDays($applied, mt_rand(20, 70)) : null),
                 'application_status' => $status,
                 'date_submitted' => $this->chance(0.5) ? HrDate::addDays($applied, mt_rand(3, 20)) : null,
             ]);

@@ -14,7 +14,6 @@ use App\Models\WellnessLeave;
 use App\Services\DashboardStats;
 use App\Services\RequirementService;
 use App\Support\ActivityFeed;
-use App\Support\HrDate;
 use App\Support\ImportModules;
 use App\Support\ReportingPeriod;
 use Illuminate\Database\Eloquent\Builder;
@@ -30,10 +29,10 @@ class DashboardController extends Controller
         $user = $request->user();
         $branchId = $request->integer('branch') ?: null;
         $classification = Classification::tryFrom((string) $request->query('classification'))?->value;
-        $period = ReportingPeriod::resolve((string) $request->query('period'));
-        $today = HrDate::today();
-        $year = (int) substr($today, 0, 4);
-        $sparkMonths = ReportingPeriod::buckets(ReportingPeriod::addMonths(substr($today, 0, 7).'-01', -11), $today, 'month');
+        $period = ReportingPeriod::resolve((string) $request->query('period'), null, (string) $request->query('from'), (string) $request->query('to'));
+        // Annual requirements and the monthly sparklines follow the range's last day.
+        $year = (int) substr($period['to'], 0, 4);
+        $sparkMonths = ReportingPeriod::buckets(ReportingPeriod::addMonths(substr($period['to'], 0, 7).'-01', -11), $period['to'], 'month');
         $filter = ['branch' => $branchId, 'classification' => $classification];
 
         $compliance = array_map(function (string $route) use ($requirements, $year, $filter): array {
@@ -64,6 +63,7 @@ class DashboardController extends Controller
         return view('dashboard', [
             'firstName' => strtok(trim((string) $user->name), ' ') ?: 'there',
             'period' => $period,
+            'isCustom' => $period['key'] === ReportingPeriod::CUSTOM,
             'periods' => ReportingPeriod::OPTIONS,
             'branchId' => $branchId,
             'classification' => $classification,
@@ -72,12 +72,13 @@ class DashboardController extends Controller
             'branches' => Branch::query()->orderBy('name')->get(['id', 'name']),
             'classifications' => array_column(Classification::cases(), 'value'),
             'statuses' => array_column(EmploymentStatus::cases(), 'value'),
-            'headcount' => $stats->employees($branchId, $classification),
+            'headcount' => $stats->employees($branchId, $classification, $period['to']),
             'movement' => $stats->period($period, $sparkMonths[0]['key'].'-01', $branchId, $classification),
             'compliance' => $compliance,
-            'recentHires' => $filtered(Employee::query()->with('station'))->whereNotNull('date_hired')->orderByDesc('date_hired')->orderByDesc('id')->limit(5)->get(),
+            'recentHires' => $filtered(Employee::query()->with('station'))->whereBetween('date_hired', [$period['from'], $period['to']])->orderByDesc('date_hired')->orderByDesc('id')->limit(5)->get(),
             'pendingLeaves' => WellnessLeave::query()
                 ->where('status', LeaveStatus::Pending)
+                ->whereBetween('date_filing', [$period['from'], $period['to']])
                 ->whereHas('employee', $filtered)
                 ->orderByDesc('date_filing')
                 ->orderByDesc('id')

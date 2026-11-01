@@ -252,10 +252,11 @@ class ImportModules
             self::field('replacement', 'Replacement', 'text', ['width' => 22]),
             self::field('date_applied', 'Date Applied', 'date', ['required' => true]),
             self::field('start_ojt', 'Start OJT', 'date'),
+            self::field('fds_date', 'FDS Date', 'date', ['help' => 'First day of service.']),
             self::select('application_status', 'Application Status', ApplicationStatus::class, ['required' => true]),
             ...$requirements,
             self::field('date_submitted', 'Date Submitted', 'date'),
-            self::field('requirements_status', 'FDS Requirements Status', 'text', ['computed' => true]),
+            self::field('requirements_status', 'Requirements Status', 'text', ['computed' => true]),
             self::field('remarks', 'Remarks', 'textarea', ['width' => 30]),
         ]);
     }

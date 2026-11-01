@@ -67,7 +67,7 @@ class EmployeeController extends Controller
                 'first_name' => implode(' ', $parts),
                 'position' => $application->position_applied,
                 'station' => (string) $application->station_id,
-                'date_hired' => $application->start_ojt?->toDateString(),
+                'date_hired' => ($application->fds_date ?? $application->start_ojt)?->toDateString(),
                 'email' => $application->email,
             ]);
         }

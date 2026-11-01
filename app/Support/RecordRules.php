@@ -20,7 +20,7 @@ class RecordRules
      */
     private const DATE_ORDER = [
         'employees' => [['date_hired', 'last_day_of_service', 'Last day of service cannot be before the date hired']],
-        'applications' => [['date_applied', 'start_ojt', 'Start OJT cannot be before the date applied']],
+        'applications' => [['date_applied', 'start_ojt', 'Start OJT cannot be before the date applied'], ['date_applied', 'fds_date', 'The FDS date cannot be before the date applied']],
         'employment-history' => [['hired_on', 'separated_on', 'The date separated cannot be before the date hired']],
         'wellness-leaves' => [['date_filing', 'date_received', 'Date received cannot be before the filing date']],
         'itr-submissions' => [self::RECEIVED_AFTER_SUBMITTED],
