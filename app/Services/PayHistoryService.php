@@ -121,7 +121,7 @@ class PayHistoryService
         }
 
         if (PayChange::query()->where('employee_id', $employee->id)->where('effective_on', $data['effective_on'])->exists()) {
-            throw new UserFacingException('There is already a pay record on '.HrDate::format($data['effective_on']).'. Delete it first, or choose another date.');
+            throw new UserFacingException('There is already a compensation record on '.HrDate::format($data['effective_on']).'. Delete it first, or choose another date.');
         }
 
         $change = new PayChange([...$data, 'employee_id' => $employee->id]);

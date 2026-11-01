@@ -259,7 +259,7 @@ class ImportModules
      */
     private static function payHistory(): array
     {
-        return self::module('pay-history', 'Pay History', 'Pay History', ['employee_id', 'effective_on'], [
+        return self::module('pay-history', 'Compensation History', 'Compensation History', ['employee_id', 'effective_on'], [
             self::field('employee', 'Employee ID', 'employee', ['required' => true]),
             self::field('effective_on', 'Effective Date', 'date', ['required' => true]),
             self::select('change_type', 'Change Type', PayChangeType::class, ['required' => true, 'width' => 16]),

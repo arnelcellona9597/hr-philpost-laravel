@@ -47,7 +47,7 @@ class PositionChangeController extends Controller
 
         $positions->delete($change);
 
-        return $this->back($employee, 'The record was deleted. Any pay record made with it stays in the pay history.');
+        return $this->back($employee, 'The record was deleted. Any compensation record made with it stays in the compensation history.');
     }
 
     private function back(Employee $employee, string $message, string $type = 'success'): RedirectResponse

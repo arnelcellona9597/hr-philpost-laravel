@@ -24,7 +24,7 @@
 
     <section class="card mt-6 p-5">
         <h2 class="text-sm font-semibold">Apply to employees</h2>
-        <p class="mt-1 text-sm text-muted">Adds this rate to the pay history of everyone in {{ $order->region->value }} employed while it applied, including people who have since left. Someone hired after {{ HrDate::format($order->effective_on) }} gets it from their own hire date, until the next rate. Monthly-paid staff and anyone already at or above it are left alone. Applying again only picks up people added since.</p>
+        <p class="mt-1 text-sm text-muted">Adds this rate to the compensation history of everyone in {{ $order->region->value }} employed while it applied, including people who have since left. Someone hired after {{ HrDate::format($order->effective_on) }} gets it from their own hire date, until the next rate. Monthly-paid staff and anyone already at or above it are left alone. Applying again only picks up people added since.</p>
         @if ($pending > 0)
             <form method="post" action="{{ route('wage-orders.apply', $order) }}" class="mt-3 flex flex-wrap items-end gap-3" data-confirm="Raise {{ $pending }} employee(s) to {{ Money::format($order->daily_rate_centavos) }} a day?">
                 @csrf

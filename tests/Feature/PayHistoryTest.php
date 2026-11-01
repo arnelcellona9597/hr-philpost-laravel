@@ -152,7 +152,7 @@ it('records salary increases in order on the profile and printout', function () 
         ->and($summary['current']->amount_centavos)->toBe(52_050);
 
     $this->get("/employees/{$employee->id}")->assertOk()->assertSee('₱520.50')->assertSee('+₱70.50')->assertSee('Memo 12');
-    $this->get("/employees/{$employee->id}/print")->assertOk()->assertSee('Pay history')->assertSee('₱520.50')->assertSee('Salary increase');
+    $this->get("/employees/{$employee->id}/print")->assertOk()->assertSee('Compensation History')->assertDontSee('Salary History')->assertDontSee('Pay history')->assertSee('₱520.50')->assertSee('Salary increase');
 });
 
 it('treats a future rate as upcoming, not current', function () {
@@ -184,7 +184,7 @@ it('refuses an incomplete or repeated pay record', function (array $change, stri
 
     expect(PayChange::query()->where('employee_id', $employee->id)->count())->toBe(1);
 })->with([
-    'same date' => [['effective_on' => '2026-03-01'], 'already a pay record'],
+    'same date' => [['effective_on' => '2026-03-01'], 'already a compensation record'],
     'bad date' => [['effective_on' => 'soon'], 'valid effective date'],
     'no rate' => [['amount' => ''], 'Enter the new rate'],
     'bad rate' => [['amount' => 'abc'], 'not an amount'],
@@ -246,7 +246,7 @@ it('refuses an incomplete promotion and leaves nothing behind when its rate is b
     $service = app(PositionHistoryService::class);
 
     expect(fn () => $service->record($employee, ['effective_on' => '2026-05-01', 'change_type' => 'Promotion', 'to_position' => '']))->toThrow(UserFacingException::class, 'new position')
-        ->and(fn () => $service->record($employee, ['effective_on' => '2026-05-01', 'change_type' => 'Promotion', 'to_position' => 'Clerk II', 'amount_centavos' => 60_000, 'rate_type' => 'Daily']))->toThrow(UserFacingException::class, 'already a pay record');
+        ->and(fn () => $service->record($employee, ['effective_on' => '2026-05-01', 'change_type' => 'Promotion', 'to_position' => 'Clerk II', 'amount_centavos' => 60_000, 'rate_type' => 'Daily']))->toThrow(UserFacingException::class, 'already a compensation record');
 
     expect(PositionChange::query()->count())->toBe(0)->and($employee->fresh()->position)->toBe('Clerk I');
 });
@@ -270,7 +270,7 @@ it('imports and exports wage orders, pay history and promotions', function () {
     $spreadsheet->removeSheetByIndex(0);
     $sheets = [
         'Wage Orders' => [['Region', 'Wage Order No.', 'Sector', 'Daily Minimum Wage', 'Effective Date'], ['Region XI', 'RB XI-23', 'Non-agriculture', 510.5, '2026-01-01']],
-        'Pay History' => [['Employee ID', 'Effective Date', 'Change Type', 'Rate Type', 'Basic Rate', 'Premium %', 'Reference'], ['EMP-77', '2026-01-01', 'Wage order', 'Daily', '1,020.00', '15', 'RB XI-23']],
+        'Compensation History' => [['Employee ID', 'Effective Date', 'Change Type', 'Rate Type', 'Basic Rate', 'Premium %', 'Reference'], ['EMP-77', '2026-01-01', 'Wage order', 'Daily', '1,020.00', '15', 'RB XI-23']],
         'Promotions' => [['Employee ID', 'Effective Date', 'Change Type', 'From Position', 'To Position'], ['EMP-77', '2026-02-01', 'Promotion', 'Clerk I', 'Clerk II']],
     ];
 
@@ -297,7 +297,7 @@ it('imports and exports wage orders, pay history and promotions', function () {
 
     $export = tempnam(sys_get_temp_dir(), 'export').'.xlsx';
     file_put_contents($export, $this->get('/data/export?module=pay-history')->assertOk()->streamedContent());
-    $sheet = IOFactory::load($export)->getSheetByName('Pay History');
+    $sheet = IOFactory::load($export)->getSheetByName('Compensation History');
     $headers = $sheet->rangeToArray('A1:'.$sheet->getHighestColumn().'1')[0];
 
     expect($sheet->getCell([array_search('Basic Rate', $headers, true) + 1, 2])->getValue())->toEqual(1020)
