@@ -58,7 +58,7 @@
                     <label class="label" for="margin">Margins</label>
                     <select class="input" id="margin" name="margin" data-page-opt>
                         @foreach (CertificateBlocks::MARGINS as $margin)
-                            <option value="{{ $margin }}" @selected($margin === $selectedMargin)>{{ ucfirst($margin) }}</option>
+                            <option value="{{ $margin }}" @selected($margin === $selectedMargin)>{{ CertificateBlocks::MARGIN_LABELS[$margin] }}</option>
                         @endforeach
                     </select>
                 </div>

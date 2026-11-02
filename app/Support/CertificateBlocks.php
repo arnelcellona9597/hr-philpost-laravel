@@ -43,14 +43,52 @@ class CertificateBlocks
         'serif' => ['label' => 'DejaVu Serif', 'screen' => "'Times New Roman', Times, 'Liberation Serif', serif", 'pdf' => "'DejaVu Serif', serif", 'word' => 'Times New Roman', 'points' => 12],
     ];
 
-    public const MARGINS = ['narrow', 'normal', 'wide'];
+    public const MARGINS = ['narrow', 'normal', 'wide', 'office'];
+
+    public const MARGIN_LABELS = ['narrow' => 'Narrow', 'normal' => 'Normal', 'wide' => 'Wide', 'office' => 'Office (0.5 in, 1.5 in on the left)'];
+
+    /**
+     * The four margins of a preset, in points.
+     *
+     * @return array{top: int, right: int, bottom: int, left: int}
+     */
+    public static function marginBox(?string $key): array
+    {
+        $margin = self::MARGIN_POINTS[$key] ?? self::MARGIN_POINTS['normal'];
+        [$top, $right, $bottom, $left] = is_array($margin) ? $margin : [$margin, $margin, $margin, $margin];
+
+        return ['top' => $top, 'right' => $right, 'bottom' => $bottom, 'left' => $left];
+    }
+
+    /**
+     * The margins as CSS: "36pt 36pt 36pt 108pt".
+     */
+    public static function marginCss(?string $key): string
+    {
+        return implode(' ', array_map(fn (int $points): string => "{$points}pt", self::marginBox($key)));
+    }
+
+    /**
+     * The browser print margin: the left margin is left to the sheet's padding so margin names can sit inside it.
+     */
+    public static function printPageMargin(?string $key): string
+    {
+        $box = self::marginBox($key);
+
+        return "{$box['top']}pt {$box['right']}pt {$box['bottom']}pt 0";
+    }
 
     /**
      * Page sizes in PDF points.
      */
     public const PAPER_POINTS = ['A4' => [595.28, 841.89], 'Letter' => [612, 792], 'Legal' => [612, 1008], 'Folio' => [612, 936]];
 
-    public const MARGIN_POINTS = ['narrow' => 50, 'normal' => 72, 'wide' => 96];
+    /**
+     * Page margins in points: one number for all four sides, or top, right, bottom and left.
+     *
+     * @var array<string, int|array{0: int, 1: int, 2: int, 3: int}>
+     */
+    public const MARGIN_POINTS = ['narrow' => 50, 'normal' => 72, 'wide' => 96, 'office' => [36, 36, 36, 108]];
 
     public const SPACER_POINTS = ['sm' => 8, 'md' => 18, 'lg' => 32, 'xl' => 56];
 
@@ -79,6 +117,7 @@ class CertificateBlocks
         ['type' => 'title', 'label' => 'Title', 'description' => 'e.g. CONTRACT OF SERVICE', 'icon' => 'file'],
         ['type' => 'paragraph', 'label' => 'Paragraph / clause', 'description' => 'Text with {{placeholders}}; **bold** for clause headings', 'icon' => 'edit'],
         ['type' => 'signatory', 'label' => 'Signatories', 'description' => 'Up to 4 names with titles and signature lines', 'icon' => 'user'],
+        ['type' => 'sideNames', 'label' => 'Names in the margin', 'description' => 'Names and titles up the left margin of every page', 'icon' => 'user'],
         ['type' => 'spacer', 'label' => 'Space', 'description' => 'Empty vertical space', 'icon' => 'minus'],
         ['type' => 'divider', 'label' => 'Line', 'description' => 'A thin horizontal rule', 'icon' => 'minus'],
         ['type' => 'pageBreak', 'label' => 'Page break', 'description' => 'Start the next block on a new page', 'icon' => 'file'],
@@ -150,9 +189,10 @@ class CertificateBlocks
             'letterhead' => [],
             'header' => ['showLogo' => true, 'companyName' => '', 'lines' => '', 'align' => 'center'],
             'title' => ['text' => 'CERTIFICATION', 'size' => 'lg', 'align' => 'center', 'wide' => true],
-            'paragraph' => ['text' => 'Type your text here. Use {{fullName}} and other placeholders.', 'align' => 'justify', 'size' => 'md', 'indent' => true],
+            'paragraph' => ['text' => 'Type your text here. Use {{fullName}} and other placeholders.', 'align' => 'justify', 'size' => 'md', 'indent' => true, 'list' => false],
             'details' => ['fields' => ['fullName', 'position', 'station', 'dateHired']],
-            'signatory' => ['align' => 'right', 'signers' => [['label' => '', 'name' => '', 'title' => 'HR Officer']]],
+            'signatory' => ['align' => 'right', 'line' => true, 'spread' => 'normal', 'signers' => [['label' => '', 'name' => '', 'title' => 'HR Officer']]],
+            'sideNames' => ['signers' => [['label' => '', 'name' => '', 'title' => '']]],
             'spacer' => ['size' => 'md'],
             'divider' => [],
             'footer' => ['text' => 'Not valid without the official dry seal.', 'align' => 'left'],
@@ -282,6 +322,7 @@ class CertificateBlocks
                     return [...$block, 'text' => $fill($block['text'])];
 
                 case 'signatory':
+                case 'sideNames':
                     return [...$block, 'signers' => array_map(fn (array $signer): array => array_map($fill, $signer), $block['signers'])];
 
                 case 'details':
@@ -494,6 +535,7 @@ class CertificateBlocks
                 'align' => self::pick($block['align'] ?? null, ['left', 'center', 'right', 'justify'], 'justify'),
                 'size' => self::pick($block['size'] ?? null, ['xs', 'sm', 'md', 'lg'], 'md'),
                 'indent' => self::bool($block['indent'] ?? null),
+                'list' => self::bool($block['list'] ?? null),
             ],
             'details' => [
                 'type' => $type,
@@ -505,8 +547,11 @@ class CertificateBlocks
             'signatory' => [
                 'type' => $type,
                 'align' => self::pick($block['align'] ?? null, ['left', 'center', 'right'], 'right'),
+                'line' => ! array_key_exists('line', $block) || self::bool($block['line']),
+                'spread' => self::pick($block['spread'] ?? null, ['normal', 'wide'], 'normal'),
                 'signers' => self::signers($block['signers'] ?? null),
             ],
+            'sideNames' => ['type' => $type, 'signers' => self::signers($block['signers'] ?? null, 6)],
             'spacer' => ['type' => $type, 'size' => self::pick($block['size'] ?? null, ['sm', 'md', 'lg', 'xl'], 'md')],
             'divider' => ['type' => $type],
             'footer' => [
@@ -527,13 +572,13 @@ class CertificateBlocks
     /**
      * @return list<array{label: string, name: string, title: string}>
      */
-    private static function signers(mixed $input): array
+    private static function signers(mixed $input, int $max = 4): array
     {
         $signers = array_map(fn (mixed $signer): array => [
             'label' => self::text($signer['label'] ?? null, 60),
             'name' => self::text($signer['name'] ?? null, 120),
             'title' => self::text($signer['title'] ?? null, 160),
-        ], array_slice(array_values(array_filter(is_array($input) ? $input : [], is_array(...))), 0, 4));
+        ], array_slice(array_values(array_filter(is_array($input) ? $input : [], is_array(...))), 0, $max));
 
         return $signers !== [] ? $signers : [['label' => '', 'name' => '', 'title' => '']];
     }
@@ -549,7 +594,7 @@ class CertificateBlocks
         return match ($block['type']) {
             'header' => [$block['companyName'], $block['lines']],
             'title', 'paragraph', 'footer', 'pageFooter' => [$block['text']],
-            'signatory' => array_merge(...array_map(fn (array $signer): array => array_values($signer), $block['signers'])),
+            'signatory', 'sideNames' => array_merge(...array_map(fn (array $signer): array => array_values($signer), $block['signers'])),
             default => [],
         };
     }

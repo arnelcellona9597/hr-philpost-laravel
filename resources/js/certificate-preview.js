@@ -5,7 +5,7 @@ const scaleBox = document.querySelector('[data-preview-scale]')
 const box = document.querySelector('[data-preview-box]')
 const status = document.querySelector('[data-preview-status]')
 const SIZES = { A4: [794, 1123], Letter: [816, 1056], Legal: [816, 1344] }
-const MARGINS = { narrow: 50, normal: 72, wide: 96 }
+const MARGINS = { narrow: '50pt', normal: '72pt', wide: '96pt', office: '36pt 36pt 36pt 108pt' }
 
 const fit = () => {
   const w = Number(paper.dataset.w || 794)
@@ -49,7 +49,7 @@ const refresh = () => {
     paper.dataset.h = String(h)
     paper.style.width = `${w}px`
     paper.style.minHeight = `${h}px`
-    paper.style.padding = `${MARGINS[response.headers.get('X-Margin')] ?? 72}pt`
+    paper.style.padding = MARGINS[response.headers.get('X-Margin')] ?? '72pt'
     paper.innerHTML = body
     status.textContent = 'Control number is assigned when issued.'
     fit()

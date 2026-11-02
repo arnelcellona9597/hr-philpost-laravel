@@ -26,9 +26,10 @@ class CertificateRenderer
 
         // The PDF engine repeats a fixed footer on every page only when it sits directly in the page.
         if ($options['pdf'] ?? false) {
-            $repeating = array_filter($blocks, fn (array $block): bool => $block['type'] === 'pageFooter');
-            $blocks = array_filter($blocks, fn (array $block): bool => $block['type'] !== 'pageFooter');
-            $footers = implode('', array_map(fn (array $block): string => str_replace('<div class="cert-pagefooter', '<div style="font-family:'.e($family).'" class="cert-pagefooter', self::block($block, $options)), $repeating));
+            $repeats = fn (array $block): bool => in_array($block['type'], ['pageFooter', 'sideNames'], true);
+            $repeating = array_filter($blocks, $repeats);
+            $blocks = array_filter($blocks, fn (array $block): bool => ! $repeats($block));
+            $footers = implode('', array_map(fn (array $block): string => self::block($block, $options), $repeating));
         }
 
         $body = implode('', array_map(fn (array $block): string => self::block($block, $options), $blocks));
@@ -47,14 +48,17 @@ class CertificateRenderer
             'header' => self::header($block, $options),
             // Not a heading: the certificate sits inside pages that already have their own.
             'title' => '<div class="cert-title cert-'.e($block['align']).' cert-t-'.e($block['size']).($block['wide'] ? ' cert-wide' : '').'">'.self::inline($block['text'], $options).'</div>',
-            'paragraph' => '<p class="cert-p cert-'.e($block['align']).' cert-s-'.e($block['size']).($block['indent'] ? ' cert-indent' : '').'">'.(self::inline($block['text'], $options) ?: '&nbsp;').'</p>',
+            'paragraph' => ($block['list'] ?? false)
+                ? '<div class="cert-p cert-'.e($block['align']).' cert-s-'.e($block['size']).'">'.self::listRows($block['text'], $options).'</div>'
+                : '<p class="cert-p cert-'.e($block['align']).' cert-s-'.e($block['size']).($block['indent'] ? ' cert-indent' : '').'">'.(self::inline($block['text'], $options) ?: '&nbsp;').'</p>',
             'details' => self::details($block, $options),
             'signatory' => self::signatory($block, $options),
+            'sideNames' => self::sideNames($block, $options),
             'spacer' => '<div style="height:'.CertificateBlocks::SPACER_POINTS[$block['size']].'pt"></div>',
             'divider' => '<hr class="cert-hr">',
             'footer' => '<p class="cert-footer cert-'.e($block['align']).'">'.self::inline($block['text'], $options).'</p>',
             'pageBreak' => '<div class="cert-pagebreak"></div>',
-            'pageFooter' => '<div class="cert-pagefooter cert-'.e($block['align']).'">'.self::footerText($block['text'], $options).'</div>',
+            'pageFooter' => '<div class="cert-pagefooter cert-'.e($block['align']).'"'.(($options['pdf'] ?? false) ? ' style="font-family:'.e(CertificateBlocks::font($options['font'])['pdf']).'"' : '').'>'.self::footerText($block['text'], $options).'</div>',
             default => '',
         };
     }
@@ -169,22 +173,84 @@ class CertificateRenderer
      */
     private static function signatory(array $block, array $options): string
     {
-        $columns = array_map(function (array $signer) use ($options): string {
+        $columns = array_map(function (array $signer) use ($options, $block): string {
             $label = $signer['label'] !== '' ? '<div class="cert-sig-label">'.self::inline($signer['label'], $options).'</div>' : '';
 
-            return '<div class="cert-signer">'.$label.'<div class="cert-sig-line"></div><div class="cert-sig-name">'
+            return '<div class="cert-signer">'.$label.(($block['line'] ?? true) ? '<div class="cert-sig-line"></div>' : '').'<div class="cert-sig-name">'
                 .(self::inline($signer['name'], $options) ?: '&nbsp;').'</div><div class="cert-sig-title">'.self::inline($signer['title'], $options).'</div></div>';
         }, $block['signers']);
+        $wide = ($block['spread'] ?? 'normal') === 'wide';
+        $plain = ($block['line'] ?? true) ? '' : ' cert-sig-plain';
 
         if (! ($options['pdf'] ?? false)) {
-            return '<div class="cert-signatory cert-'.e($block['align']).'">'.implode('', $columns).'</div>';
+            return '<div class="cert-signatory cert-'.e($block['align']).($wide ? ' cert-sig-wide' : '').$plain.'">'.implode('', $columns).'</div>';
         }
 
-        $cells = implode('<td class="cert-sig-gap"></td>', array_map(fn (string $column): string => '<td class="cert-sig-cell">'.$column.'</td>', $columns));
+        $cells = implode('<td class="cert-sig-gap"></td>', array_map(fn (string $column): string => '<td class="cert-sig-cell'.($wide ? ' cert-sig-wide' : '').'">'.$column.'</td>', $columns));
         $before = in_array($block['align'], ['center', 'right'], true) ? '<td></td>' : '';
         $after = in_array($block['align'], ['center', 'left'], true) ? '<td></td>' : '';
 
-        return '<table class="cert-layout cert-signatory-table cert-'.e($block['align']).'"><tr>'.$before.$cells.$after.'</tr></table>';
+        return '<table class="cert-layout cert-signatory-table cert-'.e($block['align']).$plain.'"><tr>'.$before.$cells.$after.'</tr></table>';
+    }
+
+    /**
+     * Names and titles up the left margin of every page, each beside a thin line, as in the office's contracts.
+     * Browsers turn the text on its side with writing-mode; the PDF engine has no writing-mode, so each
+     * entry is a block turned a quarter turn instead.
+     *
+     * @param  Block  $block
+     * @param  RenderOptions  $options
+     */
+    private static function sideNames(array $block, array $options): string
+    {
+        $entries = array_values(array_filter($block['signers'], fn (array $signer): bool => trim($signer['name'].$signer['title']) !== ''));
+
+        if (! ($options['pdf'] ?? false)) {
+            $items = implode('', array_map(fn (array $signer): string => '<div class="cert-side-item"><div class="cert-side-text"><strong>'.self::inline($signer['name'], $options).'</strong><br>'.self::inline($signer['title'], $options).'</div></div>', $entries));
+
+            return '<div class="cert-sidenames">'.$items.'</div>';
+        }
+
+        $pitch = 185;
+        $items = '';
+
+        foreach ($entries as $index => $signer) {
+            $bottom = 120 + $pitch * ($index + 1) - 25;
+            $items .= '<div class="cert-side-pdf" style="top:'.$bottom.'pt;font-family:'.e(CertificateBlocks::font($options['font'])['pdf']).'"><strong>'.self::inline($signer['name'], $options).'</strong><br>'.self::inline($signer['title'], $options).'</div>';
+        }
+
+        return $items;
+    }
+
+    /**
+     * Lines of a clause list. "1. Heading" hangs at the first level, "6.1 duty" and "a. item" at the second,
+     * "> text" is indented under a clause, and a blank line leaves a line of space.
+     *
+     * @param  RenderOptions  $options
+     */
+    private static function listRows(string $text, array $options): string
+    {
+        $rows = '';
+
+        foreach (explode("\n", $text) as $line) {
+            if (trim($line) === '') {
+                $rows .= '<div class="cert-gap"></div>';
+
+                continue;
+            }
+
+            if (preg_match('/^(\d+\.)\s+(.*)$/s', $line, $found)) {
+                $rows .= '<div class="cert-li cert-li-1"><span class="cert-n cert-n1">'.e($found[1]).'</span>'.self::inline($found[2], $options).'</div>';
+            } elseif (preg_match('/^(\d+\.\d+|[a-z]\.)\s+(.*)$/s', $line, $found)) {
+                $rows .= '<div class="cert-li cert-li-2"><span class="cert-n cert-n2">'.e($found[1]).'</span>'.self::inline($found[2], $options).'</div>';
+            } elseif (str_starts_with($line, '> ')) {
+                $rows .= '<div class="cert-li-inset">'.self::inline(substr($line, 2), $options).'</div>';
+            } else {
+                $rows .= '<div class="cert-row">'.self::inline($line, $options).'</div>';
+            }
+        }
+
+        return $rows;
     }
 
     /**
@@ -200,13 +266,23 @@ class CertificateRenderer
      */
     private static function rich(string $text): string
     {
-        $parts = preg_split('/(\*\*[^*]+\*\*)/', $text, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+        // **bold**, ~~underlined~~, and both together as **~~text~~**. (Underscores stay free for blank lines.)
+        $html = implode('', array_map(function (string $part): string {
+            if (preg_match('/^\*\*(.+)\*\*$/s', $part, $bold)) {
+                return '<strong>'.self::underlined($bold[1]).'</strong>';
+            }
 
-        $html = implode('', array_map(
-            fn (string $part): string => preg_match('/^\*\*[^*]+\*\*$/', $part) ? '<strong>'.e(substr($part, 2, -2)).'</strong>' : e($part),
-            $parts,
-        ));
+            return self::underlined($part);
+        }, preg_split('/(\*\*.+?\*\*)/s', $text, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY) ?: []));
 
         return str_replace("\n", '<br>', $html);
+    }
+
+    private static function underlined(string $text): string
+    {
+        return implode('', array_map(
+            fn (string $part): string => preg_match('/^~~(.+)~~$/s', $part, $under) ? '<u>'.e($under[1]).'</u>' : e($part),
+            preg_split('/(~~.+?~~)/s', $text, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY) ?: [],
+        ));
     }
 }

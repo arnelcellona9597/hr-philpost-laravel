@@ -14,6 +14,8 @@ use PhpOffice\PhpWord\IOFactory;
 use PhpOffice\PhpWord\PhpWord;
 use PhpOffice\PhpWord\Settings;
 use PhpOffice\PhpWord\SimpleType\Jc;
+use PhpOffice\PhpWord\Style\Cell;
+use PhpOffice\PhpWord\Style\Tab;
 
 /**
  * An issued contract as a Word document (.docx), built from the same frozen blocks as the PDF so the two
@@ -27,7 +29,7 @@ class ContractWordExporter
 
     private const TITLE_POINTS = ['md' => 16, 'lg' => 20, 'xl' => 24];
 
-    private const TEXT_POINTS = ['xs' => 9.5, 'sm' => 10.5, 'md' => 12, 'lg' => 13.5];
+    private const TEXT_POINTS = ['xs' => 10, 'sm' => 10.5, 'md' => 12, 'lg' => 13.5];
 
     /**
      * The .docx file as bytes.
@@ -36,23 +38,24 @@ class ContractWordExporter
     {
         $content = $contract->content;
         $paper = CertificateBlocks::PAPER_POINTS[$content['paperSize']] ?? CertificateBlocks::PAPER_POINTS['A4'];
-        $margin = (int) ((CertificateBlocks::MARGIN_POINTS[$content['margin']] ?? 72) * 20);
+        $margin = array_map(fn (int $points): int => $points * 20, CertificateBlocks::marginBox($content['margin']));
         $font = CertificateBlocks::font($content['font']);
         $escaping = Settings::isOutputEscapingEnabled();
         Settings::setOutputEscapingEnabled(true);
 
         try {
             $word = new PhpWord;
+            $word->setDefaultParagraphStyle(['lineHeight' => 1.0, 'spaceAfter' => 0, 'spaceBefore' => 0]);
             $word->setDefaultFontName($font['word']);
-            $word->setDefaultFontSize($font['points']);
+            $word->setDefaultFontSize($this->baseSize($content['blocks'], $font['points']));
             $word->getDocInfo()->setTitle($contract->control_number)->setSubject('Contract of Service');
             $section = $word->addSection([
                 'pageSizeW' => (int) ($paper[0] * 20),
                 'pageSizeH' => (int) ($paper[1] * 20),
-                'marginTop' => $margin,
-                'marginBottom' => $margin,
-                'marginLeft' => $margin,
-                'marginRight' => $margin,
+                'marginTop' => $margin['top'],
+                'marginBottom' => $margin['bottom'],
+                'marginLeft' => $margin['left'],
+                'marginRight' => $margin['right'],
             ]);
 
             foreach ($content['blocks'] as $block) {
@@ -72,6 +75,22 @@ class ContractWordExporter
         } finally {
             Settings::setOutputEscapingEnabled($escaping);
         }
+    }
+
+    /**
+     * The size of the contract's body text, so empty lines and paragraph marks do not make lines taller.
+     *
+     * @param  list<Block>  $blocks
+     */
+    private function baseSize(array $blocks, int $fallback): float
+    {
+        foreach ($blocks as $block) {
+            if ($block['type'] === 'paragraph') {
+                return (float) (self::TEXT_POINTS[$block['size']] ?? $fallback);
+            }
+        }
+
+        return (float) $fallback;
     }
 
     public function filename(Contract $contract): string
@@ -100,6 +119,10 @@ class ContractWordExporter
 
             case 'signatory':
                 $this->signatory($section, $block);
+                break;
+
+            case 'sideNames':
+                $this->sideNames($section, $block);
                 break;
 
             case 'spacer':
@@ -171,30 +194,102 @@ class ContractWordExporter
     }
 
     /**
-     * Text with **bold** runs, one Word paragraph per line break.
+     * Text with **bold** and __underlined__ runs, one Word paragraph per line break. With hanging clause
+     * numbers, "1. Heading" and "6.1 item" lines hang their numbers as the office's contracts do.
      *
      * @param  Block  $block
      */
     private function paragraph(Section $section, array $block): void
     {
-        $style = [
-            'alignment' => self::ALIGN[$block['align']] ?? Jc::BOTH,
-            'spaceAfter' => 120,
-            'indentation' => $block['indent'] ? ['firstLine' => 720] : [],
-        ];
         $size = self::TEXT_POINTS[$block['size']] ?? 12;
+        $after = (int) round($size * 1.22 * 20);
+        $align = self::ALIGN[$block['align']] ?? Jc::BOTH;
+
+        if (! ($block['list'] ?? false)) {
+            $run = $section->addTextRun(['alignment' => $align, 'spaceAfter' => $after, 'indentation' => $block['indent'] ? ['firstLine' => 720] : []]);
+
+            foreach (explode("\n", $block['text']) as $index => $line) {
+                if ($index > 0) {
+                    $run->addTextBreak();
+                }
+
+                $this->runs($run, $line, $size);
+            }
+
+            return;
+        }
 
         foreach (explode("\n", $block['text']) as $line) {
-            $run = $section->addTextRun($style);
-            $this->runs($run, $line, $size);
+            if (trim($line) === '') {
+                $section->addTextRun(['spaceAfter' => 0])->addText('', ['size' => $size]);
+
+                continue;
+            }
+
+            [$number, $text, $left, $hanging] = match (true) {
+                (bool) preg_match('/^(\d+\.)\s+(.*)$/s', $line, $found) => [$found[1], $found[2], 720, 320],
+                (bool) preg_match('/^(\d+\.\d+|[a-z]\.)\s+(.*)$/s', $line, $found) => [$found[1], $found[2], 1600, 580],
+                str_starts_with($line, '> ') => [null, substr($line, 2), 720, 0],
+                default => [null, $line, 0, 0],
+            };
+
+            $run = $section->addTextRun([
+                'alignment' => $align,
+                'spaceAfter' => 0,
+                'indentation' => ['left' => $left, 'hanging' => $hanging],
+                'tabs' => $hanging > 0 ? [new Tab('left', $left)] : [],
+            ]);
+
+            if ($number !== null) {
+                $run->addText($number."\t", ['size' => $size]);
+            }
+
+            $this->runs($run, $text, $size);
         }
+
+        $section->addTextRun(['spaceAfter' => 0])->addText('', ['size' => $size]);
     }
 
     private function runs(TextRun $run, string $line, float $size): void
     {
-        foreach (preg_split('/(\*\*[^*]+\*\*)/', $line, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY) ?: [] as $part) {
-            $bold = (bool) preg_match('/^\*\*[^*]+\*\*$/', $part);
-            $run->addText($bold ? substr($part, 2, -2) : $part, ['bold' => $bold, 'size' => $size]);
+        foreach (preg_split('/(\*\*.+?\*\*)/s', $line, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY) ?: [] as $part) {
+            $bold = (bool) preg_match('/^\*\*(.+)\*\*$/s', $part);
+            $inner = $bold ? substr($part, 2, -2) : $part;
+
+            foreach (preg_split('/(~~.+?~~)/s', $inner, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY) ?: [] as $piece) {
+                $underline = (bool) preg_match('/^~~(.+)~~$/s', $piece);
+                $run->addText($underline ? substr($piece, 2, -2) : $piece, ['bold' => $bold, 'underline' => $underline ? 'single' : 'none', 'size' => $size]);
+            }
+        }
+    }
+
+    /**
+     * Names and titles up the left margin on every page: a floating table in the header whose cells run
+     * their text from bottom to top, each with a thin line on its left.
+     *
+     * @param  Block  $block
+     */
+    private function sideNames(Section $section, array $block): void
+    {
+        $entries = array_values(array_filter($block['signers'], fn (array $signer): bool => trim($signer['name'].$signer['title']) !== ''));
+
+        if ($entries === []) {
+            return;
+        }
+
+        $table = $section->addHeader()->addTable([
+            'position' => ['horzAnchor' => 'page', 'vertAnchor' => 'page', 'tblpX' => 960, 'tblpY' => 2700],
+            'cellMargin' => 0,
+        ]);
+
+        foreach ($entries as $index => $signer) {
+            if ($index > 0) {
+                $table->addRow(900, ['exactHeight' => true])->addCell(520);
+            }
+
+            $cell = $table->addRow(2600, ['exactHeight' => true])->addCell(520, ['textDirection' => Cell::TEXT_DIR_BTLR, 'vAlign' => 'center', 'borderLeftSize' => 6, 'borderLeftColor' => '111111']);
+            $cell->addText($this->plain($signer['name']), ['bold' => true, 'size' => 9], ['alignment' => Jc::CENTER, 'spaceAfter' => 0]);
+            $cell->addText($this->plain($signer['title']), ['size' => 9], ['alignment' => Jc::CENTER, 'spaceAfter' => 0]);
         }
     }
 
@@ -203,19 +298,31 @@ class ContractWordExporter
      */
     private function signatory(Section $section, array $block): void
     {
-        $table = $section->addTable(['alignment' => self::ALIGN[$block['align']] ?? Jc::START, 'cellMargin' => 80]);
+        $line = $block['line'] ?? true;
+        $width = ($block['spread'] ?? 'normal') === 'wide' ? 6760 : 3000;
+        $table = $section->addTable(['alignment' => self::ALIGN[$block['align']] ?? Jc::START, 'cellMargin' => $line ? 80 : 0]);
         $row = $table->addRow();
         $alignment = $block['align'] === 'left' ? Jc::START : Jc::CENTER;
 
         foreach ($block['signers'] as $signer) {
-            $cell = $row->addCell(3000);
-            $cell->addText($this->plain($signer['label']), ['size' => 10.5], ['alignment' => Jc::START, 'spaceAfter' => 480]);
-            $cell->addText('', ['size' => 2], ['borderTopSize' => 6, 'borderTopColor' => '111111', 'spaceAfter' => 0]);
-            $cell->addText(mb_strtoupper($this->plain($signer['name'])), ['bold' => true], ['alignment' => $alignment, 'spaceAfter' => 0]);
-            $cell->addText($this->plain($signer['title']), ['size' => 10.5], ['alignment' => $alignment]);
+            $cell = $row->addCell($width);
+            $label = $this->plain($signer['label']);
+
+            if ($label !== '' || $line) {
+                $cell->addText($label, ['size' => 10.5], ['alignment' => Jc::START, 'spaceAfter' => $line ? 480 : 0]);
+            }
+
+            if ($line) {
+                $cell->addText('', ['size' => 2], ['borderTopSize' => 6, 'borderTopColor' => '111111', 'spaceAfter' => 0]);
+            }
+
+            $cell->addText(mb_strtoupper($this->plain($signer['name'])), ['bold' => true, 'size' => 10], ['alignment' => $alignment, 'spaceAfter' => 0]);
+            $cell->addText($this->plain($signer['title']), ['size' => 10], ['alignment' => $alignment]);
         }
 
-        $section->addText('', ['size' => 2], ['spaceAfter' => 120]);
+        if ($line) {
+            $section->addText('', ['size' => 2], ['spaceAfter' => 120]);
+        }
     }
 
     /**
@@ -223,6 +330,6 @@ class ContractWordExporter
      */
     private function plain(string $text): string
     {
-        return str_replace('**', '', MergeTemplate::render($text, []));
+        return str_replace(['**', '~~'], '', MergeTemplate::render($text, []));
     }
 }
