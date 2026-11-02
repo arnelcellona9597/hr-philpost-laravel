@@ -1,4 +1,5 @@
-{{-- Certificate PDF. The PDF engine has no flexbox, and DejaVu covers every character people type. --}}
+{{-- Certificate PDF. The PDF engine has no flexbox, and DejaVu covers every character people type. Carlito lines come out about 1.344 times (and wrap slightly earlier than Word, so a little is taken back) the requested height, so $k scales them back. --}}
+@php $k = ($carlito ?? false) ? 0.715 : 1; @endphp
 <!doctype html>
 <html lang="en">
     <head>
@@ -7,7 +8,7 @@
         <style>
             @page { margin: {{ $margin['top'] }}pt {{ $margin['right'] }}pt {{ $margin['bottom'] }}pt {{ $margin['left'] }}pt; }
             body { margin: 0; color: #111; }
-            .cert { line-height: 1.5; font-size: 12pt; }
+            .cert { line-height: {{ round(1.5 * $k, 3) }}; font-size: 12pt; }
             .cert-compact { font-size: 11pt; }
             .cert-left { text-align: left; }
             .cert-center { text-align: center; }
@@ -17,15 +18,15 @@
             .cert-layout td { padding: 0; vertical-align: top; }
             .cert-header { margin-bottom: 4pt; }
             .cert-logo-cell { width: 132pt; }
-            .cert-company { font-weight: bold; font-size: 14pt; line-height: 1.25; }
-            .cert-lines { font-size: 10pt; color: #333; line-height: 1.35; }
-            .cert-title { font-weight: bold; line-height: 1.2; }
+            .cert-company { font-weight: bold; font-size: 14pt; line-height: {{ round(1.25 * $k, 3) }}; }
+            .cert-lines { font-size: 10pt; color: #333; line-height: {{ round(1.35 * $k, 3) }}; }
+            .cert-title { font-weight: bold; line-height: {{ round(1.2 * $k, 3) }}; }
             .cert-t-md { font-size: 16pt; }
             .cert-t-lg { font-size: 20pt; }
             .cert-t-xl { font-size: 24pt; }
             .cert-wide { letter-spacing: .12em; }
             .cert-p { margin: 0 0 10pt; }
-            .cert-s-xs { font-size: 10pt; line-height: 1.22; margin-bottom: 12pt; }
+            .cert-s-xs { font-size: 10pt; line-height: {{ round(12.2 * $k, 2) }}pt; margin-bottom: 12pt; }
             .cert-li-1 { margin-left: 36pt; }
             .cert-n { float: left; }
             .cert-n1 { width: 16pt; margin-left: -16pt; }
