@@ -12,6 +12,8 @@ use App\Models\SiteSetting;
 use App\Support\CertificateBlocks;
 use App\Support\CertificateRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Dompdf\Dompdf;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -43,6 +45,7 @@ class PdfRenderer
             'margin' => CertificateBlocks::marginBox($content['margin']),
             'void' => $certificate->isVoid(),
             'compact' => CertificateBlocks::font($content['font'])['points'] === 11,
+            'carlito' => str_starts_with(CertificateBlocks::font($content['font'])['pdf'], 'Carlito'),
         ], $paper);
     }
 
@@ -64,6 +67,7 @@ class PdfRenderer
             'margin' => CertificateBlocks::marginBox($content['margin']),
             'void' => $contract->isVoid(),
             'compact' => CertificateBlocks::font($content['font'])['points'] === 11,
+            'carlito' => str_starts_with(CertificateBlocks::font($content['font'])['pdf'], 'Carlito'),
         ], $paper);
     }
 
@@ -147,10 +151,34 @@ class PdfRenderer
      */
     private function render(string $view, array $data, array $paper): string
     {
-        return Pdf::loadView($view, $data)
+        $pdf = Pdf::loadView($view, $data)
             ->setOption(['isFontSubsettingEnabled' => true])
-            ->setPaper([0, 0, $paper[0], $paper[1]])
-            ->output();
+            ->setPaper([0, 0, $paper[0], $paper[1]]);
+
+        $this->registerCarlito($pdf->getDomPDF());
+
+        return $pdf->output();
+    }
+
+    /**
+     * Carlito stands in for Calibri, which cannot be embedded. Registered once; the metrics cache goes to storage/fonts.
+     */
+    private function registerCarlito(Dompdf $dompdf): void
+    {
+        $metrics = $dompdf->getFontMetrics();
+
+        if ($metrics->getFamily('carlito') !== null) {
+            return;
+        }
+
+        File::ensureDirectoryExists(storage_path('fonts'));
+
+        foreach (['normal' => 'Regular', 'bold' => 'Bold'] as $weight => $file) {
+            foreach (['normal' => '', 'italic' => 'Italic'] as $style => $suffix) {
+                $name = $weight === 'bold' && $suffix !== '' ? 'BoldItalic' : ($suffix !== '' ? 'Italic' : $file);
+                $metrics->registerFont(['family' => 'carlito', 'weight' => $weight, 'style' => $style], resource_path("fonts/carlito/Carlito-{$name}.ttf"));
+            }
+        }
     }
 
     private function safeName(string $name): string

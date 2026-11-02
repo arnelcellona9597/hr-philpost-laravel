@@ -35,7 +35,7 @@ class CertificateBlocks
     public const FONTS = [
         'times' => ['label' => 'Times New Roman', 'screen' => "'Times New Roman', Times, 'Liberation Serif', serif", 'pdf' => "Times, 'DejaVu Serif', serif", 'word' => 'Times New Roman', 'points' => 12],
         'arial' => ['label' => 'Arial', 'screen' => "Arial, Arimo, 'Liberation Sans', sans-serif", 'pdf' => "Helvetica, 'DejaVu Sans', sans-serif", 'word' => 'Arial', 'points' => 12],
-        'calibri' => ['label' => 'Calibri', 'screen' => 'Calibri, Carlito, Arial, sans-serif', 'pdf' => "Helvetica, 'DejaVu Sans', sans-serif", 'word' => 'Calibri', 'points' => 12],
+        'calibri' => ['label' => 'Calibri', 'screen' => 'Calibri, Carlito, Arial, sans-serif', 'pdf' => "Carlito, Helvetica, 'DejaVu Sans', sans-serif", 'word' => 'Calibri', 'points' => 12],
         'sans' => ['label' => 'Tahoma', 'screen' => "Tahoma, 'DejaVu Sans', sans-serif", 'pdf' => "'DejaVu Sans', sans-serif", 'word' => 'Tahoma', 'points' => 11],
         'verdana' => ['label' => 'Verdana', 'screen' => "Verdana, 'DejaVu Sans', sans-serif", 'pdf' => "'DejaVu Sans', sans-serif", 'word' => 'Verdana', 'points' => 11],
         'georgia' => ['label' => 'Georgia', 'screen' => "Georgia, 'DejaVu Serif', serif", 'pdf' => "'DejaVu Serif', serif", 'word' => 'Georgia', 'points' => 12],
