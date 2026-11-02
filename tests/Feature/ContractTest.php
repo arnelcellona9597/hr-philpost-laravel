@@ -245,6 +245,7 @@ it('serves the page, the print view and the PDF', function () {
     $this->get("/contracts/{$contract->id}/print")->assertOk()->assertSee('cert-sidenames', false);
     $pdf = $this->get("/contracts/{$contract->id}/pdf")->assertOk();
     expect($pdf->headers->get('Content-Type'))->toBe('application/pdf')->and(substr($pdf->getContent(), 0, 4))->toBe('%PDF');
+    expect($pdf->getContent())->toContain('Carlito-Regular');
 });
 
 it('downloads chosen contracts as a ZIP of Word or PDF files', function (string $format, string $extension) {
