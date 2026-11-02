@@ -40,7 +40,7 @@ class PdfRenderer
                 'letterheadLogoSize' => $letterheadLogo['size'] ?? null,
                 'pdf' => true,
             ]),
-            'margin' => CertificateBlocks::MARGIN_POINTS[$content['margin']] ?? 72,
+            'margin' => CertificateBlocks::marginBox($content['margin']),
             'void' => $certificate->isVoid(),
             'compact' => CertificateBlocks::font($content['font'])['points'] === 11,
         ], $paper);
@@ -61,7 +61,7 @@ class PdfRenderer
                 'logoSize' => $logo['size'] ?? null,
                 'pdf' => true,
             ]),
-            'margin' => CertificateBlocks::MARGIN_POINTS[$content['margin']] ?? 72,
+            'margin' => CertificateBlocks::marginBox($content['margin']),
             'void' => $contract->isVoid(),
             'compact' => CertificateBlocks::font($content['font'])['points'] === 11,
         ], $paper);

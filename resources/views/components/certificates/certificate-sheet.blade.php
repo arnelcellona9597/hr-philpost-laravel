@@ -3,11 +3,12 @@
 
 @php
     [$width, $height] = ['A4' => ['210mm', '297mm'], 'Letter' => ['8.5in', '11in'], 'Legal' => ['8.5in', '14in'], 'Folio' => ['8.5in', '13in']][$paperSize] ?? ['210mm', '297mm'];
-    $padding = ['narrow' => 50, 'normal' => 72, 'wide' => 96][$margin] ?? 72;
+    $padding = \App\Support\CertificateBlocks::marginCss($margin);
+    $leftMargin = \App\Support\CertificateBlocks::marginBox($margin)['left'];
 @endphp
 
 <div class="cert-frame">
-    <article @class(['sheet cert-paper', 'cert-print' => $print]) style="width:{{ $width }};min-height:{{ $height }};padding:{{ $padding }}pt" aria-label="Certificate">
+    <article @class(['sheet cert-paper', 'cert-print' => $print]) style="width:{{ $width }};min-height:{{ $height }};padding:{{ $padding }};--cert-left:{{ $leftMargin }}pt" aria-label="Certificate">
         {{ $slot }}
         @if ($void)
             <div class="cert-void" aria-label="This certificate is void">VOID</div>

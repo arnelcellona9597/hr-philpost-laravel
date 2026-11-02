@@ -593,11 +593,13 @@
     overflow: visible;
     padding: 0;
   }
+  html .cert .cert-sidenames { position: fixed; top: 99pt; left: 46pt; }
   .cert-paper.cert-print {
     width: auto !important;
     min-height: 0 !important;
-    padding: 0 !important;
+    padding: 0 0 0 var(--cert-left, 0pt) !important;
     box-shadow: none !important;
+    overflow: visible !important;
   }
 }
 
@@ -620,7 +622,21 @@
 .cert .cert-t-xl { font-size: 24pt; }
 .cert .cert-wide { letter-spacing: 0.12em; }
 .cert .cert-p { margin: 0 0 10pt; }
-.cert .cert-s-xs { font-size: 9.5pt; line-height: 1.28; margin-bottom: 6pt; }
+/* The office contract: 10 pt text, clause lists that hang, and names up the left margin. */
+.cert .cert-s-xs { font-size: 10pt; line-height: 1.22; margin-bottom: 12pt; }
+.cert .cert-li-1 { margin-left: 36pt; }
+.cert .cert-n { float: left; }
+.cert .cert-n1 { width: 16pt; margin-left: -16pt; }
+.cert .cert-li-2 { margin-left: 80pt; }
+.cert .cert-n2 { width: 29pt; margin-left: -29pt; }
+.cert .cert-li-inset { margin-left: 36pt; }
+.cert .cert-gap { height: 12.2pt; }
+.cert .cert-sig-plain .cert-sig-line { display: none; }
+.cert .cert-sig-wide .cert-signer { width: 314pt; }
+.cert .cert-sig-plain .cert-sig-name, .cert .cert-sig-plain .cert-sig-title { font-size: 10pt; }
+.cert .cert-sidenames { position: absolute; top: 135pt; left: 46pt; display: flex; flex-direction: column; gap: 45pt; height: 650pt; }
+.cert .cert-side-item { display: flex; height: 130pt; border-left: 0.75pt solid #111; padding-left: 3pt; }
+.cert .cert-side-text { writing-mode: vertical-rl; transform: rotate(180deg); text-align: center; font-size: 9pt; line-height: 1.2; height: 100%; }
 .cert .cert-s-sm { font-size: 10.5pt; }
 .cert .cert-s-md { font-size: 12pt; }
 .cert .cert-s-lg { font-size: 13.5pt; }

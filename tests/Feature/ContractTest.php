@@ -206,14 +206,14 @@ it('builds a Word file that opens and carries the contract text', function () {
 
     expect($zip->open($path))->toBeTrue()
         ->and($zip->locateName('word/document.xml'))->not->toBeFalse()
-        ->and($zip->locateName('word/footer1.xml'))->not->toBeFalse();
+        ->and($zip->locateName('word/header1.xml'))->not->toBeFalse();
 
     $document = $zip->getFromName('word/document.xml');
-    $footer = $zip->getFromName('word/footer1.xml');
+    $footer = $zip->getFromName('word/header1.xml');
     $zip->close();
 
     expect($document)->toContain('CONTRACT OF SERVICE')->toContain('MAYLIN')->toContain('Four Hundred Fifty Pesos')->toContain('A C K N O W L E D G E M E N T')->not->toContain('{{')
-        ->and($footer)->toContain('Ben T. Santos')->toContain('Service Contractor')->toContain('Carla M. Lim');
+        ->and($footer)->toContain('Ben T. Santos')->toContain('Service Contractor')->toContain('Carla M. Lim')->toContain('w:textDirection w:val="btLr"')->toContain('w:tblpX');
 
     $response = $this->get("/contracts/{$contract->id}/docx")->assertOk();
     expect($response->headers->get('Content-Disposition'))->toContain('COS-2026-0001')->toContain('.docx')
@@ -242,7 +242,7 @@ it('serves the page, the print view and the PDF', function () {
     $contract = app(ContractService::class)->issue($this->hr, $this->template->id, $employee->id, contractRow($employee), '2026-06-20');
 
     $this->get("/contracts/{$contract->id}")->assertOk()->assertSee('COS-2026-0001')->assertSee('CONTRACT OF SERVICE');
-    $this->get("/contracts/{$contract->id}/print")->assertOk()->assertSee('cert-pagefooter', false);
+    $this->get("/contracts/{$contract->id}/print")->assertOk()->assertSee('cert-sidenames', false);
     $pdf = $this->get("/contracts/{$contract->id}/pdf")->assertOk();
     expect($pdf->headers->get('Content-Type'))->toBe('application/pdf')->and(substr($pdf->getContent(), 0, 4))->toBe('%PDF');
 });
@@ -406,7 +406,7 @@ it('writes one rate with its premium when the wage does not change', function ()
     $employee = cosEmployee();
     $contract = app(ContractService::class)->issue($this->hr, $this->template->id, $employee->id, contractRow($employee, ['daily_wage' => '460']), '2026-06-20');
 
-    expect(json_encode($contract->content['blocks'], JSON_UNESCAPED_UNICODE))->toContain('fixed daily wage of Four Hundred Sixty Pesos (₱ 460.00) and Fifteen percent (15%) premium in Philippine Currency');
+    expect(json_encode($contract->content['blocks'], JSON_UNESCAPED_UNICODE))->toContain('fixed daily wage of **Four Hundred Sixty Pesos (₱ 460.00) and Fifteen percent (15%) premium** in Philippine Currency');
 });
 
 it('edits, adds, duplicates and deletes scopes', function () {
@@ -426,23 +426,24 @@ it('edits, adds, duplicates and deletes scopes', function () {
     expect(ContractScope::query()->whereKey($scope->id)->exists())->toBeFalse();
 });
 
-it('prints on 8.5 by 13 paper with the footer in columns on every page', function () {
+it('prints on 8.5 by 13 paper with the office margins and the names up the left margin', function () {
     $employee = cosEmployee();
     $contract = app(ContractService::class)->issue($this->hr, $this->template->id, $employee->id, contractRow($employee), '2026-06-20');
 
-    expect($contract->content['paperSize'])->toBe('Folio');
-    $this->get("/contracts/{$contract->id}/print")->assertOk()->assertSee('8.5in 13in', false)->assertSee('cert-pagefooter', false);
+    expect($contract->content['paperSize'])->toBe('Folio')->and($contract->content['margin'])->toBe('office');
+    $this->get("/contracts/{$contract->id}/print")->assertOk()->assertSee('8.5in 13in', false)->assertSee('36pt 36pt 36pt 108pt', false)->assertSee('cert-sidenames', false);
 
-    $body = CertificateRenderer::html($contract->content['blocks'], ['companyName' => 'x', 'font' => 'arial', 'pdf' => true]);
+    $pdf = CertificateRenderer::html($contract->content['blocks'], ['companyName' => 'x', 'font' => 'calibri', 'pdf' => true]);
 
-    expect(strpos($body, 'cert-pagefooter'))->toBeLessThan(strpos($body, 'class="cert'.'"'))
-        ->and(strpos($body, 'cert-pagefooter'))->toBeLessThan(strpos($body, 'CONTRACT OF SERVICE'));
+    expect(substr_count($pdf, 'cert-side-pdf'))->toBe(4)->and($pdf)->not->toContain('cert-sidenames');
 });
 
-it('shows the page footer at the end of the contract on screen', function () {
+it('hangs clause numbers and underlines text like the office contract', function () {
     $employee = cosEmployee();
     $contract = app(ContractService::class)->issue($this->hr, $this->template->id, $employee->id, contractRow($employee), '2026-06-20');
-    $html = $this->get("/contracts/{$contract->id}")->assertOk()->getContent();
+    $html = CertificateRenderer::html($contract->content['blocks'], ['companyName' => 'x', 'font' => 'calibri']);
 
-    expect(strpos($html, 'cert-pagefooter'))->toBeGreaterThan(strpos($html, 'A C K N O W L E D G E M E N T'));
+    expect($html)->toContain('<span class="cert-n cert-n1">1.</span>')->toContain('<span class="cert-n cert-n2">6.1</span>')->toContain('<span class="cert-n cert-n2">10.11</span>')
+        ->toContain('cert-li-inset')->toContain('<strong><u>')->toContain('cert-gap')->not->toContain('<u>_')
+        ->and($html)->toContain('<u>July 01, 2026 up to December 31, 2026,</u>');
 });
