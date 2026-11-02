@@ -33,15 +33,32 @@ const opt = (name) => form.elements.namedItem(name).value
 const PLACEHOLDER = /\{\{\s*([a-zA-Z][a-zA-Z0-9]*)\s*\}\}/g
 const sampleValues = () => ({ ...Object.fromEntries(Object.entries(FIELDS).map(([name, field]) => [name, field.sample])), companyName: data.companyName })
 const merge = (text, values) => text.replace(PLACEHOLDER, (_, key) => values[key] ?? '')
+const underlined = (part) => part.split(/(~~.+?~~)/g).filter(Boolean).map((piece) => (/^~~.+~~$/.test(piece) ? `<u>${esc(piece.slice(2, -2))}</u>` : esc(piece))).join('')
 const rich = (text) =>
   text
-    .split(/(\*\*[^*]+\*\*)/g)
+    .split(/(\*\*.+?\*\*)/g)
     .filter(Boolean)
-    .map((part) => (/^\*\*[^*]+\*\*$/.test(part) ? `<strong>${esc(part.slice(2, -2))}</strong>` : esc(part)))
+    .map((part) => (/^\*\*.+\*\*$/.test(part) ? `<strong>${underlined(part.slice(2, -2))}</strong>` : underlined(part)))
     .join('')
     .replace(/\n/g, '<br>')
 const chip = (name) => `<span class="cert-ph">${esc(name)}</span>`
 const inline = (text, options) => (options.showPlaceholders ? rich(text).replace(PLACEHOLDER, (_, key) => chip(key)) : rich(merge(text, options.values)))
+
+// Clause lists, as in CertificateRenderer::listRows.
+function listRows(text, options) {
+  return text
+    .split('\n')
+    .map((line) => {
+      if (!line.trim()) return '<div class="cert-gap"></div>'
+      let found = line.match(/^(\d+\.)\s+([\s\S]*)$/)
+      if (found) return `<div class="cert-li cert-li-1"><span class="cert-n cert-n1">${esc(found[1])}</span>${inline(found[2], options)}</div>`
+      found = line.match(/^(\d+\.\d+|[a-z]\.)\s+([\s\S]*)$/)
+      if (found) return `<div class="cert-li cert-li-2"><span class="cert-n cert-n2">${esc(found[1])}</span>${inline(found[2], options)}</div>`
+      if (line.startsWith('> ')) return `<div class="cert-li-inset">${inline(line.slice(2), options)}</div>`
+      return `<div class="cert-row">${inline(line, options)}</div>`
+    })
+    .join('')
+}
 
 // A " | " starts a new column, as in CertificateRenderer::footerText.
 function footerText(text, options) {
@@ -77,6 +94,7 @@ function renderBlock(block, options) {
     case 'title':
       return `<div class="cert-title cert-${block.align} cert-t-${block.size}${block.wide ? ' cert-wide' : ''}">${inline(block.text, options)}</div>`
     case 'paragraph':
+      if (block.list) return `<div class="cert-p cert-${block.align} cert-s-${block.size}">${listRows(block.text, options)}</div>`
       return `<p class="cert-p cert-${block.align} cert-s-${block.size}${block.indent ? ' cert-indent' : ''}">${inline(block.text, options) || '&nbsp;'}</p>`
     case 'details': {
       const rows = block.fields
@@ -86,9 +104,16 @@ function renderBlock(block, options) {
     }
     case 'signatory': {
       const columns = block.signers
-        .map((signer) => `<div class="cert-signer">${signer.label ? `<div class="cert-sig-label">${inline(signer.label, options)}</div>` : ''}<div class="cert-sig-line"></div><div class="cert-sig-name">${inline(signer.name, options) || '&nbsp;'}</div><div class="cert-sig-title">${inline(signer.title, options)}</div></div>`)
+        .map((signer) => `<div class="cert-signer">${signer.label ? `<div class="cert-sig-label">${inline(signer.label, options)}</div>` : ''}${block.line === false ? '' : '<div class="cert-sig-line"></div>'}<div class="cert-sig-name">${inline(signer.name, options) || '&nbsp;'}</div><div class="cert-sig-title">${inline(signer.title, options)}</div></div>`)
         .join('')
-      return `<div class="cert-signatory cert-${block.align}">${columns}</div>`
+      return `<div class="cert-signatory cert-${block.align}${block.spread === 'wide' ? ' cert-sig-wide' : ''}${block.line === false ? ' cert-sig-plain' : ''}">${columns}</div>`
+    }
+    case 'sideNames': {
+      const items = block.signers
+        .filter((signer) => (signer.name + signer.title).trim())
+        .map((signer) => `<div class="cert-side-item"><div class="cert-side-text"><strong>${inline(signer.name, options)}</strong><br>${inline(signer.title, options)}</div></div>`)
+        .join('')
+      return `<div class="cert-sidenames">${items}</div>`
     }
     case 'spacer':
       return `<div style="height:${data.spacers[block.size]}pt"></div>`
@@ -107,13 +132,13 @@ function renderBlock(block, options) {
 
 function blockTexts(block) {
   if (block.type === 'header') return [block.companyName, block.lines]
-  if (block.type === 'signatory') return block.signers.flatMap((s) => [s.label, s.name, s.title])
+  if (block.type === 'signatory' || block.type === 'sideNames') return block.signers.flatMap((s) => [s.label, s.name, s.title])
   return 'text' in block ? [block.text] : []
 }
 const unknownPlaceholders = () => [...new Set(state.blocks.flatMap(blockTexts).flatMap((text) => [...text.matchAll(PLACEHOLDER)].map((m) => m[1])))].filter((name) => !(name in FIELDS))
 
 function summary(block) {
-  const text = 'text' in block ? block.text : block.type === 'signatory' ? block.signers.map((s) => s.name || s.title).join(', ') : ''
+  const text = 'text' in block ? block.text : block.type === 'signatory' || block.type === 'sideNames' ? block.signers.map((s) => s.name || s.title).join(', ') : ''
   return `${labelOf(block)}${text ? `: ${text.replace(/\*\*/g, '').slice(0, 60)}` : ''}`
 }
 
@@ -121,7 +146,8 @@ function renderPage() {
   const [width, height] = SIZES[opt('paper_size')] ?? SIZES.A4
   paper.style.width = `${width}px`
   paper.style.minHeight = `${height}px`
-  paper.style.padding = `${data.margins[opt('margin')] ?? 72}pt`
+  const margin = data.margins[opt('margin')] ?? 72
+  paper.style.padding = Array.isArray(margin) ? margin.map((points) => `${points}pt`).join(' ') : `${margin}pt`
   const options = { values: sampleValues(), showPlaceholders: state.mode === 'placeholders' }
   const font = opt('font')
   const items = state.blocks
@@ -199,6 +225,8 @@ function renderInspector() {
       html += field('Alignment', select('align', block.align, ALIGN4))
       html += field('Text size', select('size', block.size, [['xs', 'Fine print'], ['sm', 'Small'], ['md', 'Normal'], ['lg', 'Large']]))
       html += check('indent', block.indent, 'Indent the first line')
+      html += check('list', block.list, 'Hanging clause numbers')
+      if (block.list) html += '<p class="text-xs text-muted">One line per row. “1. Heading” and “6.1 item” hang their numbers; start a line with “&gt; ” to indent it under a clause; a blank line leaves space. Use ~~underline~~ and **bold**.</p>'
       break
     case 'footer':
       html += field('Text', area('text', block.text, 3))
@@ -227,8 +255,21 @@ function renderInspector() {
         .map(([name, f]) => `<label class="flex items-center gap-2 py-0.5 text-sm"><input type="checkbox" class="size-4 accent-[var(--primary)]" data-field="${name}"${block.fields.includes(name) ? ' checked' : ''}> ${esc(f.label)}</label>`)
         .join('')
       break
+    case 'sideNames':
+      html += '<p class="mb-2 text-xs text-muted">Names and titles up the left margin of every page. They need the Office margin setting to have room.</p>'
+      block.signers.forEach((signer, index) => {
+        html += `<fieldset class="mb-3 rounded-lg border border-line p-3"><legend class="px-1 text-xs font-semibold text-muted">Entry ${index + 1}</legend>
+          ${field('Name', `<input class="input mt-1" data-signer="${index}" data-skey="name" value="${esc(signer.name)}">`)}
+          ${field('Title', `<input class="input mt-1" data-signer="${index}" data-skey="title" value="${esc(signer.title)}">`)}
+          ${block.signers.length > 1 ? `<button type="button" class="btn-ghost btn-sm text-danger" data-remove-signer="${index}">Remove</button>` : ''}
+        </fieldset>`
+      })
+      if (block.signers.length < 6) html += '<button type="button" class="btn-secondary btn-sm" data-add-signer>Add entry</button>'
+      break
     case 'signatory':
       html += field('Alignment', select('align', block.align, ALIGN3))
+      html += field('Columns', select('spread', block.spread ?? 'normal', [['normal', 'Close together'], ['wide', 'Wide apart']]))
+      html += check('line', block.line !== false, 'Signature line above each name')
       block.signers.forEach((signer, index) => {
         html += `<fieldset class="mb-3 rounded-lg border border-line p-3"><legend class="px-1 text-xs font-semibold text-muted">Signatory ${index + 1}</legend>
           ${field('Label (optional)', `<input class="input mt-1" data-signer="${index}" data-skey="label" value="${esc(signer.label)}" placeholder="e.g. Certified by:">`)}
@@ -262,7 +303,7 @@ inspector.addEventListener('input', (event) => {
 inspector.addEventListener('click', (event) => {
   const target = event.target.closest('button')
   const block = selectedBlock()
-  if (!target || !block || block.type !== 'signatory') return
+  if (!target || !block || !['signatory', 'sideNames'].includes(block.type)) return
   if (target.hasAttribute('data-add-signer')) block.signers.push({ label: '', name: '', title: '' })
   else if (target.dataset.removeSigner) block.signers.splice(Number(target.dataset.removeSigner), 1)
   else return
