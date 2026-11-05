@@ -234,7 +234,7 @@ Route::middleware(RequireActiveSession::class)->group(function () {
                 Route::post('/generate', 'generate')->name('generate');
                 Route::put('/grid', 'saveGrid')->name('grid');
                 Route::post('/release', 'release')->name('release');
-                Route::delete('/payslips', 'destroyPayslips')->name('payslips.destroy');
+                Route::delete('/payslips', 'destroyPayslips')->name('payslips.destroy-all');
                 Route::get('/print', 'print')->name('print');
                 Route::get('/export', 'export')->name('export');
             });

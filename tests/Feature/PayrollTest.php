@@ -274,6 +274,20 @@ it('enforces the delete rules', function () {
     expect($kept->fresh())->not->toBeNull();
 });
 
+it('points the delete-all button at the period, not at a single payslip', function () {
+    $period = PayrollPeriod::factory()->create();
+    paidSlip($period);
+
+    $this->get("/payroll/{$period->id}")->assertOk()
+        ->assertSee('action="'.url("/payroll/{$period->id}/payslips").'"', false)
+        ->assertDontSee('action="'.url("/payroll/payslips/{$period->id}").'"', false);
+});
+
+it('keeps the route list cacheable, as php artisan optimize needs on the live server', function () {
+    $this->artisan('route:cache')->assertSuccessful();
+    $this->artisan('route:clear')->assertSuccessful();
+});
+
 it('shows the payroll pages', function () {
     $period = PayrollPeriod::factory()->create(['name' => 'Oct A']);
     $slip = paidSlip($period, ['full_name' => '<b>Reyes</b>', 'remarks' => 'Note']);
