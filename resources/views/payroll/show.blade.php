@@ -154,7 +154,7 @@
     @unless ($released)
         <div class="mt-6 flex flex-wrap gap-2">
             @if ($slips->isNotEmpty())
-                <form method="post" action="{{ route('payroll.payslips.destroy', $period) }}" data-confirm="Delete ALL payslips in this period? This cannot be undone.">
+                <form method="post" action="{{ route('payroll.payslips.destroy-all', $period) }}" data-confirm="Delete ALL payslips in this period? This cannot be undone.">
                     @csrf
                     @method('DELETE')
                     <button class="btn-danger btn-sm"><x-icon name="trash" class="size-3.5" /> Delete all payslips</button>
