@@ -87,6 +87,9 @@ Route::middleware(RequireActiveSession::class)->group(function () {
         Route::post('/', 'store')->name('store');
         Route::get('/new', 'create')->name('create');
         Route::get('/print', 'printMany')->name('print-many');
+        Route::get('/print/bios.zip', 'biosZip')->name('bios-zip');
+        Route::get('/print/table', 'printTable')->name('print-table');
+        Route::get('/print/table.docx', 'tableDocx')->name('table-docx');
         Route::get('/{employee}', 'show')->name('show')->whereNumber('employee');
         Route::put('/{employee}', 'update')->name('update')->whereNumber('employee');
         Route::delete('/{employee}', 'destroy')->name('destroy')->whereNumber('employee');

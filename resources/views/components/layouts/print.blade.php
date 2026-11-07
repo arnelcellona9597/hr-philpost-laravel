@@ -6,6 +6,7 @@
         'Legal' => 'legal',
         'Folio' => '8.5in 13in',
         'Half-Letter' => '5.5in 8.5in',
+        'A4 landscape' => 'A4 landscape',
         default => 'A4',
     };
 @endphp
@@ -27,7 +28,10 @@
         <div class="no-print sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-line bg-surface px-4 py-3">
             <a href="{{ $back }}" class="btn-ghost btn-sm">← Back</a>
             <span class="truncate text-sm font-medium">{{ $title }}</span>
-            <button class="btn-primary btn-sm" onclick="window.print()">Print / Save as PDF</button>
+            <div class="flex items-center gap-2">
+                {{ $actions ?? '' }}
+                <button class="btn-primary btn-sm" onclick="window.print()">Print / Save as PDF</button>
+            </div>
         </div>
         <main class="mx-auto py-6 print:py-0">{{ $slot }}</main>
     </body>
