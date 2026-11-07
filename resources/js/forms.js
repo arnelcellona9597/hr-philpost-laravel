@@ -285,6 +285,13 @@ document.querySelectorAll('form[data-autosubmit] select, select[data-autosubmit]
   select.addEventListener('change', () => select.form?.requestSubmit())
 })
 
+// The rows-per-page choice is remembered in this browser, so every list opens with it next time.
+document.querySelectorAll('form[data-page-size] select[name=perPage]').forEach((select) => {
+  select.addEventListener('change', () => {
+    document.cookie = `hr-per-page=${select.value}; path=/; max-age=31536000; samesite=lax`
+  })
+})
+
 // A dashboard date range replaces the preset, and a preset replaces the range.
 document.querySelectorAll('form[data-autosubmit]').forEach((form) => {
   const dates = [...form.querySelectorAll('[data-range-date]')]

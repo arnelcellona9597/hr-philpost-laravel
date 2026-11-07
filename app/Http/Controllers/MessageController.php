@@ -19,6 +19,7 @@ use App\Support\Choices;
 use App\Support\EmailLayout;
 use App\Support\GovId;
 use App\Support\MergeTemplate;
+use App\Support\PageSize;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -66,7 +67,7 @@ class MessageController extends Controller
                     ->orWhere('audience', 'like', "%{$search}%")
                     ->orWhere('sent_by_name', 'like', "%{$search}%")))
                 ->latest('id')
-                ->paginate(30)
+                ->paginate(PageSize::resolve($request, 25))
                 ->withQueryString(),
             'categories' => MessageCategory::cases(),
             'category' => $category,
@@ -179,7 +180,7 @@ class MessageController extends Controller
 
         return view('messages.show', [
             'message' => $message->load('attachments'),
-            'recipients' => $message->recipients()->when($status, fn ($query) => $query->where('status', $status))->orderBy('id')->paginate(50)->withQueryString(),
+            'recipients' => $message->recipients()->when($status, fn ($query) => $query->where('status', $status))->orderBy('id')->paginate(PageSize::resolve($request, 50))->withQueryString(),
             'status' => $status,
         ]);
     }

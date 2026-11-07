@@ -13,6 +13,7 @@ use App\Services\PdfRenderer;
 use App\Support\CertificateRenderer;
 use App\Support\Choices;
 use App\Support\HrDate;
+use App\Support\PageSize;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -40,7 +41,7 @@ class CertificateController extends Controller
             ->when($status, fn ($query) => $query->where('status', $status))
             ->latest()
             ->orderByDesc('id')
-            ->paginate(25)
+            ->paginate(PageSize::resolve($request, 25))
             ->withQueryString();
 
         return view('certificates.index', [

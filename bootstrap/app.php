@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'hr-sidebar',
             'hr-sidebar-side',
             'hr-header',
+            'hr-per-page',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

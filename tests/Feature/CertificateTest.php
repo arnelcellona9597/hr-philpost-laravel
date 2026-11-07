@@ -336,3 +336,11 @@ it('replaces the stored letterhead logo file in place', function () {
     expect($logo->fresh()->size)->toBe(filesize(resource_path('branding/phlpost-letterhead-logo.png')))
         ->and(Storage::disk('local')->get('media/old.png'))->not->toBe('old');
 });
+
+it('stores the letterhead logo on a white background', function () {
+    $logo = imagecreatefrompng(resource_path('branding/phlpost-letterhead-logo.png'));
+
+    expect(imageistruecolor($logo))->toBeTrue()
+        ->and(imagecolorat($logo, 2, 2) & 0xFFFFFF)->toBe(0xFFFFFF)
+        ->and(imagecolorsforindex($logo, imagecolorat($logo, 2, 2))['alpha'])->toBe(0);
+});

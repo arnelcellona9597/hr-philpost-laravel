@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Support\ActivityFeed;
+use App\Support\PageSize;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
@@ -30,7 +31,7 @@ class AuditLogController extends Controller
                     ->where('doc_label', 'like', "%{$search}%")
                     ->orWhere('user_name', 'like', "%{$search}%")))
                 ->latest('id')
-                ->paginate(50)
+                ->paginate(PageSize::resolve($request, 50))
                 ->withQueryString(),
             'collections' => array_values(array_diff(ActivityFeed::slugs(), $user->isSystemAdmin() ? [] : AuditLog::ADMIN_ONLY_COLLECTIONS)),
             'actions' => self::ACTIONS,

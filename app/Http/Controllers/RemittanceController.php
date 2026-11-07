@@ -14,6 +14,7 @@ use App\Services\RemittanceService;
 use App\Services\RemittancesWorkbook;
 use App\Support\HrDate;
 use App\Support\Money;
+use App\Support\PageSize;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -35,7 +36,7 @@ class RemittanceController extends Controller
         Gate::authorize('viewAny', Remittance::class);
 
         $kind = RemittanceKind::tryFrom((string) $request->query('kind')) ?? RemittanceKind::Sss;
-        $remittances = Remittance::query()->where('kind', $kind->value)->withCount('lines')->orderByDesc('year')->orderByDesc('month')->paginate(self::PER_PAGE)->withQueryString();
+        $remittances = Remittance::query()->where('kind', $kind->value)->withCount('lines')->orderByDesc('year')->orderByDesc('month')->paginate(PageSize::resolve($request, self::PER_PAGE))->withQueryString();
         $latest = Remittance::query()->where('kind', $kind->value)->orderByDesc('year')->orderByDesc('month')->first();
         $next = $latest === null ? [(int) substr(HrDate::today(), 0, 4), (int) substr(HrDate::today(), 5, 2)] : ($latest->month === 12 ? [$latest->year + 1, 1] : [$latest->year, $latest->month + 1]);
 

@@ -14,6 +14,7 @@ use App\Support\Deadlines;
 use App\Support\HrDate;
 use App\Support\ImportModules;
 use App\Support\Names;
+use App\Support\PageSize;
 use App\Support\RecordForm;
 use App\Support\RecordRules;
 use Illuminate\Database\Eloquent\Builder;
@@ -91,9 +92,9 @@ class RequirementController extends Controller
                 $requirements->filterByStatus($query, $status, $timely['deadlines']);
             }
 
-            $records = $query->orderBy('last_name')->orderBy('first_name')->orderBy('id')->paginate(50)->withQueryString();
+            $records = $query->orderBy('last_name')->orderBy('first_name')->orderBy('id')->paginate(PageSize::resolve($request, 50))->withQueryString();
         } else {
-            $missing = Employee::query()->with('station')->whereIn('id', $stats['missingIds'] ?: [0])->orderBy('full_name')->paginate(50)->withQueryString();
+            $missing = Employee::query()->with('station')->whereIn('id', $stats['missingIds'] ?: [0])->orderBy('full_name')->paginate(PageSize::resolve($request, 50))->withQueryString();
         }
 
         return view('requirements.index', [

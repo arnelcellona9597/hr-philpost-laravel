@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Notification;
+use App\Support\PageSize;
 use App\Support\SafeRedirect;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,7 +17,7 @@ class NotificationController extends Controller
         Gate::authorize('viewAny', Notification::class);
 
         return view('notifications.index', [
-            'notifications' => $request->user()->hrNotifications()->latest('id')->paginate(30),
+            'notifications' => $request->user()->hrNotifications()->latest('id')->paginate(PageSize::resolve($request, 25))->withQueryString(),
         ]);
     }
 

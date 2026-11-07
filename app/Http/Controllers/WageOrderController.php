@@ -8,6 +8,7 @@ use App\Models\WageOrder;
 use App\Services\PayHistoryService;
 use App\Support\HrDate;
 use App\Support\ImportModules;
+use App\Support\PageSize;
 use App\Support\RecordForm;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,7 +33,7 @@ class WageOrderController extends Controller
             'regions' => Region::cases(),
             'region' => $region,
             'inForce' => $inForce,
-            'orders' => WageOrder::query()->withCount('payChanges')->when($region, fn ($query) => $query->where('region', $region->value))->orderByDesc('effective_on')->orderBy('region')->orderBy('sector')->paginate(self::PER_PAGE)->withQueryString(),
+            'orders' => WageOrder::query()->withCount('payChanges')->when($region, fn ($query) => $query->where('region', $region->value))->orderByDesc('effective_on')->orderBy('region')->orderBy('sector')->paginate(PageSize::resolve($request, self::PER_PAGE))->withQueryString(),
             'today' => $today,
         ]);
     }
