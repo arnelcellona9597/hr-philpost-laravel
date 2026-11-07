@@ -22,6 +22,9 @@
 <x-layouts.app title="Employees" heading="Employee profiles" description="Search, filter and open any employee record.">
     <x-slot:actions>
         <a class="btn-secondary" href="{{ url("/data/export?{$exportQuery}") }}"><x-icon name="download" /> Export these results</a>
+        @if ($employees->total() > 0)
+            <a class="btn-secondary" href="{{ route('employees.print-many', request()->except(['page', 'perPage', 'cols'])) }}" target="_blank" rel="noopener" title="Prints one profile per page for all {{ number_format($employees->total()) }} employees matching the current search and filters"><x-icon name="printer" /> Print profiles ({{ number_format($employees->total()) }})</a>
+        @endif
         <a class="btn-ghost" href="{{ route('data.duplicates', ['module' => 'employees']) }}"><x-icon name="copy" /> Duplicates</a>
         <a class="btn-primary" href="{{ route('employees.create') }}"><x-icon name="plus" /> Add employee</a>
     </x-slot:actions>
