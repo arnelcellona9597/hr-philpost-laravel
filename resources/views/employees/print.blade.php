@@ -20,7 +20,7 @@
                 <div class="flex size-24 items-center justify-center bg-[#e8eef8] text-2xl font-semibold">{{ Names::initials($employee->first_name.' '.$employee->last_name) }}</div>
             @endif
             <div class="min-w-0">
-                <p class="text-base font-bold">{{ $employee->full_name }}</p>
+                <p class="text-base font-bold">{{ mb_strtoupper($employee->full_name) }}</p>
                 <p class="font-mono">{{ $employee->employee_id }}</p>
                 <p>{{ $employee->position ?: 'No position recorded' }} · {{ $employee->station?->name ?? 'No station' }}</p>
                 <p>{{ $employee->employment_status->value }} · {{ $employee->classification->value }}{{ $employee->length_of_service !== '' ? ' · '.$employee->length_of_service.' in service' : '' }}{{ $employee->age !== null ? ' · '.$employee->age.' years old' : '' }}</p>

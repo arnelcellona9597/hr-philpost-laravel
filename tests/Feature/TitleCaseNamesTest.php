@@ -13,12 +13,12 @@ beforeEach(function () {
 
 it('shows the names in title case on the profile, the print and the list', function () {
     $this->get("/employees/{$this->employee->id}")->assertOk()
-        ->assertSee('Abuomar, Razul K.')
+        ->assertSee('Abuomar')
         ->assertSee('Karon')
         ->assertDontSee('ABUOMAr');
 
     $this->get("/employees/{$this->employee->id}/print")->assertOk()
-        ->assertSee('Abuomar, Razul K.')
+        ->assertSee('Abuomar')
         ->assertDontSee('ABUOMAr');
 
     $this->get('/employees')->assertOk()->assertSee('Abuomar, Razul K.');
@@ -38,4 +38,12 @@ it('shows leave filings with title-case names', function () {
     WellnessLeave::factory()->for($this->employee)->create(['last_name' => 'ABUOMAr', 'first_name' => 'RAZUL', 'middle_name' => 'KARON']);
 
     $this->get('/leave')->assertOk()->assertSee('Abuomar')->assertSee('Razul')->assertDontSee('ABUOMAr');
+});
+
+it('shows the name heading in capitals on the profile and its print, with the fields below in title case', function () {
+    foreach (['', '/print'] as $suffix) {
+        $this->get("/employees/{$this->employee->id}{$suffix}")->assertOk()
+            ->assertSee('ABUOMAR, RAZUL K.')
+            ->assertSee('Abuomar');
+    }
 });
