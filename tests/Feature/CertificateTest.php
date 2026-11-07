@@ -305,7 +305,7 @@ it('fills in the office letterhead wording only where it is blank', function () 
 it('prints the letterhead logo large enough to match the office letterhead', function () {
     $html = CertificateRenderer::html([['type' => 'letterhead', 'top' => 'Republic of the Philippines', 'name' => ['PHILIPPINE POSTAL CORPORATION'], 'details' => [], 'section' => '']], ['companyName' => 'x', 'font' => 'calibri', 'letterheadLogoUrl' => '/files/1']);
 
-    expect($html)->toContain('width:205pt;height:50pt');
+    expect($html)->toContain('width:225pt;height:48pt');
 });
 
 it('uses the wide PHLPOST logo as the letterhead logo and keeps the previous file', function () {
@@ -324,4 +324,15 @@ it('uses the wide PHLPOST logo as the letterhead logo and keeps the previous fil
         ->and($old->fresh())->not->toBeNull();
 
     Storage::disk('local')->assertExists($logo->path);
+});
+
+it('replaces the stored letterhead logo file in place', function () {
+    Storage::fake('local');
+    Storage::disk('local')->put('media/old.png', 'old');
+    $logo = Media::factory()->create(['filename' => 'phlpost-letterhead-logo.png', 'path' => 'media/old.png', 'size' => 3]);
+
+    (require database_path('migrations/2026_11_08_090000_replace_office_letterhead_logo_file.php'))->up();
+
+    expect($logo->fresh()->size)->toBe(filesize(resource_path('branding/phlpost-letterhead-logo.png')))
+        ->and(Storage::disk('local')->get('media/old.png'))->not->toBe('old');
 });
