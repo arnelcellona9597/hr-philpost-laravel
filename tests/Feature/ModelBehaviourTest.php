@@ -95,12 +95,23 @@ it('stamps applicants created as hired', function () {
 it('rounds IPCR ratings and derives the adjectival rating', function () {
     $rating = IpcrRating::factory()->create(['rating' => 4.4996]);
 
-    expect($rating->fresh()->rating)->toBe('4.500')
+    expect($rating->fresh()->rating)->toBe('4.50')
         ->and($rating->fresh()->adjectival_rating)->toBe('Outstanding');
 
     $rating->update(['rating' => null]);
 
     expect($rating->fresh()->adjectival_rating)->toBeNull();
+});
+
+it('keeps a stored three-decimal IPCR rating when other fields change, and shows it with two', function () {
+    $rating = IpcrRating::factory()->create(['rating' => 4.5]);
+    DB::table('ipcr_ratings')->where('id', $rating->id)->update(['rating' => 4.495, 'adjectival_rating' => 'Very Satisfactory']);
+
+    $rating->fresh()->update(['remarks' => 'Checked']);
+
+    expect((string) DB::table('ipcr_ratings')->where('id', $rating->id)->value('rating'))->toBe('4.495')
+        ->and($rating->fresh()->adjectival_rating)->toBe('Very Satisfactory')
+        ->and($rating->fresh()->rating)->toBe('4.50');
 });
 
 it('adds up payslip totals in centavos', function () {

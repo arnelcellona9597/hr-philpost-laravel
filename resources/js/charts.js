@@ -18,6 +18,8 @@ Chart.register(BarController, BarElement, LineController, LineElement, PointElem
 const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)')
 const font = () => getComputedStyle(document.body).fontFamily
+const twoDecimals = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 })
+const number = (value) => twoDecimals.format(Number(value))
 
 /** '#rrggbb' + alpha → rgba() (series tokens are plain hex). */
 const alpha = (hex, a) => {
@@ -43,11 +45,11 @@ const valueLabelPlugin = {
       if (spec.horizontal) {
         ctx.textAlign = 'left'
         ctx.textBaseline = 'middle'
-        ctx.fillText(v.toLocaleString(), x + 6, y)
+        ctx.fillText(number(v), x + 6, y)
       } else {
         ctx.textAlign = 'center'
         ctx.textBaseline = 'bottom'
-        ctx.fillText(v.toLocaleString(), x, y - 4)
+        ctx.fillText(number(v), x, y - 4)
       }
     })
     ctx.restore()
@@ -79,8 +81,8 @@ function render(canvas, animate) {
     callbacks: {
       label: (item) =>
         kind === 'doughnut'
-          ? ` ${Number(item.raw).toLocaleString()}${spec.unit ? ` ${spec.unit}` : ''}`
-          : ` ${Number(item.raw).toLocaleString()}${spec.unit ? ` ${spec.unit}` : ''} — ${item.dataset.label}`,
+          ? ` ${number(item.raw)}${spec.unit ? ` ${spec.unit}` : ''}`
+          : ` ${number(item.raw)}${spec.unit ? ` ${spec.unit}` : ''} — ${item.dataset.label}`,
     },
   }
   const animation = animate && !reducedMotion.matches ? { duration: 450, easing: 'easeOutQuart' } : false

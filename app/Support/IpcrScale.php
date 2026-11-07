@@ -21,7 +21,7 @@ class IpcrScale
 
     public static function round(float $rating): float
     {
-        return round($rating, 3);
+        return round($rating, 2);
     }
 
     public static function adjectival(?float $rating): string

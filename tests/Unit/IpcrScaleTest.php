@@ -7,7 +7,8 @@ it('maps ratings to the adjectival scale', function (?float $rating, string $lab
 })->with([
     [5.0, 'Outstanding'],
     [4.5, 'Outstanding'],
-    [4.499, 'Very Satisfactory'],
+    [4.49, 'Very Satisfactory'],
+    [4.494, 'Very Satisfactory'],
     [3.5, 'Very Satisfactory'],
     [2.5, 'Satisfactory'],
     [1.5, 'Unsatisfactory'],
@@ -17,7 +18,8 @@ it('maps ratings to the adjectival scale', function (?float $rating, string $lab
     [null, ''],
 ]);
 
-it('rounds to three decimals before applying the scale', function () {
+it('rounds to two decimals before applying the scale', function () {
     expect(IpcrScale::round(4.4996))->toBe(4.5)
-        ->and(IpcrScale::adjectival(4.4996))->toBe('Outstanding');
+        ->and(IpcrScale::round(4.567))->toBe(4.57)
+        ->and(IpcrScale::adjectival(4.495))->toBe('Outstanding');
 });
