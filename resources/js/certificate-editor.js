@@ -76,7 +76,7 @@ function renderLetterhead() {
     ...letterhead.name.map((line) => `<div style="font-size:12pt;font-weight:bold;line-height:1.2">${esc(line)}</div>`),
     ...letterhead.details.map((line) => `<div style="font-size:8.5pt">${esc(line)}</div>`),
   ].join('')
-  const logo = letterhead.logoUrl ? `<img src="${esc(letterhead.logoUrl)}" alt="" style="max-height:60pt;max-width:190pt">` : ''
+  const logo = letterhead.logoUrl ? `<img src="${esc(letterhead.logoUrl)}" alt="" style="height:75pt;width:auto;max-width:230pt">` : ''
   const section = letterhead.section ? `<table style="width:100%;border-collapse:collapse"><tr><td></td><td style="width:1%;white-space:nowrap;background:#111418;color:#fff;font-size:9.5pt;font-weight:bold;padding:2pt 16pt">${esc(letterhead.section)}</td></tr></table>` : ''
   return `<table style="width:100%;border-collapse:collapse"><tr><td style="vertical-align:bottom;padding:0 0 4pt">${text}</td><td style="vertical-align:bottom;text-align:right;padding:0 0 4pt">${logo}</td></tr></table><div style="border-top:2.5pt solid #111418"></div>${section}`
 }
