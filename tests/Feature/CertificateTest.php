@@ -17,6 +17,7 @@ use App\Models\SiteSetting;
 use App\Models\User;
 use App\Services\CertificateService;
 use App\Services\PdfRenderer;
+use App\Support\CertificateRenderer;
 
 function certificateTemplate(string $key = 'coe-active'): CertificateTemplate
 {
@@ -297,4 +298,10 @@ it('fills in the office letterhead wording only where it is blank', function () 
     expect($letterhead['name'])->toBe(['PHILIPPINE POSTAL CORPORATION', 'AREA 7 EASTERN MINANAO'])
         ->and($letterhead['details'])->toBe(['R. Magsaysay ext. cor. Roxas Avenue, 8000 Davao City', 'hr7official2022@gmail.com'])
         ->and($letterhead['section'])->toBe('Typed by HR');
+});
+
+it('prints the letterhead logo large enough to match the office letterhead', function () {
+    $html = CertificateRenderer::html([['type' => 'letterhead', 'top' => 'Republic of the Philippines', 'name' => ['PHILIPPINE POSTAL CORPORATION'], 'details' => [], 'section' => '']], ['companyName' => 'x', 'font' => 'calibri', 'letterheadLogoUrl' => '/files/1']);
+
+    expect($html)->toContain('height:75pt');
 });
