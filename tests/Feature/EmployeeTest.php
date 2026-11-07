@@ -273,7 +273,7 @@ it('shows requirements with their status on the profile', function () {
     ItrSubmission::factory()->for($employee)->create(['year' => 2026, 'date_submitted' => '2026-05-02']);
     IpcrRating::factory()->for($employee)->create(['year' => 2025, 'rating' => 4.5, 'date_submitted' => '2025-07-01']);
 
-    $this->get("/employees/{$employee->id}")->assertSee('Late')->assertSee('4.500');
+    $this->get("/employees/{$employee->id}")->assertSee('Late')->assertSee('4.50')->assertDontSee('4.500');
 });
 
 it('shows change history already recorded', function () {

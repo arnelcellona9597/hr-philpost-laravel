@@ -22,13 +22,18 @@ class IpcrRating extends ComplianceRecord
     public const SNAPSHOT = ['station', 'job_title'];
 
     /**
-     * Round the rating the way IPCR forms report it and keep the adjectival rating in step.
+     * Round a new or changed rating the way IPCR forms report it and keep the adjectival rating in step.
+     * A rating that isn't being changed keeps its stored value.
      */
     protected static function booted(): void
     {
         parent::booted();
 
         static::saving(function (IpcrRating $rating): void {
+            if ($rating->exists && ! $rating->isDirty('rating')) {
+                return;
+            }
+
             $value = $rating->rating === null ? null : IpcrScale::round((float) $rating->rating);
 
             $rating->rating = $value;
@@ -48,7 +53,7 @@ class IpcrRating extends ComplianceRecord
             'rating_period' => IpcrPeriod::class,
             'period_from' => 'date:Y-m-d',
             'period_to' => 'date:Y-m-d',
-            'rating' => 'decimal:3',
+            'rating' => 'decimal:2',
         ];
     }
 
