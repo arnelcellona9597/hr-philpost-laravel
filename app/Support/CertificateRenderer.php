@@ -102,7 +102,7 @@ class CertificateRenderer
         $logo = '';
 
         if ($options['letterheadLogoUrl'] ?? null) {
-            $size = ($options['letterheadLogoSize'] ?? null) ? 'width:'.$options['letterheadLogoSize'][0].'pt;height:'.$options['letterheadLogoSize'][1].'pt' : 'width:205pt;height:50pt;object-fit:contain;object-position:right bottom';
+            $size = ($options['letterheadLogoSize'] ?? null) ? 'width:'.$options['letterheadLogoSize'][0].'pt;height:'.$options['letterheadLogoSize'][1].'pt' : 'width:225pt;height:48pt;object-fit:contain;object-position:right bottom';
             $logo = '<img src="'.e($options['letterheadLogoUrl']).'" alt="" style="'.$size.'">';
         }
 
