@@ -91,14 +91,31 @@ class Employee extends Model
     }
 
     /**
+     * Total service over every employment period, so someone who left and came back counts both stints.
+     * Falls back to the hire date alone for an employee with no history rows.
+     *
      * @return Attribute<string, never>
      */
     protected function lengthOfService(): Attribute
     {
-        return Attribute::get(fn (): string => HrDate::formatSpan(HrDate::lengthOfService(
-            $this->date_hired?->toDateString(),
-            $this->last_day_of_service?->toDateString(),
-        )));
+        return Attribute::get(function (): string {
+            $periods = $this->employmentPeriods;
+
+            if ($periods->isEmpty()) {
+                return HrDate::formatSpan(HrDate::lengthOfService(
+                    $this->date_hired?->toDateString(),
+                    $this->last_day_of_service?->toDateString(),
+                ));
+            }
+
+            $spans = $periods
+                ->map(fn (EmploymentPeriod $period): ?array => HrDate::lengthOfService($period->hired_on->toDateString(), $period->separated_on?->toDateString()))
+                ->filter()
+                ->values()
+                ->all();
+
+            return $spans === [] ? '' : HrDate::formatSpan(HrDate::sumSpans($spans));
+        });
     }
 
     /**
