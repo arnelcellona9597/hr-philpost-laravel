@@ -2,6 +2,7 @@
     use App\Enums\RemittanceKind;
     use App\Support\HrDate;
     use App\Support\Money;
+    use App\Support\Names;
 
     $kind = $remittance->kind;
     $letterhead = trim((string) $setting->letterhead_lines) !== '' ? trim((string) $setting->letterhead_lines) : mb_strtoupper($site->company_name).($site->tagline ? "\n{$site->tagline}" : '');
@@ -41,10 +42,10 @@
                             <td class="{{ $cell }} text-right tabular">{{ number_format($line->amount_centavos / 100, 2) }}</td>
                         @elseif ($kind === RemittanceKind::Hdmf)
                             <td class="{{ $cell }}">{{ $line->member_number }}</td>
-                            <td class="{{ $cell }}">{{ $line->last_name }}</td>
-                            <td class="{{ $cell }}">{{ $line->first_name }}</td>
+                            <td class="{{ $cell }}">{{ Names::title($line->last_name) }}</td>
+                            <td class="{{ $cell }}">{{ Names::title($line->first_name) }}</td>
                             <td class="{{ $cell }}">{{ $line->extension }}</td>
-                            <td class="{{ $cell }}">{{ $line->middle_name }}</td>
+                            <td class="{{ $cell }}">{{ Names::title($line->middle_name) }}</td>
                             <td class="{{ $cell }}">{{ sprintf('%04d%02d', $remittance->year, $remittance->month) }}</td>
                             <td class="{{ $cell }} text-right tabular">{{ number_format($line->compensation_centavos / 100, 2) }}</td>
                             <td class="{{ $cell }} text-right tabular">{{ number_format($line->employer_share_centavos / 100, 2) }}</td>

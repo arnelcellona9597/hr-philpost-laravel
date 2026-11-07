@@ -5,8 +5,10 @@ namespace App\Models;
 use App\Enums\CertificateStatus;
 use App\Exceptions\UserFacingException;
 use App\Models\Concerns\Audited;
+use App\Support\Names;
 use Database\Factories\CertificateFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -33,6 +35,16 @@ class Certificate extends Model
                 throw new UserFacingException('A voided certificate cannot be made valid again. Issue a new one instead.');
             }
         });
+    }
+
+    /**
+     * The employee's name in title case for lists and headings; the issued text is unchanged.
+     *
+     * @return Attribute<string, never>
+     */
+    protected function employeeName(): Attribute
+    {
+        return Attribute::get(fn (?string $value): string => Names::title($value));
     }
 
     /**

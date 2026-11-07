@@ -13,6 +13,7 @@ use App\Support\Choices;
 use App\Support\Deadlines;
 use App\Support\HrDate;
 use App\Support\ImportModules;
+use App\Support\Names;
 use App\Support\RecordForm;
 use App\Support\RecordRules;
 use Illuminate\Database\Eloquent\Builder;
@@ -261,7 +262,7 @@ class RequirementController extends Controller
 
         return $this->flash(
             redirect()->route('requirements.index', [$type, 'year' => $record->year]),
-            $wasNew ? $this->module($type)['title']." record for {$record->first_name} {$record->last_name} ({$record->year}) was saved." : 'Record updated.',
+            $wasNew ? $this->module($type)['title'].' record for '.Names::title("{$record->first_name} {$record->last_name}")." ({$record->year}) was saved." : 'Record updated.',
         );
     }
 

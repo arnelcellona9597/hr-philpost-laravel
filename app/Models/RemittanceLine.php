@@ -35,13 +35,13 @@ class RemittanceLine extends Model
     }
 
     /**
-     * "LAST, First M. Ext." as the office lists it.
+     * "Last, First M. Ext." in title case, whatever case the names were typed in.
      *
      * @return Attribute<string, never>
      */
     protected function fullName(): Attribute
     {
-        return Attribute::get(fn (): string => Names::lastFirst($this->last_name, $this->first_name, $this->middle_name, $this->extension));
+        return Attribute::get(fn (): string => Names::title(Names::lastFirst($this->last_name, $this->first_name, $this->middle_name, $this->extension)));
     }
 
     /**

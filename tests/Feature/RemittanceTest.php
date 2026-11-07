@@ -192,7 +192,7 @@ it('exports the SSS layout with a real SUM and reads it back', function () {
     expect($sheet->getTitle())->toBe('SSS OCTOBER 2026');
     $formulas = collect($sheet->getCellCollection()->getCoordinates())->filter(fn (string $cell): bool => $sheet->getCell($cell)->isFormula());
     expect($formulas)->toHaveCount(1)->and($sheet->getCell($formulas->first())->getValue())->toStartWith('=SUM(E');
-    $cmd = collect($sheet->getCellCollection()->getCoordinates())->first(fn (string $cell): bool => str_contains((string) $sheet->getCell($cell)->getValue(), 'cmd'));
+    $cmd = collect($sheet->getCellCollection()->getCoordinates())->first(fn (string $cell): bool => str_contains(mb_strtolower((string) $sheet->getCell($cell)->getValue()), 'cmd'));
     expect($sheet->getCell($cmd)->isFormula())->toBeFalse();
 
     $path = tempnam(sys_get_temp_dir(), 'sss').'.xlsx';

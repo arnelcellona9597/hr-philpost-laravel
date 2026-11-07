@@ -132,7 +132,7 @@ class MessageQueue
             $employee = $recipient['employee'] ?? null;
             $user = $recipient['user'] ?? null;
             $email = Str::lower(trim((string) ($recipient['email'] ?? $employee?->email ?? $user?->email))) ?: null;
-            $name = $recipient['name'] ?? ($employee ? "{$employee->first_name} {$employee->last_name}" : ($user?->name ?? (string) $email));
+            $name = $recipient['name'] ?? ($employee ? Names::title("{$employee->first_name} {$employee->last_name}") : ($user?->name ?? (string) $email));
             $skip = match (true) {
                 $email === null => 'No email address on file',
                 GovId::validateEmail($email) !== null => 'Invalid email address',
@@ -232,9 +232,9 @@ class MessageQueue
     {
         return [
             'companyName' => $company,
-            'firstName' => $employee?->first_name ?? Str::before(trim($user?->name ?? $name), ' '),
-            'lastName' => (string) $employee?->last_name,
-            'fullName' => $employee ? Names::firstLast($employee->last_name, $employee->first_name, $employee->middle_name, $employee->extension) : $name,
+            'firstName' => $employee ? Names::title($employee->first_name) : Str::before(trim($user?->name ?? $name), ' '),
+            'lastName' => Names::title($employee?->last_name),
+            'fullName' => $employee ? Names::title(Names::firstLast($employee->last_name, $employee->first_name, $employee->middle_name, $employee->extension)) : $name,
             'employeeId' => (string) $employee?->employee_id,
             'position' => (string) $employee?->position,
             'station' => (string) $employee?->station?->name,
