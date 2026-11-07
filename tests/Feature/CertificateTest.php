@@ -285,3 +285,16 @@ it('offers every template when issuing, and templates can be edited', function (
 
     expect(certificateText(app(CertificateService::class)->issue($this->hr, $template->id, certificateEmployee()->id, null, '2026-10-04')))->toContain('Edited wording for Maria S. Reyes.');
 });
+
+it('fills in the office letterhead wording only where it is blank', function () {
+    $settings = SiteSetting::current();
+    $settings->update(['letterhead_name' => null, 'letterhead_details' => '', 'letterhead_section' => 'Typed by HR']);
+
+    (require database_path('migrations/2026_11_07_150000_set_office_letterhead.php'))->up();
+
+    $letterhead = $settings->fresh()->letterhead();
+
+    expect($letterhead['name'])->toBe(['PHILIPPINE POSTAL CORPORATION', 'AREA 7 EASTERN MINANAO'])
+        ->and($letterhead['details'])->toBe(['R. Magsaysay ext. cor. Roxas Avenue, 8000 Davao City', 'hr7official2022@gmail.com'])
+        ->and($letterhead['section'])->toBe('Typed by HR');
+});
