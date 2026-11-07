@@ -12,12 +12,14 @@ use App\Models\CertificateTemplate;
 use App\Models\ContractSetting;
 use App\Models\DocumentSequence;
 use App\Models\Employee;
+use App\Models\Media;
 use App\Models\PayChange;
 use App\Models\SiteSetting;
 use App\Models\User;
 use App\Services\CertificateService;
 use App\Services\PdfRenderer;
 use App\Support\CertificateRenderer;
+use Illuminate\Support\Facades\Storage;
 
 function certificateTemplate(string $key = 'coe-active'): CertificateTemplate
 {
@@ -303,5 +305,23 @@ it('fills in the office letterhead wording only where it is blank', function () 
 it('prints the letterhead logo large enough to match the office letterhead', function () {
     $html = CertificateRenderer::html([['type' => 'letterhead', 'top' => 'Republic of the Philippines', 'name' => ['PHILIPPINE POSTAL CORPORATION'], 'details' => [], 'section' => '']], ['companyName' => 'x', 'font' => 'calibri', 'letterheadLogoUrl' => '/files/1']);
 
-    expect($html)->toContain('height:75pt');
+    expect($html)->toContain('width:205pt;height:50pt');
+});
+
+it('uses the wide PHLPOST logo as the letterhead logo and keeps the previous file', function () {
+    Storage::fake('local');
+    $old = Media::factory()->create();
+    $settings = SiteSetting::current();
+    $settings->update(['letterhead_logo_id' => $old->id]);
+
+    (require database_path('migrations/2026_11_07_160000_set_office_letterhead_logo.php'))->up();
+
+    $logo = Media::query()->findOrFail($settings->fresh()->letterhead_logo_id);
+
+    expect($logo->id)->not->toBe($old->id)
+        ->and($logo->mime_type)->toBe('image/png')
+        ->and($logo->is_public)->toBeTrue()
+        ->and($old->fresh())->not->toBeNull();
+
+    Storage::disk('local')->assertExists($logo->path);
 });

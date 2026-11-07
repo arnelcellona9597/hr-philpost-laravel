@@ -6,7 +6,7 @@
     ['top' => $top, 'name' => $name, 'details' => $details, 'logoId' => $logoId] = $letterhead;
 @endphp
 
-<header class="text-[#111418]">
+<header class="font-[Arial,Helvetica,sans-serif] text-[#111418]">
     <div class="flex items-end justify-between gap-6 pb-1.5">
         <div class="min-w-0">
             <p class="text-[13px]">{{ $top }}</p>
@@ -18,7 +18,7 @@
             @endforeach
         </div>
         @if ($logoId)
-            <img src="{{ route('files.show', $logoId, false) }}" alt="" class="h-24 w-auto max-w-[50%] shrink-0 object-contain" />
+            <img src="{{ route('files.show', $logoId, false) }}" alt="" class="mb-3.5 h-[50pt] w-[205pt] shrink-0 object-contain object-right-bottom" />
         @endif
     </div>
     <div class="border-t-[3px] border-[#111418]"></div>
