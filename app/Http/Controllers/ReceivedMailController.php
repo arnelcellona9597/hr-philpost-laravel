@@ -7,6 +7,7 @@ use App\Models\ReceivedMail;
 use App\Models\SiteSetting;
 use App\Services\ReceivedMailsWorkbook;
 use App\Support\HrDate;
+use App\Support\PageSize;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -46,7 +47,7 @@ class ReceivedMailController extends Controller
                 ->when($office !== '', fn (Builder $query) => $query->where('post_office', $office))
                 ->orderBy('received_on')
                 ->orderBy('id')
-                ->paginate(self::PER_PAGE)
+                ->paginate(PageSize::resolve($request, self::PER_PAGE))
                 ->withQueryString(),
             'month' => $month,
             'months' => $this->months(),

@@ -14,6 +14,7 @@ use App\Support\Choices;
 use App\Support\HrDate;
 use App\Support\ImportModules;
 use App\Support\Names;
+use App\Support\PageSize;
 use App\Support\RecordForm;
 use App\Support\RecordRules;
 use Illuminate\Database\Eloquent\Builder;
@@ -54,7 +55,7 @@ class WellnessLeaveController extends Controller
             ->when($employeeId, fn (Builder $query) => $query->where('employee_id', $employeeId))
             ->orderByDesc('inclusive_date_from')
             ->orderByDesc('id')
-            ->paginate(25)
+            ->paginate(PageSize::resolve($request, 25))
             ->withQueryString();
 
         return view('leave.index', [

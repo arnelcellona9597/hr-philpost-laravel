@@ -15,6 +15,7 @@ use App\Services\ContractWordExporter;
 use App\Services\PdfRenderer;
 use App\Support\CertificateRenderer;
 use App\Support\HrDate;
+use App\Support\PageSize;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -60,7 +61,7 @@ class ContractController extends Controller
             ->when($ending, fn (Builder $query) => $query->where('status', ContractStatus::Valid->value)->whereBetween('term_end', [$today, $soon]))
             ->orderByDesc('term_start')
             ->orderByDesc('id')
-            ->paginate(self::PER_PAGE)
+            ->paginate(PageSize::resolve($request, self::PER_PAGE))
             ->withQueryString();
 
         return view('contracts.index', [

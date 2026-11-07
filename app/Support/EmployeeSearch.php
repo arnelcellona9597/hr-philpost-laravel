@@ -99,7 +99,7 @@ class EmployeeSearch
 
         $sort = (string) $request->query('sort', 'fullName');
         $this->sort = isset(self::SORTS[ltrim($sort, '-')]) ? $sort : 'fullName';
-        $this->limit = in_array((int) $request->query('limit'), [25, 50, 100], true) ? (int) $request->query('limit') : 25;
+        $this->limit = PageSize::resolve($request, 25);
     }
 
     /**

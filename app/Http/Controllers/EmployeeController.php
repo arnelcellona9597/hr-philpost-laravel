@@ -22,6 +22,7 @@ use App\Services\LeaveService;
 use App\Services\MediaStore;
 use App\Services\PayHistoryService;
 use App\Support\Choices;
+use App\Support\EmployeeColumns;
 use App\Support\EmployeeSearch;
 use App\Support\HrDate;
 use App\Support\ImportModules;
@@ -29,6 +30,7 @@ use App\Support\RecordForm;
 use App\Support\RecordRules;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -45,8 +47,17 @@ class EmployeeController extends Controller
         Gate::authorize('viewAny', Employee::class);
 
         $search = new EmployeeSearch($request);
+        $chosen = EmployeeColumns::choose($request);
+
+        if ($chosen['remember'] === false) {
+            Cookie::queue(Cookie::forget(EmployeeColumns::COOKIE));
+        } elseif ($chosen['remember'] !== null) {
+            Cookie::queue(EmployeeColumns::COOKIE, implode(',', $chosen['remember']), 60 * 24 * 365);
+        }
 
         return view('employees.index', [
+            'columns' => $chosen['columns'],
+            'columnChoices' => EmployeeColumns::available(),
             'search' => $search,
             'filters' => $search->activeFilterCount(),
             'employees' => $search->apply(Employee::query()->with(['station', 'employmentPeriods']))->paginate($search->limit)->withQueryString(),
