@@ -56,7 +56,7 @@ class DataWorkbook
     public function query(array $module): Builder
     {
         $modelClass = ImportModules::MODELS[$module['slug']];
-        $query = $modelClass::query()->with(array_values(array_filter(['station', 'employee'], fn (string $relation): bool => method_exists($modelClass, $relation))));
+        $query = $modelClass::query()->with(array_values(array_filter(['station', 'employee', 'employmentPeriods'], fn (string $relation): bool => method_exists($modelClass, $relation))));
 
         if (is_subclass_of($modelClass, ComplianceRecord::class)) {
             $query->orderByDesc('year')->orderBy('last_name')->orderBy('first_name');
