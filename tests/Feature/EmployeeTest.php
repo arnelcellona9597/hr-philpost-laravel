@@ -392,3 +392,47 @@ it('leaves bank details optional and refuses a malformed account number', functi
     expect(Employee::query()->count())->toBe(0);
     $this->post('/employees', employeeForm())->assertSessionHasNoErrors();
 })->with(['letters' => 'ABC123', 'symbols' => '12/34']);
+
+it('prints every profile that matches the filters, one per page', function () {
+    $branch = Branch::factory()->create();
+    $inBranch = Employee::factory()->count(3)->create(['station_id' => $branch->id, 'classification' => 'COS']);
+    Employee::factory()->create(['classification' => 'Regular', 'last_name' => 'Outsider']);
+
+    $page = $this->get('/employees/print?classification[]=COS')->assertOk();
+
+    expect(substr_count($page->getContent(), 'EMPLOYEE PROFILE</h1>'))->toBe(3);
+
+    foreach ($inBranch as $employee) {
+        $page->assertSee(mb_strtoupper($employee->full_name));
+    }
+
+    $page->assertDontSee('OUTSIDER');
+});
+
+it('follows the search text when printing profiles', function () {
+    Employee::factory()->create(['last_name' => 'Abuomar', 'first_name' => 'Razul']);
+    Employee::factory()->create(['last_name' => 'Santos', 'first_name' => 'Ana']);
+
+    $page = $this->get('/employees/print?q=Abuomar')->assertOk();
+
+    expect(substr_count($page->getContent(), 'EMPLOYEE PROFILE</h1>'))->toBe(1);
+    $page->assertSee('ABUOMAR, RAZUL')->assertDontSee('SANTOS');
+});
+
+it('says so instead of printing nothing when no employee matches', function () {
+    Employee::factory()->create(['last_name' => 'Santos']);
+
+    $this->get('/employees/print?q=Nobodyatall')->assertRedirect('/employees?q=Nobodyatall')->assertSessionHas('flash.type', 'error');
+});
+
+it('offers a Print profiles button on the employee list with the matching count', function () {
+    Employee::factory()->count(2)->create();
+
+    $this->get('/employees')->assertOk()->assertSee('Print profiles (2)', false)->assertSee('/employees/print', false);
+});
+
+it('keeps the single profile print working', function () {
+    $employee = Employee::factory()->create(['last_name' => 'Abuomar', 'first_name' => 'Razul']);
+
+    $this->get("/employees/{$employee->id}/print")->assertOk()->assertSee('EMPLOYEE PROFILE')->assertSee('ABUOMAR, RAZUL');
+});

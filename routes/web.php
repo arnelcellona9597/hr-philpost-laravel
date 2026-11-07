@@ -86,6 +86,7 @@ Route::middleware(RequireActiveSession::class)->group(function () {
         Route::get('/', 'index')->name('index');
         Route::post('/', 'store')->name('store');
         Route::get('/new', 'create')->name('create');
+        Route::get('/print', 'printMany')->name('print-many');
         Route::get('/{employee}', 'show')->name('show')->whereNumber('employee');
         Route::put('/{employee}', 'update')->name('update')->whereNumber('employee');
         Route::delete('/{employee}', 'destroy')->name('destroy')->whereNumber('employee');
