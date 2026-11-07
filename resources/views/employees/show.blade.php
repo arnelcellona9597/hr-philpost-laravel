@@ -14,7 +14,7 @@
     $describe = fn ($record): string => ($record->date_submitted ? 'Submitted '.HrDate::format($record->date_submitted) : 'Not submitted').' · '.$timely($record)['label'];
 @endphp
 
-<x-layouts.app :title="$employee->full_name" :heading="$employee->full_name" :back="['href' => route('employees.index'), 'label' => 'Employees']">
+<x-layouts.app :title="$employee->full_name" :heading="mb_strtoupper($employee->full_name)" :back="['href' => route('employees.index'), 'label' => 'Employees']">
     <x-slot:actions>
         <a class="btn-secondary" href="{{ url("/messages/new?employees={$employee->id}") }}"><x-icon name="mail" /> Email employee</a>
         <a class="btn-secondary" href="{{ route('leave.create', ['employee' => $employee->id]) }}"><x-icon name="calendar" /> File leave</a>
