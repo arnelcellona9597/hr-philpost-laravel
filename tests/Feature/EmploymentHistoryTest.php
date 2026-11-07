@@ -329,3 +329,23 @@ it('backfills one period per hired employee when the table is created', function
         ->and($rows[0]->isOpen())->toBeTrue()
         ->and(HrDate::today())->not->toBeEmpty();
 });
+
+it('shows the same total service on the profile badge, the list and the history', function () {
+    $this->travelTo('2026-11-07');
+    $employee = rehiredEmployee();
+    $total = HrDate::formatSpan(history()->summary($employee->fresh())['total']);
+
+    expect($employee->fresh()->length_of_service)->toBe($total)
+        ->and($total)->not->toBe(HrDate::formatSpan(HrDate::lengthOfService('2022-01-10')));
+
+    $this->get("/employees/{$employee->id}")->assertOk()->assertSee("{$total} in service")->assertSee("{$total} in total");
+    $this->get('/employees')->assertOk()->assertSee($total);
+    $this->get("/employees/{$employee->id}/print")->assertOk()->assertSee("Total service: {$total}");
+});
+
+it('counts a single-period employee the same as before', function () {
+    $this->travelTo('2026-06-30T16:30:00Z');
+    $employee = Employee::factory()->create(['date_hired' => '2024-07-01', 'last_day_of_service' => null]);
+
+    expect($employee->fresh()->length_of_service)->toBe('2 yrs');
+});

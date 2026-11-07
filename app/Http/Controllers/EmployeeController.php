@@ -49,7 +49,7 @@ class EmployeeController extends Controller
         return view('employees.index', [
             'search' => $search,
             'filters' => $search->activeFilterCount(),
-            'employees' => $search->apply(Employee::query()->with('station'))->paginate($search->limit)->withQueryString(),
+            'employees' => $search->apply(Employee::query()->with(['station', 'employmentPeriods']))->paginate($search->limit)->withQueryString(),
             'branches' => Branch::query()->orderBy('name')->get(['id', 'name']),
         ]);
     }
