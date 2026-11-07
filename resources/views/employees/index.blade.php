@@ -23,7 +23,28 @@
     <x-slot:actions>
         <a class="btn-secondary" href="{{ url("/data/export?{$exportQuery}") }}"><x-icon name="download" /> Export these results</a>
         @if ($employees->total() > 0)
-            <a class="btn-secondary" href="{{ route('employees.print-many', request()->except(['page', 'perPage', 'cols'])) }}" target="_blank" rel="noopener" title="Prints one profile per page for all {{ number_format($employees->total()) }} employees matching the current search and filters"><x-icon name="printer" /> Print profiles ({{ number_format($employees->total()) }})</a>
+            @php
+                $printQuery = request()->except(['page', 'perPage', 'cols']);
+                $count = number_format($employees->total());
+            @endphp
+            <details class="relative">
+                <summary class="btn-secondary cursor-pointer list-none"><x-icon name="printer" /> Print profiles ({{ $count }})</summary>
+                <div class="absolute right-0 z-20 mt-2 w-80 rounded-xl border border-line bg-surface p-1.5 shadow-pop">
+                    <p class="px-3 pb-1 pt-2 text-xs text-muted">For the {{ $count }} employees matching the current search and filters</p>
+                    <a class="block rounded-lg px-3 py-2 hover:bg-surface-2" href="{{ route('employees.bios-zip', $printQuery) }}">
+                        <span class="block text-sm font-medium">Individual bios</span>
+                        <span class="block text-xs text-muted">One Word file (.docx) for each employee, in a ZIP</span>
+                    </a>
+                    <a class="block rounded-lg px-3 py-2 hover:bg-surface-2" href="{{ route('employees.print-table', [...$printQuery, 'cols' => $columns]) }}" target="_blank" rel="noopener">
+                        <span class="block text-sm font-medium">All in one table</span>
+                        <span class="block text-xs text-muted">A single document with one row per employee, using the columns shown. Print or save as Word</span>
+                    </a>
+                    <a class="block rounded-lg px-3 py-2 hover:bg-surface-2" href="{{ route('employees.print-many', $printQuery) }}" target="_blank" rel="noopener">
+                        <span class="block text-sm font-medium">One profile per page</span>
+                        <span class="block text-xs text-muted">Every full profile on its own page, to print or save as PDF</span>
+                    </a>
+                </div>
+            </details>
         @endif
         <a class="btn-ghost" href="{{ route('data.duplicates', ['module' => 'employees']) }}"><x-icon name="copy" /> Duplicates</a>
         <a class="btn-primary" href="{{ route('employees.create') }}"><x-icon name="plus" /> Add employee</a>
