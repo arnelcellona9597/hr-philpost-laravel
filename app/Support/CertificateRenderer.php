@@ -89,26 +89,26 @@ class CertificateRenderer
      */
     private static function letterhead(array $block, array $options): string
     {
-        $text = '<div style="font-size:10pt">'.e($block['top'] ?? '').'</div>';
+        $text = '<div style="font-size:10pt;font-family:Helvetica,Arial,sans-serif">'.e($block['top'] ?? '').'</div>';
 
         foreach ($block['name'] ?? [] as $line) {
-            $text .= '<div style="font-size:12pt;font-weight:bold;line-height:1.2">'.e($line).'</div>';
+            $text .= '<div style="font-size:12pt;font-weight:bold;line-height:1.2;font-family:Helvetica,Arial,sans-serif">'.e($line).'</div>';
         }
 
         foreach ($block['details'] ?? [] as $line) {
-            $text .= '<div style="font-size:8.5pt">'.e($line).'</div>';
+            $text .= '<div style="font-size:8.5pt;font-family:Helvetica,Arial,sans-serif">'.e($line).'</div>';
         }
 
         $logo = '';
 
         if ($options['letterheadLogoUrl'] ?? null) {
-            $size = ($options['letterheadLogoSize'] ?? null) ? 'width:'.$options['letterheadLogoSize'][0].'pt;height:'.$options['letterheadLogoSize'][1].'pt' : 'height:75pt;width:auto;max-width:230pt';
+            $size = ($options['letterheadLogoSize'] ?? null) ? 'width:'.$options['letterheadLogoSize'][0].'pt;height:'.$options['letterheadLogoSize'][1].'pt' : 'width:205pt;height:50pt;object-fit:contain;object-position:right bottom';
             $logo = '<img src="'.e($options['letterheadLogoUrl']).'" alt="" style="'.$size.'">';
         }
 
-        $section = trim((string) ($block['section'] ?? '')) === '' ? '' : '<table style="width:100%;border-collapse:collapse"><tr><td></td><td style="width:1%;white-space:nowrap;background:#111418;color:#fff;font-size:9.5pt;font-weight:bold;padding:2pt 16pt;-webkit-print-color-adjust:exact;print-color-adjust:exact">'.e($block['section']).'</td></tr></table>';
+        $section = trim((string) ($block['section'] ?? '')) === '' ? '' : '<table style="width:100%;border-collapse:collapse"><tr><td></td><td style="width:1%;white-space:nowrap;background:#111418;color:#fff;font-size:9.5pt;font-weight:bold;font-family:Helvetica,Arial,sans-serif;padding:2pt 16pt;-webkit-print-color-adjust:exact;print-color-adjust:exact">'.e($block['section']).'</td></tr></table>';
 
-        return '<table style="width:100%;border-collapse:collapse"><tr><td style="vertical-align:bottom;padding:0 0 4pt">'.$text.'</td><td style="vertical-align:bottom;text-align:right;padding:0 0 4pt">'.$logo.'</td></tr></table>'
+        return '<table style="width:100%;border-collapse:collapse"><tr><td style="vertical-align:bottom;padding:0 0 4pt">'.$text.'</td><td style="vertical-align:bottom;text-align:right;padding:0 0 18pt 12pt">'.$logo.'</td></tr></table>'
             .'<div style="border-top:2.5pt solid #111418"></div>'.$section;
     }
 
