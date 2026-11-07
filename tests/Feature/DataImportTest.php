@@ -225,7 +225,7 @@ it('links requirements to employees added by the same file and fills their detai
     $this->post('/data/import/commit', ['token' => $check->viewData('token')]);
 
     expect(ItrSubmission::query()->sole()->last_name)->toBe('Reyes')
-        ->and((float) IpcrRating::query()->sole()->rating)->toBe(4.568);
+        ->and((float) IpcrRating::query()->sole()->rating)->toBe(4.57);
 });
 
 it('applies the same date rules as the forms', function () {

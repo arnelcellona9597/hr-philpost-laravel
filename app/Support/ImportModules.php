@@ -149,7 +149,7 @@ class ImportModules
                 self::select('rating_period', 'Rating Period', IpcrPeriod::class, ['required' => true]),
                 self::field('period_from', 'Period From', 'date'),
                 self::field('period_to', 'Period To', 'date'),
-                self::field('rating', 'Rating', 'number', ['min' => 1, 'max' => 5, 'step' => 0.001, 'width' => 8]),
+                self::field('rating', 'Rating', 'number', ['min' => 1, 'max' => 5, 'step' => 0.01, 'width' => 8]),
                 self::field('adjectival_rating', 'Adjectival Rating', 'text', ['computed' => true, 'width' => 18]),
                 ...self::submissionDates(),
                 ...self::timelinessFields(),
