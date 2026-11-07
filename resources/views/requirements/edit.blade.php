@@ -4,7 +4,7 @@
     $list = route('requirements.index', [$type, 'year' => $record->year]);
 @endphp
 
-<x-layouts.app :title="$module['title']" :heading="$module['title'].': '.$record->first_name.' '.$record->last_name.' ('.$record->year.')'" :back="['href' => $list, 'label' => $module['title']]">
+<x-layouts.app :title="$module['title']" :heading="$module['title'].': '.\App\Support\Names::title($record->first_name.' '.$record->last_name).' ('.$record->year.')'" :back="['href' => $list, 'label' => $module['title']]">
     <x-slot:actions>
         <span class="{{ Badge::TIMELINESS[$timely['status']] }}" title="Date Submitted compared with the deadline" data-timeliness>{{ $timely['label'] }}</span>
         @if ($record->adjectival_rating)

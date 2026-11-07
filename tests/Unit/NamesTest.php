@@ -17,3 +17,17 @@ it('takes up to two initials', function () {
         ->and(Names::initials('ñino'))->toBe('Ñ')
         ->and(Names::initials(null))->toBe('?');
 });
+
+it('shows names in title case whatever case they were typed in', function (?string $typed, string $shown) {
+    expect(Names::title($typed))->toBe($shown);
+})->with([
+    ['ABUOMAr', 'Abuomar'],
+    ['ABUOMAr, RAZUL K.', 'Abuomar, Razul K.'],
+    ['dela cruz, juan p. jr.', 'Dela Cruz, Juan P. Jr.'],
+    ['DE LOS REYES-SANTOS', 'De Los Reyes-Santos'],
+    ['SANTOS, JOSE III', 'Santos, Jose III'],
+    ["O'BRIEN", "O'Brien"],
+    ['  MA.   CRISTINA ', 'Ma. Cristina'],
+    ['Vi', 'Vi'],
+    [null, ''],
+]);

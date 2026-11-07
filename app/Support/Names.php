@@ -26,6 +26,24 @@ class Names
     }
 
     /**
+     * A name as it is shown, in title case whatever case it was typed in: "ABUOMAr" becomes "Abuomar".
+     * Suffixes II, III and IV stay in capitals, and O'Brien keeps its second capital. The saved value is never changed.
+     */
+    public static function title(?string $name): string
+    {
+        $name = self::clean($name);
+
+        if ($name === '') {
+            return '';
+        }
+
+        $title = mb_convert_case(mb_strtolower($name), MB_CASE_TITLE);
+        $title = preg_replace_callback("/\\b(\\p{Lu}['’])(\\p{Ll})/u", fn (array $match): string => $match[1].mb_strtoupper($match[2]), $title);
+
+        return preg_replace_callback('/\b(?:ii|iii|iv)\b/iu', fn (array $match): string => mb_strtoupper($match[0]), $title);
+    }
+
+    /**
      * Up to two initials from a full display name.
      */
     public static function initials(?string $name): string
