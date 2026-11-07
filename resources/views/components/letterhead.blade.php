@@ -18,7 +18,7 @@
             @endforeach
         </div>
         @if ($logoId)
-            <img src="{{ route('files.show', $logoId, false) }}" alt="" class="mb-3.5 h-[50pt] w-[205pt] shrink-0 object-contain object-right-bottom" />
+            <img src="{{ route('files.show', $logoId, false) }}" alt="" class="mb-3.5 h-[48pt] w-[225pt] shrink-0 object-contain object-right-bottom" />
         @endif
     </div>
     <div class="border-t-[3px] border-[#111418]"></div>
