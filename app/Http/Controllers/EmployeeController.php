@@ -42,6 +42,11 @@ class EmployeeController extends Controller
 
     private const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
+    /**
+     * Profiles in one bulk print. Each loads its own history, so a longer list is printed in parts.
+     */
+    private const PRINT_MAX = 200;
+
     public function index(Request $request): View
     {
         Gate::authorize('viewAny', Employee::class);
@@ -173,6 +178,37 @@ class EmployeeController extends Controller
             'pay' => $pay->summary($employee),
             'positionChanges' => $employee->positionChanges()->get(),
             'site' => SiteSetting::current(),
+        ]);
+    }
+
+    /**
+     * Every profile that matches the filters on the employee list, one per page, in the list's order.
+     */
+    public function printMany(Request $request, EmploymentHistoryService $history, PayHistoryService $pay): View|RedirectResponse
+    {
+        Gate::authorize('viewAny', Employee::class);
+
+        $query = (new EmployeeSearch($request))->apply(Employee::query()->with('station'));
+        $total = (clone $query)->count();
+
+        if ($total === 0) {
+            return $this->flash(redirect()->route('employees.index', $request->query()), 'No employees match these filters, so there is nothing to print.', 'error');
+        }
+
+        $profiles = $query->limit(self::PRINT_MAX)->get()->map(fn (Employee $employee): array => [
+            'employee' => $employee,
+            'employment' => $history->summary($employee),
+            'pay' => $pay->summary($employee),
+            'positionChanges' => $employee->positionChanges()->get(),
+        ]);
+
+        return view('employees.print-many', [
+            'profiles' => $profiles,
+            'total' => $total,
+            'max' => self::PRINT_MAX,
+            'fields' => ImportModules::find('employees')['fields'],
+            'site' => SiteSetting::current(),
+            'back' => route('employees.index', $request->except(['page'])),
         ]);
     }
 
