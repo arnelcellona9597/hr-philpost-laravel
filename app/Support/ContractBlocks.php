@@ -99,15 +99,15 @@ class ContractBlocks
     public static function values(Employee $employee, array $terms, ContractSetting $settings, string $issuedDate, ?string $controlNumber, string $companyName, ?ContractScope $scope = null): array
     {
         $female = $employee->gender === Gender::Female;
-        $fullName = Names::firstLast($employee->last_name, $employee->first_name, $employee->middle_name, $employee->extension);
+        $fullName = Names::title(Names::firstLast($employee->last_name, $employee->first_name, $employee->middle_name, $employee->extension));
         $second = $terms['second_wage_centavos'];
         $hasSecond = $second !== null && $second > 0 && $terms['second_wage_from'] !== null;
         $values = [
             'fullName' => $fullName,
             'fullNameUpper' => mb_strtoupper($fullName),
-            'fullNameTitle' => mb_convert_case($fullName, MB_CASE_TITLE),
-            'firstName' => trim((string) $employee->first_name),
-            'lastName' => trim((string) $employee->last_name),
+            'fullNameTitle' => $fullName,
+            'firstName' => Names::title($employee->first_name),
+            'lastName' => Names::title($employee->last_name),
             'honorific' => $female ? 'Ms.' : 'Mr.',
             'pronoun' => $female ? 'she' : 'he',
             'pronounCap' => $female ? 'She' : 'He',

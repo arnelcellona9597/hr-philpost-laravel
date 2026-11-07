@@ -1,4 +1,4 @@
-<x-layouts.app title="Edit leave" :heading="'Leave of '.$leave->first_name.' '.$leave->last_name" :back="['href' => route('leave.index'), 'label' => 'Wellness leave']">
+<x-layouts.app title="Edit leave" :heading="'Leave of '.\App\Support\Names::title($leave->first_name.' '.$leave->last_name)" :back="['href' => route('leave.index'), 'label' => 'Wellness leave']">
     <x-slot:actions>
         <form method="post" action="{{ route('leave.destroy', $leave) }}" data-confirm="Delete this leave filing? The days return to the employee's balance.">
             @csrf

@@ -32,6 +32,11 @@ class Employee extends Model
     /**
      * Keep the stored "LAST, First M. Ext." copy used for sorting, searching and labels in step.
      */
+    /**
+     * Name parts shown in title case. They are saved exactly as typed.
+     */
+    public const NAME_FIELDS = ['last_name', 'first_name', 'middle_name'];
+
     protected static function booted(): void
     {
         static::saving(function (Employee $employee): void {
@@ -44,6 +49,16 @@ class Employee extends Model
                 app(EmploymentHistoryService::class)->syncPeriodFromEmployee($employee);
             }
         });
+    }
+
+    /**
+     * "Last, First M." in title case for display, whatever case the name was typed in.
+     *
+     * @return Attribute<string, never>
+     */
+    protected function fullName(): Attribute
+    {
+        return Attribute::get(fn (?string $value): string => Names::title($value));
     }
 
     /**
@@ -224,6 +239,7 @@ class Employee extends Model
             $value === null || $value === '' => '—',
             $field['kind'] === 'date' => HrDate::format($value),
             $value instanceof BackedEnum => $value->value,
+            in_array($field['name'], self::NAME_FIELDS, true) => Names::title($value),
             default => (string) $value,
         };
     }

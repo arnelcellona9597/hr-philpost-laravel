@@ -14,6 +14,7 @@ use App\Models\NotificationSetting;
 use App\Models\User;
 use App\Models\WellnessLeave;
 use App\Support\HrDate;
+use App\Support\Names;
 use App\Support\Workdays;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -240,7 +241,7 @@ class LeaveService
             ->orderBy('name')
             ->limit(15)
             ->get()
-            ->map(fn (object $row): array => ['name' => $row->name, 'days' => (int) $row->days])
+            ->map(fn (object $row): array => ['name' => Names::title($row->name), 'days' => (int) $row->days])
             ->all();
 
         return [
@@ -301,7 +302,7 @@ class LeaveService
             Notification::query()->create([
                 'user_id' => $userId,
                 'title' => 'Wellness leave filed',
-                'body' => "{$leave->first_name} {$leave->last_name}: {$leave->days} day".($leave->days === 1 ? '' : 's').' ('.$leave->status->value.')',
+                'body' => Names::title("{$leave->first_name} {$leave->last_name}").": {$leave->days} day".($leave->days === 1 ? '' : 's').' ('.$leave->status->value.')',
                 'link' => "/leave/{$leave->id}",
             ]);
         }

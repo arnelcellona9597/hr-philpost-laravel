@@ -13,6 +13,7 @@ use App\Services\LeaveService;
 use App\Support\Choices;
 use App\Support\HrDate;
 use App\Support\ImportModules;
+use App\Support\Names;
 use App\Support\RecordForm;
 use App\Support\RecordRules;
 use Illuminate\Database\Eloquent\Builder;
@@ -98,7 +99,7 @@ class WellnessLeaveController extends Controller
             return $this->refused($exception->getMessage());
         }
 
-        return $this->flash(redirect()->route('leave.index'), "Wellness leave for {$filing->first_name} {$filing->last_name} was saved ({$filing->days} day".($filing->days === 1 ? '' : 's').').');
+        return $this->flash(redirect()->route('leave.index'), 'Wellness leave for '.Names::title("{$filing->first_name} {$filing->last_name}")." was saved ({$filing->days} day".($filing->days === 1 ? '' : 's').').');
     }
 
     public function edit(WellnessLeave $leave): View

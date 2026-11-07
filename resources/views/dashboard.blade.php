@@ -1,6 +1,7 @@
 @php
     use App\Support\HrDate;
     use App\Support\Money;
+    use App\Support\Names;
     use App\Support\ReportingPeriod as Reporting;
 
     $bucket = $period['bucket'];
@@ -290,7 +291,7 @@
                                     <li>
                                         <a href="{{ route('leave.edit', $leave) }}" class="flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-surface-2">
                                             <span class="min-w-0">
-                                                <span class="block truncate text-sm font-medium">{{ collect([$leave->last_name, $leave->first_name])->filter()->implode(', ') }}</span>
+                                                <span class="block truncate text-sm font-medium">{{ Names::title(collect([$leave->last_name, $leave->first_name])->filter()->implode(', ')) }}</span>
                                                 <span class="block text-xs text-muted">{{ HrDate::format($leave->inclusive_date_from) }}{{ $leave->inclusive_date_to != $leave->inclusive_date_from ? ' – '.HrDate::format($leave->inclusive_date_to) : '' }}</span>
                                             </span>
                                             <span class="badge-warning shrink-0 tabular">{{ $leave->days ?? 0 }} day{{ $leave->days === 1 ? '' : 's' }}</span>

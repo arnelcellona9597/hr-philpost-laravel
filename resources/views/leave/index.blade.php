@@ -2,6 +2,7 @@
     use App\Enums\LeaveStatus;
     use App\Support\Badge;
     use App\Support\HrDate;
+    use App\Support\Names;
 
     $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     $daysUsed = array_sum(array_column($stats['byMonth'], 'days'));
@@ -103,9 +104,9 @@
                     <tbody>
                         @foreach ($leaves as $leave)
                             <tr>
-                                <td class="font-medium"><a class="hover:text-primary-ink" href="{{ route('leave.edit', $leave) }}">{{ $leave->last_name }}</a></td>
-                                <td>{{ $leave->first_name }}</td>
-                                <td class="text-fg-2">{{ $leave->middle_name }}</td>
+                                <td class="font-medium"><a class="hover:text-primary-ink" href="{{ route('leave.edit', $leave) }}">{{ Names::title($leave->last_name) }}</a></td>
+                                <td>{{ Names::title($leave->first_name) }}</td>
+                                <td class="text-fg-2">{{ Names::title($leave->middle_name) }}</td>
                                 <td class="whitespace-nowrap tabular">{{ HrDate::format($leave->date_filing) }}</td>
                                 <td class="whitespace-nowrap tabular">
                                     {{ HrDate::format($leave->inclusive_date_from) }}

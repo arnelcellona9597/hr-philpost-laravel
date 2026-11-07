@@ -3,8 +3,10 @@
 namespace App\Models;
 
 use App\Models\Concerns\Audited;
+use App\Support\Names;
 use Database\Factories\PayslipFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -28,6 +30,16 @@ class Payslip extends Model
             $payslip->total_deductions_centavos = $deductions;
             $payslip->net_pay_centavos = $gross - $deductions;
         });
+    }
+
+    /**
+     * The employee's name in title case for display; the saved snapshot is unchanged.
+     *
+     * @return Attribute<string, never>
+     */
+    protected function fullName(): Attribute
+    {
+        return Attribute::get(fn (?string $value): string => Names::title($value));
     }
 
     /**

@@ -1,8 +1,10 @@
 @php
     use App\Enums\IpcrPeriod;
+    use App\Models\Employee;
     use App\Support\Badge;
     use App\Support\Deadlines;
     use App\Support\HrDate;
+    use App\Support\Names;
 
     $today = HrDate::today();
     $title = $module['title'];
@@ -18,6 +20,7 @@
             $value === null || $value === '' => '',
             $column['kind'] === 'date' => HrDate::format($value),
             $value instanceof BackedEnum => $value->value,
+            in_array($column['name'], Employee::NAME_FIELDS, true) => Names::title($value),
             default => (string) $value,
         };
     };

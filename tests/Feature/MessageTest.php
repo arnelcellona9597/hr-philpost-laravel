@@ -103,7 +103,7 @@ it('previews the first deliverable recipient without saving', function () {
 
     $html = $this->post('/messages/preview', compose(['employees' => [$employee->id], 'emails' => '']))->json('sample.html');
 
-    expect($html)->toContain('&lt;b&gt;Ana&lt;/b&gt;')->not->toContain('<b>Ana')
+    expect(mb_strtolower($html))->toContain('&lt;b&gt;ana&lt;/b&gt;')->not->toContain('<b>ana')
         ->and(Message::query()->count())->toBe(0);
 
     $this->post('/messages/preview', compose(['subject' => '']))->assertStatus(400)->assertJsonPath('error', 'Enter a subject.');

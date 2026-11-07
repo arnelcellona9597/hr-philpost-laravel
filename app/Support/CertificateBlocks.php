@@ -343,7 +343,7 @@ class CertificateBlocks
     public static function values(Employee $employee, string $issuedDate, ?string $purpose, ?string $controlNumber, string $companyName): array
     {
         $female = $employee->gender === Gender::Female;
-        $fullName = Names::firstLast($employee->last_name, $employee->first_name, $employee->middle_name, $employee->extension);
+        $fullName = Names::title(Names::firstLast($employee->last_name, $employee->first_name, $employee->middle_name, $employee->extension));
         $hired = $employee->date_hired?->toDateString();
         $lastDay = $employee->last_day_of_service?->toDateString();
         $periods = $employee->employmentPeriods()->get();
@@ -352,9 +352,9 @@ class CertificateBlocks
         return [
             'fullName' => $fullName,
             'fullNameUpper' => mb_strtoupper($fullName),
-            'firstName' => trim((string) $employee->first_name),
-            'lastName' => trim((string) $employee->last_name),
-            'lastNameTitle' => mb_convert_case(trim((string) $employee->last_name), MB_CASE_TITLE),
+            'firstName' => Names::title($employee->first_name),
+            'lastName' => Names::title($employee->last_name),
+            'lastNameTitle' => Names::title($employee->last_name),
             'honorific' => $female ? 'Ms.' : 'Mr.',
             'honorificUpper' => $female ? 'MS.' : 'MR.',
             'pronoun' => $female ? 'she' : 'he',
