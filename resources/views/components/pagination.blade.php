@@ -1,9 +1,13 @@
-@props(['paginator', 'sizes' => null])
+@props(['paginator', 'sizes' => \App\Support\PageSize::SIZES])
+
+@php
+    $sizes = collect($sizes)->push($paginator->perPage())->unique()->sort()->values();
+@endphp
 
 <nav class="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3 text-sm" aria-label="Pagination">
     <p class="text-muted tabular">Showing {{ number_format($paginator->firstItem() ?? 0) }}–{{ number_format($paginator->lastItem() ?? 0) }} of {{ number_format($paginator->total()) }}</p>
-    @if ($sizes)
-        <form method="get" class="flex items-center gap-2" data-autosubmit>
+    @if ($paginator->total() > 0)
+        <form method="get" class="flex items-center gap-2" data-autosubmit data-page-size>
             @foreach (request()->except(['page', 'perPage']) as $key => $value)
                 @foreach ((array) $value as $item)
                     @if (is_scalar($item))
@@ -14,7 +18,7 @@
             <label class="text-muted" for="perPage">Rows per page</label>
             <select class="input w-auto py-1" id="perPage" name="perPage">
                 @foreach ($sizes as $size)
-                    <option @selected($size === $paginator->perPage())>{{ $size }}</option>
+                    <option value="{{ $size }}" @selected($size === $paginator->perPage())>{{ number_format($size) }}</option>
                 @endforeach
             </select>
         </form>

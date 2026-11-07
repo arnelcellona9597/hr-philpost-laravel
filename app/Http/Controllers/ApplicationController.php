@@ -18,6 +18,7 @@ use App\Services\DuplicateFinder;
 use App\Support\Choices;
 use App\Support\HrDate;
 use App\Support\ImportModules;
+use App\Support\PageSize;
 use App\Support\RecordForm;
 use App\Support\RecordRules;
 use Illuminate\Database\Eloquent\Builder;
@@ -33,8 +34,6 @@ use Illuminate\View\View;
 class ApplicationController extends Controller
 {
     use RespondsToForms;
-
-    public const PAGE_SIZES = [10, 25, 50, 100];
 
     private const SORTS = [
         'applicationId' => 'application_id',
@@ -56,7 +55,7 @@ class ApplicationController extends Controller
         $statuses = array_values(array_intersect(Arr::wrap($request->query('status')), array_column(ApplicationStatus::cases(), 'value')));
         $requirements = RequirementsCompletion::tryFrom((string) $request->query('requirements'));
         $station = $request->integer('station') ?: null;
-        $perPage = in_array($request->integer('perPage'), self::PAGE_SIZES, true) ? $request->integer('perPage') : 25;
+        $perPage = PageSize::resolve($request, 25);
         $position = Str::limit(trim((string) $request->query('position')), 150, '');
         $fdsFrom = HrDate::isValid((string) $request->query('fdsFrom')) ? (string) $request->query('fdsFrom') : null;
         $fdsTo = HrDate::isValid((string) $request->query('fdsTo')) ? (string) $request->query('fdsTo') : null;
@@ -104,7 +103,7 @@ class ApplicationController extends Controller
             'requirements' => $requirements,
             'station' => $station,
             'position' => $position,
-            'pageSizes' => self::PAGE_SIZES,
+
             'positions' => Application::query()->whereNotNull('position_applied')->distinct()->orderBy('position_applied')->pluck('position_applied'),
             'fdsFrom' => $fdsFrom,
             'fdsTo' => $fdsTo,

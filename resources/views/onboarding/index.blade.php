@@ -178,7 +178,7 @@
                     </tbody>
                 </table>
             </div>
-            <x-pagination :paginator="$applications" :sizes="$pageSizes" />
+            <x-pagination :paginator="$applications" />
         @endif
     </div>
     <p class="mt-2 text-xs text-muted">Change a requirement directly in the table — it saves immediately. FDS status is Complete when every document is Submitted, Verified or N/A.</p>

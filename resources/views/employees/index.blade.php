@@ -113,14 +113,6 @@
                         <input class="input" type="number" min="0" max="80" name="losMax" value="{{ $search->losMax }}" aria-label="Maximum years of service" placeholder="max" />
                     </div>
                 </div>
-                <div>
-                    <label class="label" for="limit">Rows per page</label>
-                    <select class="input" id="limit" name="limit">
-                        @foreach ([25, 50, 100] as $size)
-                            <option value="{{ $size }}" @selected($size === $search->limit)>{{ $size }}</option>
-                        @endforeach
-                    </select>
-                </div>
             </div>
             <div class="mt-4 flex gap-2">
                 <button class="btn-primary">Apply filters</button>
@@ -131,6 +123,39 @@
             <input type="hidden" name="sort" value="{{ $search->sort }}" />
         @endif
     </form>
+
+    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p class="text-sm text-muted">{{ count($columns) }} columns shown</p>
+        <details class="relative">
+            <summary class="btn-secondary btn-sm cursor-pointer list-none"><x-icon name="settings" /> Columns</summary>
+            <form method="get" class="absolute right-0 z-20 mt-2 max-h-[70vh] w-72 overflow-y-auto rounded-xl border border-line bg-surface p-3 shadow-pop">
+                @foreach (request()->except(['cols', 'page']) as $key => $value)
+                    @foreach ((array) $value as $item)
+                        @if (is_scalar($item))
+                            <input type="hidden" name="{{ $key }}{{ is_array($value) ? '[]' : '' }}" value="{{ $item }}" />
+                        @endif
+                    @endforeach
+                @endforeach
+                <p class="mb-2 text-sm font-semibold">Columns to show</p>
+                @foreach (collect($columnChoices)->groupBy('group', preserveKeys: true) as $group => $choices)
+                    <fieldset class="mb-3">
+                        <legend class="eyebrow mb-1">{{ $group }}</legend>
+                        @foreach ($choices as $key => $choice)
+                            <label class="flex items-center gap-2 py-0.5 text-sm">
+                                <input type="checkbox" name="cols[]" value="{{ $key }}" class="size-4" @checked(in_array($key, $columns, true)) @disabled($key === 'name') />
+                                {{ $choice['label'] }}
+                            </label>
+                        @endforeach
+                    </fieldset>
+                @endforeach
+                <input type="hidden" name="cols[]" value="name" />
+                <div class="sticky bottom-0 -mx-3 -mb-3 flex gap-2 border-t border-line bg-surface p-3">
+                    <button class="btn-primary btn-sm">Apply</button>
+                    <a class="btn-ghost btn-sm" href="{{ request()->url().'?'.http_build_query([...request()->except(['cols', 'page']), 'cols' => 'default']) }}">Reset to usual</a>
+                </div>
+            </form>
+        </details>
+    </div>
 
     <div class="card overflow-hidden">
         @if ($employees->total() === 0)
@@ -143,32 +168,53 @@
                 <table class="table">
                     <thead>
                         <tr>
-                            <x-sort-header field="employeeId" label="Employee ID" />
-                            <x-sort-header field="fullName" label="Name" />
-                            <x-sort-header field="position" label="Position" />
-                            <th scope="col">Station</th>
-                            <x-sort-header field="classification" label="Classification" />
-                            <x-sort-header field="employmentStatus" label="Status" />
-                            <x-sort-header field="dateHired" label="Date hired" />
-                            <th scope="col">Service</th>
+                            @foreach ($columns as $key)
+                                @if ($columnChoices[$key]['sort'])
+                                    <x-sort-header :field="$columnChoices[$key]['sort']" :label="$columnChoices[$key]['label']" />
+                                @else
+                                    <th scope="col">{{ $columnChoices[$key]['label'] }}</th>
+                                @endif
+                            @endforeach
                         </tr>
                     </thead>
                     <tbody>
                         @foreach ($employees as $employee)
                             <tr class="cursor-pointer" data-href="{{ route('employees.show', $employee) }}">
-                                <td class="whitespace-nowrap font-mono text-xs text-fg-2">{{ $employee->employee_id }}</td>
-                                <td>
-                                    <a href="{{ route('employees.show', $employee) }}" class="flex items-center gap-3 font-medium hover:text-primary-ink">
-                                        <x-avatar :name="$employee->first_name.' '.$employee->last_name" :image-id="$employee->profile_picture_id" class="size-8 text-xs" />
-                                        <span>{{ $employee->full_name }}</span>
-                                    </a>
-                                </td>
-                                <td>{{ $employee->position }}</td>
-                                <td class="text-fg-2">{{ $employee->station?->name }}</td>
-                                <td><span class="badge-neutral">{{ $employee->classification->value }}</span></td>
-                                <td><span class="{{ Badge::for($employee->employment_status) }}">{{ $employee->employment_status->value }}</span></td>
-                                <td class="whitespace-nowrap text-fg-2 tabular">{{ HrDate::format($employee->date_hired) }}</td>
-                                <td class="whitespace-nowrap text-fg-2">{{ $employee->length_of_service }}</td>
+                                @foreach ($columns as $key)
+                                    @switch($key)
+                                        @case('employee_id')
+                                            <td class="whitespace-nowrap font-mono text-xs text-fg-2">{{ $employee->employee_id }}</td>
+                                            @break
+                                        @case('name')
+                                            <td>
+                                                <a href="{{ route('employees.show', $employee) }}" class="flex items-center gap-3 font-medium hover:text-primary-ink">
+                                                    <x-avatar :name="$employee->first_name.' '.$employee->last_name" :image-id="$employee->profile_picture_id" class="size-8 text-xs" />
+                                                    <span>{{ $employee->full_name }}</span>
+                                                </a>
+                                            </td>
+                                            @break
+                                        @case('position')
+                                            <td>{{ $employee->position }}</td>
+                                            @break
+                                        @case('station')
+                                            <td class="text-fg-2">{{ $employee->station?->name }}</td>
+                                            @break
+                                        @case('classification')
+                                            <td><span class="badge-neutral">{{ $employee->classification->value }}</span></td>
+                                            @break
+                                        @case('status')
+                                            <td><span class="{{ Badge::for($employee->employment_status) }}">{{ $employee->employment_status->value }}</span></td>
+                                            @break
+                                        @case('date_hired')
+                                            <td class="whitespace-nowrap text-fg-2 tabular">{{ HrDate::format($employee->date_hired) }}</td>
+                                            @break
+                                        @case('service')
+                                            <td class="whitespace-nowrap text-fg-2">{{ $employee->length_of_service }}</td>
+                                            @break
+                                        @default
+                                            <td class="text-fg-2">{{ $employee->fieldText($columnChoices[$key]['field']) }}</td>
+                                    @endswitch
+                                @endforeach
                             </tr>
                         @endforeach
                     </tbody>
