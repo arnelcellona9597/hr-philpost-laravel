@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Employee;
 use Illuminate\Http\Request;
 
 /**
@@ -90,6 +91,26 @@ class EmployeeColumns
         $saved = self::valid(explode(',', (string) $request->cookie(self::COOKIE)));
 
         return ['columns' => $saved === [] ? self::DEFAULT : $saved, 'remember' => null];
+    }
+
+    /**
+     * What a column shows for one employee as plain text, for printouts and Word files.
+     *
+     * @param  array{label: string, sort: string|null, group: string, field: array<string, mixed>|null}  $column
+     */
+    public static function text(Employee $employee, string $key, array $column): string
+    {
+        return match ($key) {
+            'employee_id' => (string) $employee->employee_id,
+            'name' => $employee->full_name,
+            'position' => (string) $employee->position,
+            'station' => (string) $employee->station?->name,
+            'classification' => $employee->classification->value,
+            'status' => $employee->employment_status->value,
+            'date_hired' => $employee->date_hired ? HrDate::format($employee->date_hired) : '',
+            'service' => $employee->length_of_service,
+            default => $column['field'] === null ? '' : $employee->fieldText($column['field']),
+        };
     }
 
     /**

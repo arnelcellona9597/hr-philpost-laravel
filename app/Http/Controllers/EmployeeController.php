@@ -17,6 +17,7 @@ use App\Models\RequirementDeadlineSetting;
 use App\Models\SiteSetting;
 use App\Services\ApplicationService;
 use App\Services\DuplicateFinder;
+use App\Services\EmployeeWordExporter;
 use App\Services\EmploymentHistoryService;
 use App\Services\LeaveService;
 use App\Services\MediaStore;
@@ -30,11 +31,16 @@ use App\Support\RecordForm;
 use App\Support\RecordRules;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use RuntimeException;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use ZipArchive;
 
 class EmployeeController extends Controller
 {
@@ -46,6 +52,11 @@ class EmployeeController extends Controller
      * Profiles in one bulk print. Each loads its own history, so a longer list is printed in parts.
      */
     private const PRINT_MAX = 200;
+
+    /**
+     * Employees in one printed or Word table.
+     */
+    private const TABLE_MAX = 2000;
 
     public function index(Request $request): View
     {
@@ -210,6 +221,98 @@ class EmployeeController extends Controller
             'site' => SiteSetting::current(),
             'back' => route('employees.index', $request->except(['page'])),
         ]);
+    }
+
+    /**
+     * One Word bio per matching employee, zipped.
+     */
+    public function biosZip(Request $request, EmployeeWordExporter $word): BinaryFileResponse|RedirectResponse
+    {
+        Gate::authorize('viewAny', Employee::class);
+
+        $query = (new EmployeeSearch($request))->apply(Employee::query()->with('station'));
+        $total = (clone $query)->count();
+
+        if ($total === 0) {
+            return $this->flash(redirect()->route('employees.index', $request->query()), 'No employees match these filters, so there is nothing to download.', 'error');
+        }
+
+        $path = tempnam(sys_get_temp_dir(), 'bios');
+        $zip = new ZipArchive;
+
+        if ($zip->open($path, ZipArchive::OVERWRITE) !== true) {
+            throw new RuntimeException('The ZIP file could not be created.');
+        }
+
+        $names = [];
+
+        foreach ($query->limit(self::PRINT_MAX)->get() as $employee) {
+            $name = $word->filename($employee);
+            $names[$name] = ($names[$name] ?? 0) + 1;
+            $zip->addFromString($names[$name] > 1 ? Str::replaceLast('.docx', " ({$names[$name]}).docx", $name) : $name, $word->profile($employee));
+        }
+
+        $zip->close();
+
+        return response()->download($path, 'employee-bios-'.HrDate::today().'.zip', ['Content-Type' => 'application/zip'])->deleteFileAfterSend();
+    }
+
+    /**
+     * Every matching employee in one table, with the columns chosen on the list.
+     */
+    public function printTable(Request $request): View|RedirectResponse
+    {
+        Gate::authorize('viewAny', Employee::class);
+
+        [$employees, $total] = $this->tableRows($request);
+
+        if ($total === 0) {
+            return $this->flash(redirect()->route('employees.index', $request->query()), 'No employees match these filters, so there is nothing to print.', 'error');
+        }
+
+        $columns = EmployeeColumns::choose($request)['columns'];
+
+        return view('employees.print-table', [
+            'employees' => $employees,
+            'total' => $total,
+            'max' => self::TABLE_MAX,
+            'columns' => $columns,
+            'columnChoices' => EmployeeColumns::available(),
+            'site' => SiteSetting::current(),
+            'back' => route('employees.index', $request->except(['page'])),
+            'wordUrl' => route('employees.table-docx', $request->except(['page'])),
+        ]);
+    }
+
+    /**
+     * The same table as a Word file.
+     */
+    public function tableDocx(Request $request, EmployeeWordExporter $word): Response|RedirectResponse
+    {
+        Gate::authorize('viewAny', Employee::class);
+
+        [$employees, $total] = $this->tableRows($request);
+
+        if ($total === 0) {
+            return $this->flash(redirect()->route('employees.index', $request->query()), 'No employees match these filters, so there is nothing to download.', 'error');
+        }
+
+        return response($word->table($employees, EmployeeColumns::choose($request)['columns']), 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'Content-Disposition' => 'attachment; filename="employees-'.HrDate::today().'.docx"',
+        ]);
+    }
+
+    /**
+     * @return array{0: Collection<int, Employee>, 1: int}
+     */
+    private function tableRows(Request $request): array
+    {
+        $query = (new EmployeeSearch($request))->apply(Employee::query()->with(['station', 'employmentPeriods']));
+
+        $total = (clone $query)->count();
+
+        return [$query->limit(self::TABLE_MAX)->get(), $total];
     }
 
     public function edit(Employee $employee): View
