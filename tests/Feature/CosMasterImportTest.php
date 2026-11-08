@@ -103,7 +103,7 @@ it('matches people with no Employee ID by name and birth date and gives new ones
         ->and(Employee::query()->count())->toBe(2);
 });
 
-it('skips ambiguous people, a clashing Employee ID and new people without a gender', function () {
+it('skips ambiguous people and new people without a gender, but still adds someone whose ID belongs to another person', function () {
     Employee::factory()->create(['employee_id' => '17-001', 'last_name' => 'Twin', 'first_name' => 'One', 'date_of_birth' => '1990-01-01']);
     Employee::factory()->create(['employee_id' => '17-002', 'last_name' => 'Twin', 'first_name' => 'One', 'date_of_birth' => '1990-01-01']);
     Employee::factory()->create(['employee_id' => '17-003', 'last_name' => 'Owner', 'first_name' => 'Real', 'date_of_birth' => '1980-05-05']);
@@ -114,8 +114,10 @@ it('skips ambiguous people, a clashing Employee ID and new people without a gend
         person(['Last Name' => 'NOGENDER', 'First Name' => 'PAT', 'Employee ID' => '21-777', 'Gender' => null]),
     ]);
 
-    expect($plan['counts'])->toBe(['update' => 0, 'new' => 0, 'skip' => 3])
-        ->and(collect($plan['items'])->pluck('problem')->implode(' | '))->toContain('More than one employee')->toContain('already belongs to another person')->toContain('no usable gender');
+    expect($plan['counts'])->toBe(['update' => 0, 'new' => 1, 'skip' => 2])
+        ->and(collect($plan['items'])->pluck('problem')->implode(' | '))->toContain('More than one employee')->toContain('no usable gender')
+        ->and($plan['items'][1]['generated_id'])->toBe('TEMP-0001')
+        ->and($plan['items'][1]['row']['warnings'][0])->toContain('already belongs to another person');
 });
 
 it('builds employment history from the end and rehire dates and reads the status from the position', function () {
@@ -239,4 +241,16 @@ it('gives a new person a branch only when an existing branch matches, and never 
         ->and($b->station_id)->toBeNull()->and($b->unit->name)->toBe('Somewhere New Post Office')
         ->and(Branch::query()->count())->toBe(1)
         ->and($plan['branchesForNew'])->toBe(['found' => 1, 'none' => 1]);
+});
+
+it('adds both people when two rows in the file share an Employee ID, the second with a temporary ID', function () {
+    [$import, $plan] = importPlan([
+        person(['Employee ID' => '00-012', 'Last Name' => 'FIRST', 'First Name' => 'ONE', 'Date of Birth' => '1980-12-28']),
+        person(['Employee ID' => '00-012', 'Last Name' => 'SECOND', 'First Name' => 'TWO', 'Date of Birth' => '1993-07-13']),
+    ]);
+    $import->apply($plan);
+
+    expect(Employee::query()->where('last_name', 'FIRST')->value('employee_id'))->toBe('00-012')
+        ->and(Employee::query()->where('last_name', 'SECOND')->value('employee_id'))->toBe('TEMP-0001')
+        ->and($plan['items'][1]['row']['warnings'][0])->toContain('used by someone earlier in the file');
 });
