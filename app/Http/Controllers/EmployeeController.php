@@ -10,6 +10,7 @@ use App\Http\Controllers\Concerns\RespondsToForms;
 use App\Models\Application;
 use App\Models\AuditLog;
 use App\Models\Branch;
+use App\Models\BranchUnit;
 use App\Models\Employee;
 use App\Models\LeaveSetting;
 use App\Models\Media;
@@ -78,6 +79,7 @@ class EmployeeController extends Controller
             'filters' => $search->activeFilterCount(),
             'employees' => $search->apply(Employee::query()->with(['station', 'employmentPeriods']))->paginate($search->limit)->withQueryString(),
             'branches' => Branch::query()->orderBy('name')->get(['id', 'name']),
+            'units' => BranchUnit::query()->with('branch:id,name')->get(['id', 'name', 'branch_id'])->sortBy(fn (BranchUnit $unit): string => mb_strtolower(($unit->branch?->name ?? '~').'|'.$unit->name))->groupBy(fn (BranchUnit $unit): string => $unit->branch?->name ?? 'Not placed under a branch yet'),
         ]);
     }
 
