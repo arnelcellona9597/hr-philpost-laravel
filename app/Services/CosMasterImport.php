@@ -28,9 +28,11 @@ use Throwable;
  *
  * People are matched by Employee ID, else by name and birth date. A value from the file replaces the stored
  * one only when it is present and valid, so a blank or unreadable cell never erases anything. Nobody is
- * deleted. The file's Station/Division/Unit text becomes the employee's unit: an existing unit with that name is used,
- * else a new unit is made with no branch yet, for HR to place. Branches are never created or changed, and a new
- * person gets a branch only when an existing one matches the text. `plan()` changes nothing; `apply()` saves a plan in one transaction.
+ * deleted. Someone whose Employee ID is already taken by another person gets a temporary ID instead of being
+ * left out. The file's Station/Division/Unit text becomes the employee's unit: an existing unit with that name is
+ * used, else a new unit is made with no branch yet, for HR to place. Branches are never created or changed, and a
+ * new person gets a branch only when an existing one matches the text. `plan()` changes nothing; `apply()` saves a
+ * plan in one transaction.
  *
  * @phpstan-type Row array{line: int, file_status: ?string, last_name: string, first_name: string, middle_name: ?string, data: array<string, mixed>, periods: list<array{from: string, to: ?string}>, warnings: list<string>, station: string, status_hint: ?EmploymentStatus}
  */
@@ -112,6 +114,7 @@ class CosMasterImport
 
         foreach ($rows as $row) {
             $employeeId = $row['data']['employee_id'] ?? null;
+            $idTaken = null;
             $match = null;
             $how = '';
             $problem = null;
@@ -125,7 +128,7 @@ class CosMasterImport
                     $match = $found;
                     $how = 'Employee ID';
                 } else {
-                    $problem = "Employee ID {$employeeId} already belongs to another person";
+                    $idTaken = "Employee ID {$employeeId} already belongs to another person";
                 }
             }
 
@@ -157,7 +160,11 @@ class CosMasterImport
             }
 
             if ($match === null && $problem === null && $employeeId !== null && isset($seenIds[mb_strtolower($employeeId)])) {
-                $problem = "Employee ID {$employeeId} appears twice in the file";
+                $idTaken = "Employee ID {$employeeId} is used by someone earlier in the file";
+            }
+
+            if ($idTaken !== null && $match === null && $problem === null) {
+                $row['warnings'][] = "{$idTaken}; given a temporary ID to correct later";
             }
 
             if ($employeeId !== null) {
@@ -172,7 +179,7 @@ class CosMasterImport
                 $branchesForNew[$branchId === null ? 'none' : 'found']++;
             }
 
-            if ($problem === null && $match === null && $employeeId === null) {
+            if ($problem === null && $match === null && ($employeeId === null || $idTaken !== null)) {
                 while (isset($usedIds[mb_strtolower($generated = sprintf('TEMP-%04d', ++$temp))])) {
                     // Take the next number until one is free.
                 }
@@ -244,7 +251,7 @@ class CosMasterImport
 
                     if ($item['action'] === 'new') {
                         $employee = new Employee($data);
-                        $employee->employee_id = $data['employee_id'] ?? $item['generated_id'];
+                        $employee->employee_id = $item['generated_id'] ?? $data['employee_id'];
                         $employee->last_name = $row['last_name'];
                         $employee->first_name = $row['first_name'];
                         $employee->classification = Classification::Cos;
