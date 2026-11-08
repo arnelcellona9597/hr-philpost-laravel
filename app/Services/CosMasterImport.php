@@ -30,7 +30,7 @@ use Throwable;
  * deleted. The file's Station/Division/Unit text goes into the employee's Station / Division / Unit field; branches
  * are never created or changed, and a new person gets a branch only when an existing one matches the text. `plan()` changes nothing; `apply()` saves a plan in one transaction.
  *
- * @phpstan-type Row array{line: int, last_name: string, first_name: string, middle_name: ?string, data: array<string, mixed>, periods: list<array{from: string, to: ?string}>, warnings: list<string>, station: string, status_hint: ?EmploymentStatus}
+ * @phpstan-type Row array{line: int, file_status: ?string, last_name: string, first_name: string, middle_name: ?string, data: array<string, mixed>, periods: list<array{from: string, to: ?string}>, warnings: list<string>, station: string, status_hint: ?EmploymentStatus}
  */
 class CosMasterImport
 {
@@ -40,7 +40,7 @@ class CosMasterImport
      * Columns by their header text, normalised. The second Contact Number and Address are the emergency contact's.
      */
     private const COLUMNS = [
-        'last name' => 'last_name', 'first name' => 'first_name', 'middle name' => 'middle_name', 'extn.' => 'extension',
+        'status' => 'file_status', 'photo link' => 'file_status', 'last name' => 'last_name', 'first name' => 'first_name', 'middle name' => 'middle_name', 'extn.' => 'extension',
         'gender' => 'gender', 'date of birth' => 'date_of_birth', 'civil status' => 'civil_status', 'religion' => 'religion',
         'blood type' => 'blood_type', 'professional eligibility / license' => 'professional_eligibility',
         'educational attainment' => 'educational_attainment', 'courses' => 'courses', 'year level/ earned units' => 'year_level_earned_units',
@@ -375,7 +375,9 @@ class CosMasterImport
             $data[$kind] = $value !== null && $error === null ? GovId::format($kind, $value) : null;
         }
 
+        $fileStatus = $text('file_status');
         [$position, $hint] = $this->position($text('position'));
+        $hint ??= mb_strtolower((string) $fileStatus) === 'resigned' ? EmploymentStatus::Resigned : null;
         $data['position'] = $position;
         $data['date_hired'] = $this->date($get('date_hired'), $warnings, 'Date hired');
         $periods = $this->periods($data['date_hired'], [
@@ -384,8 +386,14 @@ class CosMasterImport
             $this->date($get('end3'), $warnings, 'End 3'), $this->date($get('rehire3'), $warnings, 'Rehire 3'),
         ], $warnings);
 
+        if (mb_strtolower((string) $fileStatus) === 'active' && $periods !== [] && $periods[array_key_last($periods)]['to'] !== null) {
+            $warnings[] = 'Marked Active but has an End date; treated as still active';
+            $periods[array_key_last($periods)]['to'] = null;
+        }
+
         return [
             'line' => $line,
+            'file_status' => $fileStatus,
             'last_name' => $last,
             'first_name' => $first,
             'middle_name' => $data['middle_name'],
