@@ -22,7 +22,7 @@
         data-side="{{ $prefs['right'] ? 'right' : 'left' }}"
         data-header="{{ $prefs['compact'] ? 'compact' : 'full' }}"
     >
-        <x-shell.sidebar :groups="$groups" :path="$path" :company="$company" :logo-id="$logoId" :session-ends="$sessionEnds" :session-expires-at="$sessionExpiresAt?->getTimestampMs()" />
+        <x-shell.sidebar :groups="$groups" :path="$path" :company="$company" :logo-id="$logoId" :favicon-id="$faviconId ?? null" :session-ends="$sessionEnds" :session-expires-at="$sessionExpiresAt?->getTimestampMs()" />
 
         <div class="flex min-w-0 flex-1 flex-col">
             <x-shell.topbar :crumbs="Navigation::crumbs($path, $groups, $title)" :unread="$unreadNotifications" :user="$user" :prefs="$prefs" :path="$path" />

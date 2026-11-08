@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['company_name', 'tagline', 'logo_id', 'palette', 'default_theme', 'letterhead_top', 'letterhead_name', 'letterhead_details', 'letterhead_section', 'letterhead_logo_id'])]
+#[Fillable(['company_name', 'tagline', 'logo_id', 'favicon_id', 'palette', 'default_theme', 'letterhead_top', 'letterhead_name', 'letterhead_details', 'letterhead_section', 'letterhead_logo_id'])]
 class SiteSetting extends Model
 {
     use Audited, IsSingleton;
@@ -73,6 +73,14 @@ class SiteSetting extends Model
     public function logo(): BelongsTo
     {
         return $this->belongsTo(Media::class, 'logo_id');
+    }
+
+    /**
+     * @return BelongsTo<Media, $this>
+     */
+    public function favicon(): BelongsTo
+    {
+        return $this->belongsTo(Media::class, 'favicon_id');
     }
 
     /**

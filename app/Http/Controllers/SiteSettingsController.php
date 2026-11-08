@@ -87,6 +87,22 @@ class SiteSettingsController extends Controller
             return $this->refused($exception->getMessage());
         }
 
+        $previousFavicon = $settings->favicon;
+        $faviconFile = $request->file('favicon');
+        $faviconId = $settings->favicon_id;
+
+        try {
+            if ($faviconFile instanceof UploadedFile) {
+                $favicon = $media->store($faviconFile, "{$name} icon", MediaStore::IMAGE_TYPES, self::LOGO_MAX_BYTES);
+                $favicon->forceFill(['is_public' => true])->save();
+                $faviconId = $favicon->id;
+            } elseif ($request->boolean('remove_favicon')) {
+                $faviconId = null;
+            }
+        } catch (UserFacingException $exception) {
+            return $this->refused($exception->getMessage());
+        }
+
         $previousLetterheadLogo = $settings->letterheadLogo;
         $letterheadFile = $request->file('letterhead_logo');
         $letterheadLogoId = $settings->letterhead_logo_id;
@@ -114,10 +130,15 @@ class SiteSettingsController extends Controller
             'default_theme' => ThemeMode::tryFrom((string) $request->input('default_theme')) ?? ThemeMode::System,
             'palette' => $palette,
             'logo_id' => $logoId,
+            'favicon_id' => $faviconId,
         ])->save();
 
         if ($previousLogo instanceof Media && $previousLogo->id !== $logoId) {
             $media->delete($previousLogo);
+        }
+
+        if ($previousFavicon instanceof Media && $previousFavicon->id !== $faviconId) {
+            $media->delete($previousFavicon);
         }
 
         if ($previousLetterheadLogo instanceof Media && $previousLetterheadLogo->id !== $letterheadLogoId) {

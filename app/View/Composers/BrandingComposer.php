@@ -27,6 +27,7 @@ class BrandingComposer
             'company' => $settings->company_name,
             'tagline' => $settings->tagline,
             'logoId' => $settings->logo_id,
+            'faviconId' => $settings->favicon_id,
             'palette' => $palette,
             'onPrimary' => Colors::readableOn($palette['primary']),
             'explicitTheme' => $this->explicitTheme($settings),

@@ -316,3 +316,35 @@ it('saves the printed letterhead and replaces its logo', function () {
 
     $this->get('/settings')->assertOk()->assertSee('Printed letterhead');
 });
+
+it('saves a square icon for the browser tab and the collapsed sidebar, apart from the logo', function () {
+    $this->put('/settings', brandingForm([
+        'logo' => UploadedFile::fake()->image('logo.png', 500, 100),
+        'favicon' => UploadedFile::fake()->image('icon.png', 64, 64),
+    ]))->assertSessionHasNoErrors();
+
+    $settings = SiteSetting::current();
+    $first = $settings->favicon_id;
+
+    expect($first)->not->toBeNull()
+        ->and($first)->not->toBe($settings->logo_id)
+        ->and(Media::query()->find($first)->is_public)->toBeTrue();
+
+    $this->get('/')->assertOk()
+        ->assertSee('<link rel="icon" href="'.url("/files/{$first}").'"', false)
+        ->assertSee('src="'.url("/files/{$first}").'" alt="" class="sidebar-mark sidebar-logo-mark', false);
+
+    $this->put('/settings', brandingForm(['favicon' => UploadedFile::fake()->image('new.png', 64, 64)]))->assertSessionHasNoErrors();
+    expect(Media::query()->find($first))->toBeNull();
+
+    $this->put('/settings', brandingForm(['remove_favicon' => '1']))->assertSessionHasNoErrors();
+    expect(SiteSetting::current()->favicon_id)->toBeNull()
+        ->and(SiteSetting::current()->logo_id)->not->toBeNull();
+
+    $this->get('/')->assertSee('<link rel="icon" href="'.url('/files/'.SiteSetting::current()->logo_id).'"', false);
+});
+
+it('shows the settings headings with a plain ampersand', function () {
+    $this->get('/settings')->assertOk()->assertSee('Branding &amp; theme', false)->assertDontSee('&amp;amp;', false)->assertSee('Square icon (favicon)');
+    $this->get('/settings/notifications')->assertOk()->assertDontSee('&amp;amp;', false);
+});
