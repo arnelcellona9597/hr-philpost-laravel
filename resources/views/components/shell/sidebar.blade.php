@@ -5,16 +5,23 @@
     <div class="sidebar-brand flex shrink-0 items-center gap-3 border-b border-line px-4" style="height: var(--topbar-h)">
         <a href="{{ url('/') }}" class="flex min-w-0 flex-1 items-center gap-3 rounded-lg" data-tip="{{ $company }}">
             @if ($logoId)
-                <img src="{{ url("/files/{$logoId}") }}" alt="" class="size-9 shrink-0 rounded-lg object-contain" />
+                {{-- A logo is usually wide: shown whole on a light plate. Collapsed, its left end stands in as a mark. --}}
+                <span class="sidebar-logo flex min-w-0 items-center">
+                    <span class="inline-flex max-w-full rounded-lg bg-white px-2.5 py-1.5 shadow-elev-1 ring-1 ring-line">
+                        <img src="{{ url("/files/{$logoId}") }}" alt="" class="sidebar-logo-wide h-8 w-auto max-w-full object-contain" />
+                    </span>
+                    <span class="sr-only">{{ $company }} · Human Resource Management</span>
+                </span>
+                <img src="{{ url("/files/{$logoId}") }}" alt="" class="sidebar-mark sidebar-logo-mark size-9 shrink-0 rounded-lg bg-white object-cover object-left ring-1 ring-line" />
             @else
-                <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-bold tracking-tight text-on-primary shadow-elev-1">
+                <span class="sidebar-mark flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-bold tracking-tight text-on-primary shadow-elev-1">
                     {{ mb_strtoupper(mb_substr($company, 0, 2)) }}
                 </span>
+                <span class="sidebar-label min-w-0">
+                    <span class="block truncate text-sm font-semibold leading-tight">{{ $company }}</span>
+                    <span class="block truncate text-xs text-muted">Human Resource Management</span>
+                </span>
             @endif
-            <span class="sidebar-label min-w-0">
-                <span class="block truncate text-sm font-semibold leading-tight">{{ $company }}</span>
-                <span class="block truncate text-xs text-muted">Human Resource Management</span>
-            </span>
         </a>
         <button type="button" class="btn-icon shrink-0 lg:hidden" data-sidebar-close aria-label="Close menu">
             <x-icon name="x" class="size-5" />

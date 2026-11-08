@@ -384,6 +384,12 @@
   #shell[data-sidebar='collapsed'] .sidebar-brand > a {
     flex: none;
   }
+  #shell[data-sidebar='collapsed'] .sidebar-logo {
+    display: none;
+  }
+  #shell[data-sidebar='collapsed'] .sidebar-logo-mark {
+    display: block;
+  }
   #shell[data-sidebar='collapsed'] .sidebar-heading {
     height: 1px;
     margin-inline: 0.75rem;
@@ -466,7 +472,14 @@
 #shell[data-header='compact'] .sidebar-brand .sidebar-label > :last-child {
   display: none;
 }
-#shell[data-header='compact'] .sidebar-brand > a > :first-child {
+/* The wide logo is only for the expanded sidebar; collapsed, its mark is shown instead. */
+.sidebar-logo-mark {
+  display: none;
+}
+#shell[data-header='compact'] .sidebar-logo-wide {
+  height: 1.5rem;
+}
+#shell[data-header='compact'] .sidebar-brand .sidebar-mark {
   width: 1.75rem;
   height: 1.75rem;
   font-size: 0.6875rem;
