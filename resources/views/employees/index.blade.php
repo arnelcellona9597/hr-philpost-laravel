@@ -85,13 +85,26 @@
                     </fieldset>
                 @endforeach
                 <div>
-                    <label class="label" for="branch">Station / branch</label>
-                    <select class="input" id="branch" name="branch[]" multiple size="4">
+                    <label class="label" for="branch">Branch</label>
+                    <select class="input" id="branch" name="branch[]" multiple size="4" data-branch-filter>
                         @foreach ($branches as $branch)
                             <option value="{{ $branch->id }}" @selected(in_array($branch->id, $search->branch, true))>{{ $branch->name }}</option>
                         @endforeach
                     </select>
                     <p class="field-help">Ctrl/⌘-click to pick several.</p>
+                </div>
+                <div>
+                    <label class="label" for="unit">Division / Unit</label>
+                    <select class="input" id="unit" name="unit[]" multiple size="4" data-unit-filter>
+                        @foreach ($units as $branchName => $branchUnits)
+                            <optgroup label="{{ $branchName }}" data-branch="{{ $branchUnits->first()->branch_id }}">
+                                @foreach ($branchUnits as $unit)
+                                    <option value="{{ $unit->id }}" @selected(in_array($unit->id, $search->unit, true))>{{ $unit->name }}</option>
+                                @endforeach
+                            </optgroup>
+                        @endforeach
+                    </select>
+                    <p class="field-help">{{ $units->isEmpty() ? 'No units yet. Add them under Branches › Units.' : 'Only the chosen branches\' units are listed. Ctrl/⌘-click to pick several.' }}</p>
                 </div>
                 <div>
                     <label class="label" for="region">Region</label>

@@ -45,6 +45,9 @@ class EmployeeSearch
     /** @var list<int> */
     public array $branch;
 
+    /** @var list<int> */
+    public array $unit;
+
     /** @var list<string> */
     public array $gender;
 
@@ -89,6 +92,7 @@ class EmployeeSearch
         $this->bloodType = self::choices($request, 'bloodType', BloodType::class);
         $this->education = self::choices($request, 'education', EducationalAttainment::class);
         $this->branch = array_values(array_map(intval(...), array_filter(Arr::wrap($request->query('branch')), fn (mixed $id): bool => is_string($id) && ctype_digit($id) && $id !== '0')));
+        $this->unit = array_values(array_map(intval(...), array_filter(Arr::wrap($request->query('unit')), fn (mixed $id): bool => is_string($id) && ctype_digit($id) && $id !== '0')));
         $this->position = Str::limit(trim((string) $request->query('position')), 100, '');
         $this->hiredFrom = self::date($request, 'hiredFrom');
         $this->hiredTo = self::date($request, 'hiredTo');
@@ -127,6 +131,7 @@ class EmployeeSearch
             'employment_status' => $this->status,
             'classification' => $this->classification,
             'station_id' => $this->branch,
+            'unit_id' => $this->unit,
             'gender' => $this->gender,
             'region' => $this->region,
             'civil_status' => $this->civilStatus,
@@ -160,7 +165,7 @@ class EmployeeSearch
      */
     public function activeFilterCount(): int
     {
-        $lists = [$this->status, $this->classification, $this->branch, $this->gender, $this->region, $this->civilStatus, $this->bloodType, $this->education];
+        $lists = [$this->status, $this->classification, $this->branch, $this->unit, $this->gender, $this->region, $this->civilStatus, $this->bloodType, $this->education];
         $singles = [$this->position ?: null, $this->hiredFrom, $this->hiredTo, $this->ageMin, $this->ageMax, $this->losMin, $this->losMax];
 
         return array_sum(array_map(count(...), $lists)) + count(array_filter($singles, fn (mixed $value): bool => $value !== null));

@@ -4,6 +4,8 @@ use App\Models\Branch;
 use App\Models\BranchUnit;
 use App\Models\Employee;
 use App\Models\User;
+use App\Support\EmployeeSearch;
+use Illuminate\Http\Request;
 
 beforeEach(fn () => signIn(User::factory()->create()));
 
@@ -114,4 +116,39 @@ it('searches employees by unit and offers the unit as a column', function () {
 
     $this->get('/employees?q=Parcel')->assertOk()->assertSee('Insideunit')->assertDontSee('Outsideunit');
     $this->get('/employees?cols[]=unit')->assertOk()->assertSee('Parcel Unit');
+});
+
+it('filters the employee list by Division / Unit', function () {
+    $branch = Branch::factory()->create(['name' => 'Mintal Post Office']);
+    $records = BranchUnit::factory()->create(['branch_id' => $branch->id, 'name' => 'Records Unit']);
+    $parcel = BranchUnit::factory()->create(['branch_id' => $branch->id, 'name' => 'Parcel Unit']);
+    Employee::factory()->create(['unit_id' => $records->id, 'last_name' => 'Inrecords']);
+    Employee::factory()->create(['unit_id' => $parcel->id, 'last_name' => 'Inparcel']);
+    Employee::factory()->create(['last_name' => 'Nounit']);
+
+    $this->get("/employees?unit[]={$records->id}")->assertOk()->assertSee('Inrecords')->assertDontSee('Inparcel')->assertDontSee('Nounit');
+    $this->get("/employees?unit[]={$records->id}&unit[]={$parcel->id}")->assertOk()->assertSee('Inrecords')->assertSee('Inparcel')->assertDontSee('Nounit');
+    $this->get("/employees?branch[]={$branch->id}&unit[]={$parcel->id}")->assertOk()->assertSee('Inparcel')->assertDontSee('Inrecords');
+});
+
+it('offers the Division / Unit filter grouped by branch and counts it as a filter', function () {
+    $branch = Branch::factory()->create(['name' => 'Mintal Post Office']);
+    $unit = BranchUnit::factory()->create(['branch_id' => $branch->id, 'name' => 'Records Unit']);
+    BranchUnit::factory()->unplaced()->create(['name' => 'Waiting Unit']);
+    Employee::factory()->create(['unit_id' => $unit->id]);
+
+    $this->get('/employees')->assertOk()
+        ->assertSee('Division / Unit')
+        ->assertSee('<optgroup label="Mintal Post Office" data-branch="'.$branch->id.'">', false)
+        ->assertSee('Not placed under a branch yet')
+        ->assertSee('Waiting Unit');
+
+    expect((new EmployeeSearch(Request::create('/employees', 'GET', ['unit' => [(string) $unit->id]])))->activeFilterCount())->toBe(1);
+});
+
+it('keeps the unit filter in the employee export and print links', function () {
+    $unit = BranchUnit::factory()->create(['name' => 'Records Unit']);
+    Employee::factory()->create(['unit_id' => $unit->id]);
+
+    $this->get("/employees?unit[]={$unit->id}")->assertOk()->assertSee('unit%5B0%5D='.$unit->id, false);
 });
