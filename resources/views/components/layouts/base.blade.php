@@ -8,8 +8,8 @@
         <meta name="robots" content="noindex, nofollow" />
         <meta name="csrf-token" content="{{ csrf_token() }}" />
         <title>{{ $title }} · {{ $company }}</title>
-        @if ($logoId)
-            <link rel="icon" href="{{ url("/files/{$logoId}") }}" />
+        @if ($faviconId ?? $logoId)
+            <link rel="icon" href="{{ url('/files/'.($faviconId ?? $logoId)) }}" />
         @else
             <link rel="icon" href="data:," />
         @endif

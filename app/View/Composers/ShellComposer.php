@@ -31,6 +31,7 @@ class ShellComposer
             'user' => $user,
             'company' => $settings->company_name,
             'logoId' => $settings->logo_id,
+            'faviconId' => $settings->favicon_id,
             'mailWarning' => $this->mailWarning($user),
             'sessionExpiresAt' => $this->sessionExpiresAt(),
             'path' => '/'.ltrim($this->request->path(), '/'),
