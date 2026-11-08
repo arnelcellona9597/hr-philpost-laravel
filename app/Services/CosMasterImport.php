@@ -91,6 +91,37 @@ class CosMasterImport
     }
 
     /**
+     * Give people the Employee IDs HR has decided on, overriding what the file says.
+     *
+     * @param  list<Row>  $rows
+     * @param  array<string, string>  $corrections  "LAST NAME, FIRST NAME" => the new Employee ID
+     * @return list<Row>
+     *
+     * @throws RuntimeException when a name matches no row or more than one, or an ID is used by someone else in the file
+     */
+    public function correctIds(array $rows, array $corrections): array
+    {
+        foreach ($corrections as $name => $newId) {
+            [$last, $first] = array_pad(array_map('trim', explode(',', $name, 2)), 2, '');
+            $found = array_keys(array_filter($rows, fn (array $row): bool => mb_strtolower($row['last_name']) === mb_strtolower($last) && str_starts_with(mb_strtolower($row['first_name']), mb_strtolower($first))));
+
+            if (count($found) !== 1) {
+                throw new RuntimeException(count($found) === 0 ? "No person in the file is named \"{$name}\"." : "More than one person in the file matches \"{$name}\"; use their full first name.");
+            }
+
+            foreach ($rows as $index => $row) {
+                if ($index !== $found[0] && mb_strtolower((string) ($row['data']['employee_id'] ?? '')) === mb_strtolower($newId)) {
+                    throw new RuntimeException("Employee ID {$newId} is already used by {$row['last_name']}, {$row['first_name']} in the file.");
+                }
+            }
+
+            $rows[$found[0]]['data']['employee_id'] = $newId;
+        }
+
+        return $rows;
+    }
+
+    /**
      * What applying the rows would do, without changing anything.
      *
      * @param  list<Row>  $rows
@@ -153,8 +184,16 @@ class CosMasterImport
                 }
             }
 
+            $setId = false;
+
             if ($match !== null) {
                 $claimed[$match->id] = true;
+
+                // A temporary ID gives way to the real one once it is known and free.
+                if (str_starts_with(mb_strtoupper($match->employee_id), 'TEMP-') && $employeeId !== null && ! isset($usedIds[mb_strtolower($employeeId)])) {
+                    $setId = true;
+                    $usedIds[mb_strtolower($employeeId)] = true;
+                }
             }
 
             if ($match === null && $problem === null) {
@@ -198,7 +237,7 @@ class CosMasterImport
 
             $action = $problem !== null ? 'skip' : ($match !== null ? 'update' : 'new');
             $counts[$action]++;
-            $items[] = ['row' => $row, 'action' => $action, 'employee_id' => $match?->id, 'how' => $how, 'problem' => $problem, 'branch' => $branchName, 'unit_key' => $unitKey, 'generated_id' => $generated];
+            $items[] = ['row' => $row, 'action' => $action, 'employee_id' => $match?->id, 'how' => $how, 'problem' => $problem, 'branch' => $branchName, 'unit_key' => $unitKey, 'generated_id' => $generated, 'set_id' => $setId];
         }
 
         $missing = $existing->reject(fn (Employee $employee): bool => isset($claimed[$employee->id]))->map(fn (Employee $employee): string => $employee->employee_id)->values()->all();
@@ -290,7 +329,10 @@ class CosMasterImport
                         $result['created']++;
                     } else {
                         $employee = Employee::query()->findOrFail($item['employee_id']);
-                        unset($data['employee_id']);
+                        if (! $item['set_id']) {
+                            unset($data['employee_id']);
+                        }
+
                         $employee->fill($data)->save();
                         $result['updated']++;
                     }
