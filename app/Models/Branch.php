@@ -37,6 +37,14 @@ class Branch extends Model
     }
 
     /**
+     * @return HasMany<BranchUnit, $this>
+     */
+    public function units(): HasMany
+    {
+        return $this->hasMany(BranchUnit::class);
+    }
+
+    /**
      * @return HasMany<Application, $this>
      */
     public function applications(): HasMany
@@ -51,9 +59,14 @@ class Branch extends Model
     {
         $employees = $this->employees()->count();
         $applications = $this->applications()->count();
+        $units = $this->units()->count();
 
-        return $employees + $applications > 0
-            ? "This branch still has {$employees} employee(s) and {$applications} application(s). Reassign them first."
-            : null;
+        if ($employees + $applications + $units === 0) {
+            return null;
+        }
+
+        return $units > 0
+            ? "This branch still has {$employees} employee(s), {$applications} application(s) and {$units} unit(s). Reassign or remove them first."
+            : "This branch still has {$employees} employee(s) and {$applications} application(s). Reassign them first.";
     }
 }

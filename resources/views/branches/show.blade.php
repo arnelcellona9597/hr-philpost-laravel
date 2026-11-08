@@ -29,6 +29,22 @@
         <p class="card mt-4 p-4 text-sm text-fg-2">{{ $branch->notes }}</p>
     @endif
 
+    <section class="card mt-4 p-4">
+        <div class="mb-2 flex items-center justify-between gap-3">
+            <h2 class="text-sm font-semibold">Stations, divisions and units</h2>
+            <a class="btn-ghost btn-sm" href="{{ route('branches.units.index', ['branch' => $branch->id]) }}">Manage units</a>
+        </div>
+        @if ($branch->units->isEmpty())
+            <p class="text-sm text-muted">No units under this branch yet.</p>
+        @else
+            <ul class="grid gap-1 text-sm sm:grid-cols-2">
+                @foreach ($branch->units as $unit)
+                    <li class="flex justify-between gap-3 rounded-lg px-2 py-1 hover:bg-surface-2"><span>{{ $unit->name }}</span><span class="text-muted tabular">{{ number_format($unit->employees_count) }}</span></li>
+                @endforeach
+            </ul>
+        @endif
+    </section>
+
     <div class="card mt-6 overflow-hidden">
         <header class="p-4"><h2 class="text-sm font-semibold">Assigned employees ({{ $employees->count() }})</h2></header>
         @if ($employees->isEmpty())

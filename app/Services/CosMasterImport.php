@@ -10,6 +10,7 @@ use App\Enums\EmploymentStatus;
 use App\Enums\Gender;
 use App\Enums\Region;
 use App\Models\Branch;
+use App\Models\BranchUnit;
 use App\Models\Employee;
 use App\Models\EmploymentPeriod;
 use App\Support\GovId;
@@ -27,8 +28,9 @@ use Throwable;
  *
  * People are matched by Employee ID, else by name and birth date. A value from the file replaces the stored
  * one only when it is present and valid, so a blank or unreadable cell never erases anything. Nobody is
- * deleted. The file's Station/Division/Unit text goes into the employee's Station / Division / Unit field; branches
- * are never created or changed, and a new person gets a branch only when an existing one matches the text. `plan()` changes nothing; `apply()` saves a plan in one transaction.
+ * deleted. The file's Station/Division/Unit text becomes the employee's unit: an existing unit with that name is used,
+ * else a new unit is made with no branch yet, for HR to place. Branches are never created or changed, and a new
+ * person gets a branch only when an existing one matches the text. `plan()` changes nothing; `apply()` saves a plan in one transaction.
  *
  * @phpstan-type Row array{line: int, file_status: ?string, last_name: string, first_name: string, middle_name: ?string, data: array<string, mixed>, periods: list<array{from: string, to: ?string}>, warnings: list<string>, station: string, status_hint: ?EmploymentStatus}
  */
@@ -90,7 +92,7 @@ class CosMasterImport
      * What applying the rows would do, without changing anything.
      *
      * @param  list<Row>  $rows
-     * @return array{items: list<array<string, mixed>>, branchesForNew: array{found: int, none: int}, counts: array<string, int>, missing: list<string>}
+     * @return array{items: list<array<string, mixed>>, branchesForNew: array{found: int, none: int}, units: array{existing: int, new: int}, counts: array<string, int>, missing: list<string>}
      */
     public function plan(array $rows): array
     {
@@ -104,6 +106,8 @@ class CosMasterImport
         $temp = 0;
         $items = [];
         $branchesForNew = ['found' => 0, 'none' => 0];
+        $unitsByName = BranchUnit::query()->get(['id', 'name', 'branch_id'])->groupBy(fn (BranchUnit $unit): string => mb_strtolower($unit->name));
+        $unitNames = ['existing' => [], 'new' => []];
         $counts = ['update' => 0, 'new' => 0, 'skip' => 0];
 
         foreach ($rows as $row) {
@@ -176,28 +180,36 @@ class CosMasterImport
                 $usedIds[mb_strtolower($generated)] = true;
             }
 
+            $unitKey = $row['station'] === '' || $problem !== null ? null : mb_strtolower($row['station']);
+
+            if ($unitKey !== null) {
+                $unitNames[$unitsByName->has($unitKey) ? 'existing' : 'new'][$unitKey] = true;
+            }
+
             $action = $problem !== null ? 'skip' : ($match !== null ? 'update' : 'new');
             $counts[$action]++;
-            $items[] = ['row' => $row, 'action' => $action, 'employee_id' => $match?->id, 'how' => $how, 'problem' => $problem, 'branch_id' => $branchId, 'generated_id' => $generated];
+            $items[] = ['row' => $row, 'action' => $action, 'employee_id' => $match?->id, 'how' => $how, 'problem' => $problem, 'branch_id' => $branchId, 'unit_key' => $unitKey, 'generated_id' => $generated];
         }
 
         $missing = $existing->reject(fn (Employee $employee): bool => isset($claimed[$employee->id]))->map(fn (Employee $employee): string => $employee->employee_id)->values()->all();
 
-        return ['items' => $items, 'branchesForNew' => $branchesForNew, 'counts' => $counts, 'missing' => $missing];
+        return ['items' => $items, 'branchesForNew' => $branchesForNew, 'units' => ['existing' => count($unitNames['existing']), 'new' => count($unitNames['new'])], 'counts' => $counts, 'missing' => $missing];
     }
 
     /**
      * Save a plan: new branches, new and updated employees and their employment periods, in one transaction.
      *
-     * @param  array{items: list<array<string, mixed>>, branchesForNew: array{found: int, none: int}, counts: array<string, int>, missing: list<string>}  $plan
-     * @return array{created: int, updated: int, periods: int}
+     * @param  array{items: list<array<string, mixed>>, branchesForNew: array{found: int, none: int}, units: array{existing: int, new: int}, counts: array<string, int>, missing: list<string>}  $plan
+     * @return array{created: int, updated: int, periods: int, units: int}
      */
     public function apply(array $plan): array
     {
-        $result = ['created' => 0, 'updated' => 0, 'periods' => 0];
+        $result = ['created' => 0, 'updated' => 0, 'periods' => 0, 'units' => 0];
 
         DB::transaction(function () use ($plan, &$result): void {
             (function () use ($plan, &$result): void {
+                $units = BranchUnit::query()->get(['id', 'name', 'branch_id'])->groupBy(fn (BranchUnit $unit): string => mb_strtolower($unit->name))->map(fn ($group): int => $group->first()->id)->all();
+
                 foreach ($plan['items'] as $item) {
                     if ($item['action'] === 'skip') {
                         continue;
@@ -216,6 +228,15 @@ class CosMasterImport
                     }
 
                     $data = array_filter($data, fn (mixed $value): bool => $value !== null && $value !== '');
+
+                    if ($item['unit_key'] !== null) {
+                        if (! isset($units[$item['unit_key']])) {
+                            $units[$item['unit_key']] = BranchUnit::query()->create(['name' => $row['station']])->id;
+                            $result['units']++;
+                        }
+
+                        $data['unit_id'] = $units[$item['unit_key']];
+                    }
 
                     if ($item['action'] === 'new' && $item['branch_id'] !== null) {
                         $data['station_id'] = $item['branch_id'];
@@ -361,7 +382,6 @@ class CosMasterImport
         $data['educational_attainment'] = $this->education($text('educational_attainment'), $warnings);
         $data['region'] = $this->region($text('region'), $warnings);
         $data['email'] = $this->email($text('email'), $warnings);
-        $data['station_unit'] = $text('station');
         $data['bank_name'] = $data['bank_account_number'] !== null ? 'Land Bank of the Philippines' : null;
 
         foreach (['sss', 'pagibig', 'tin', 'philhealth'] as $kind) {

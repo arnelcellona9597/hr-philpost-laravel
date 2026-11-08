@@ -23,7 +23,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['employee_id', 'profile_picture_id', 'last_name', 'first_name', 'middle_name', 'extension', 'gender', 'date_of_birth', 'civil_status', 'religion', 'blood_type', 'professional_eligibility', 'contact_number', 'email', 'address', 'educational_attainment', 'courses', 'year_level_earned_units', 'academic_honors', 'classification', 'employment_status', 'station_id', 'station_unit', 'region', 'position', 'nature_of_work', 'driver_license_number', 'date_hired', 'last_day_of_service', 'remarks', 'sss', 'pagibig', 'tin', 'philhealth', 'bank_name', 'bank_branch', 'bank_account_name', 'bank_account_number', 'emergency_contact_name', 'emergency_relationship', 'emergency_contact_number', 'emergency_address'])]
+#[Fillable(['employee_id', 'profile_picture_id', 'last_name', 'first_name', 'middle_name', 'extension', 'gender', 'date_of_birth', 'civil_status', 'religion', 'blood_type', 'professional_eligibility', 'contact_number', 'email', 'address', 'educational_attainment', 'courses', 'year_level_earned_units', 'academic_honors', 'classification', 'employment_status', 'station_id', 'unit_id', 'region', 'position', 'nature_of_work', 'driver_license_number', 'date_hired', 'last_day_of_service', 'remarks', 'sss', 'pagibig', 'tin', 'philhealth', 'bank_name', 'bank_branch', 'bank_account_name', 'bank_account_number', 'emergency_contact_name', 'emergency_relationship', 'emergency_contact_number', 'emergency_address'])]
 class Employee extends Model
 {
     /** @use HasFactory<EmployeeFactory> */
@@ -41,6 +41,15 @@ class Employee extends Model
     {
         static::saving(function (Employee $employee): void {
             $employee->full_name = Names::lastFirst($employee->last_name, $employee->first_name, $employee->middle_name, $employee->extension);
+
+            // A unit placed under a branch decides the employee's branch, so the two cannot disagree.
+            if ($employee->unit_id !== null && ($employee->isDirty(['unit_id', 'station_id']) || ! $employee->exists)) {
+                $branchId = BranchUnit::query()->whereKey($employee->unit_id)->value('branch_id');
+
+                if ($branchId !== null) {
+                    $employee->station_id = $branchId;
+                }
+            }
         });
 
         // The latest employment period follows whatever is saved on the record.
@@ -148,6 +157,14 @@ class Employee extends Model
     }
 
     /**
+     * @return BelongsTo<BranchUnit, $this>
+     */
+    public function unit(): BelongsTo
+    {
+        return $this->belongsTo(BranchUnit::class, 'unit_id');
+    }
+
+    /**
      * @return BelongsTo<Media, $this>
      */
     public function profilePicture(): BelongsTo
@@ -250,7 +267,11 @@ class Employee extends Model
      */
     public function fieldText(array $field): string
     {
-        $value = $field['kind'] === 'branch' ? $this->station?->name : $this->getAttribute($field['name']);
+        $value = match ($field['kind']) {
+            'branch' => $this->station?->name,
+            'unit' => $this->unit?->name,
+            default => $this->getAttribute($field['name']),
+        };
 
         return match (true) {
             $value === null || $value === '' => '—',
