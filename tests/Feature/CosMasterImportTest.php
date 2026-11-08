@@ -7,7 +7,7 @@ use App\Services\CosMasterImport;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
-const MASTER_HEADERS = [null, 'Photo Link', 'LBP ACCOUNT', 'Last Name', 'First Name', 'Middle Name', 'Extn.', null, 'Gender', 'Date of Birth', 'Age', 'Civil Status', 'Religion', 'Blood Type', 'Professional Eligibility / License', 'Contact Number', null, 'Address', 'Email Address', 'Educational Attainment', 'Courses', '  Year Level/ Earned Units', 'Academic Honors Received  ', 'Employee ID', 'Station/Division/Unit', 'Region', 'Position/Designation', 'Nature of Work', 'Driver License  Number  ', 'Date Hired', 'End1', 'Rehire', 'End2', 'Rehire2', 'End3', 'Rehire3', 'Length in Service', 'SSS Number ', 'Pag-IBIG Number ', 'TIN Number ', 'PhilHealth Number  ', 'Emergency Contact Person ', 'Relationship', 'Contact Number ', 'Address', 'REMARK'];
+const MASTER_HEADERS = [null, 'STATUS', 'LBP ACCOUNT', 'Last Name', 'First Name', 'Middle Name', 'Extn.', null, 'Gender', 'Date of Birth', 'Age', 'Civil Status', 'Religion', 'Blood Type', 'Professional Eligibility / License', 'Contact Number', null, 'Address', 'Email Address', 'Educational Attainment', 'Courses', '  Year Level/ Earned Units', 'Academic Honors Received  ', 'Employee ID', 'Station/Division/Unit', 'Region', 'Position/Designation', 'Nature of Work', 'Driver License  Number  ', 'Date Hired', 'End1', 'Rehire', 'End2', 'Rehire2', 'End3', 'Rehire3', 'Length in Service', 'SSS Number ', 'Pag-IBIG Number ', 'TIN Number ', 'PhilHealth Number  ', 'Emergency Contact Person ', 'Relationship', 'Contact Number ', 'Address', 'REMARK'];
 
 /**
  * A "COS Master File" workbook with fictional people. Each row is keyed by header text.
@@ -215,4 +215,28 @@ it('gives a new person a branch only when an existing branch matches, and never 
         ->and($b->station_id)->toBeNull()->and($b->station_unit)->toBe('Somewhere New Post Office')
         ->and(Branch::query()->count())->toBe(1)
         ->and($plan['branchesForNew'])->toBe(['found' => 1, 'none' => 1]);
+});
+
+it('loads only the people marked Active when asked', function () {
+    $file = masterWorkbook([
+        person(['STATUS' => 'Active', 'Employee ID' => '20-050', 'Last Name' => 'A']),
+        person(['STATUS' => 'Resigned', 'Employee ID' => '20-051', 'Last Name' => 'B']),
+        person(['STATUS' => 'Promoted', 'Employee ID' => '20-052', 'Last Name' => 'C']),
+        person(['STATUS' => 'active', 'Employee ID' => '20-053', 'Last Name' => 'D', 'End1' => '2024-01-01']),
+    ]);
+
+    $this->artisan('hr:import-cos-master', ['file' => $file, '--only-active' => true, '--commit' => true, '--force' => true])
+        ->expectsOutputToContain('2 of 4')
+        ->assertSuccessful();
+
+    expect(Employee::query()->orderBy('employee_id')->pluck('employee_id')->all())->toBe(['20-050', '20-053'])
+        ->and(Employee::query()->where('employee_id', '20-053')->first()->employment_status)->toBe(EmploymentStatus::Active)
+        ->and(Employee::query()->where('employee_id', '20-053')->first()->last_day_of_service)->toBeNull();
+});
+
+it('reads Resigned from the STATUS column when the position does not say', function () {
+    [$import, $plan] = importPlan([person(['STATUS' => 'Resigned', 'Employee ID' => '20-060', 'Date Hired' => '2019-01-01', 'End1' => '2022-05-31'])]);
+    $import->apply($plan);
+
+    expect(Employee::query()->where('employee_id', '20-060')->first()->employment_status)->toBe(EmploymentStatus::Resigned);
 });

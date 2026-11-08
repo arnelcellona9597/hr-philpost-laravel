@@ -9,7 +9,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
 
-#[Signature('hr:import-cos-master {file : The COS Master File workbook (.xlsx)} {--commit : Save the changes. Without it nothing is changed} {--force : With --commit, do not ask first}')]
+#[Signature('hr:import-cos-master {file : The COS Master File workbook (.xlsx)} {--commit : Save the changes. Without it nothing is changed} {--only-active : Load only the people whose STATUS in the file is Active} {--force : With --commit, do not ask first}')]
 #[Description('Load the COS Master File sheet over the employees: update matches, add new people, never delete')]
 class ImportCosMaster extends Command
 {
@@ -29,6 +29,13 @@ class ImportCosMaster extends Command
         try {
             $import = new CosMasterImport;
             $rows = $import->read($path);
+            $total = count($rows);
+
+            if ($this->option('only-active')) {
+                $rows = array_values(array_filter($rows, fn (array $row): bool => mb_strtolower((string) $row['file_status']) === 'active'));
+                $this->line(sprintf('Only people marked Active are loaded: %d of %d. The other %d are left out.', count($rows), $total, $total - count($rows)));
+            }
+
             $plan = $import->plan($rows);
         } catch (RuntimeException $exception) {
             $this->error($exception->getMessage());
