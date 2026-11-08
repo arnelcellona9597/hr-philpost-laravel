@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\ThemeMode;
+use App\Models\Media;
 use App\Models\Notification;
 use App\Models\PayrollPeriod;
 use App\Models\Payslip;
@@ -274,4 +275,15 @@ it('renders a payslip and hides zero rows', function () {
         ->toContain('₱23,749.50')
         ->not->toContain('Overtime')
         ->not->toContain('111-222-333');
+});
+
+it('shows a wide company logo whole in the sidebar, with a square mark for the collapsed sidebar', function () {
+    $logo = Media::factory()->create();
+    SiteSetting::current()->update(['logo_id' => $logo->id, 'company_name' => 'PHLPOST']);
+    signIn(User::factory()->create());
+
+    $this->get('/')->assertOk()
+        ->assertSee('sidebar-logo-wide h-8 w-auto max-w-full object-contain', false)
+        ->assertSee('sidebar-mark sidebar-logo-mark', false)
+        ->assertSee('PHLPOST · Human Resource Management');
 });
