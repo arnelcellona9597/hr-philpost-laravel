@@ -61,13 +61,13 @@ class ImportCosMaster extends Command
 
         $result = $import->apply($plan);
 
-        $this->info(sprintf('Done: %d employees updated, %d added, %d employment periods written, %d units created. No branches were created or changed.', $result['updated'], $result['created'], $result['periods'], $result['units']));
+        $this->info(sprintf('Done: %d employees updated, %d added, %d employment periods written, %d branches and %d units created.', $result['updated'], $result['created'], $result['periods'], $result['branches'], $result['units']));
 
         return self::SUCCESS;
     }
 
     /**
-     * @param  array{items: list<array<string, mixed>>, branchesForNew: array{found: int, none: int}, units: array{existing: int, new: int}, counts: array<string, int>, missing: list<string>}  $plan
+     * @param  array{items: list<array<string, mixed>>, branches: array{existing: int, new: array<string, int>}, units: array{existing: int, new: int}, counts: array<string, int>, missing: list<string>}  $plan
      */
     private function summary(array $plan, int $rows, string $report): void
     {
@@ -82,8 +82,10 @@ class ImportCosMaster extends Command
         $how = collect($plan['items'])->where('action', 'update')->countBy('how')->map(fn (int $count, string $name): array => [$name, $count])->values()->all();
         $this->table(['Matched by', 'People'], $how);
 
-        $this->line(sprintf('Station / Division / Unit: %d units already exist and are reused; %d new units will be created with no branch yet, for you to place on the Units page.', $plan['units']['existing'], $plan['units']['new']));
-        $this->line(sprintf('Branches are not touched; of the new people, %d match an existing branch and %d are left without one.', $plan['branchesForNew']['found'], $plan['branchesForNew']['none']));
+        $new = collect($plan['branches']['new'])->map(fn (int $people, string $name): array => [$name, $people])->values()->all();
+        $this->line(sprintf('Branches: %d already exist and are reused; %d new ones would be created from the Branches column:', $plan['branches']['existing'], count($new)));
+        $this->table(['New branch', 'People'], $new);
+        $this->line(sprintf('Station / Division / Unit: %d units already exist and are reused; %d new units would be created under their branch.', $plan['units']['existing'], $plan['units']['new']));
 
         $warnings = collect($plan['items'])->sum(fn (array $item): int => count($item['row']['warnings']));
         $this->line("{$warnings} warnings (values left unchanged); every one is in the report.");
@@ -99,13 +101,13 @@ class ImportCosMaster extends Command
         File::ensureDirectoryExists($directory, 0700);
         $path = $directory.'/cos-master-report-'.now()->format('Ymd-His').'.csv';
         $handle = fopen($path, 'w');
-        fputcsv($handle, ['Line', 'Name', 'Result', 'Matched by', 'Employee ID given', 'Station / Division / Unit in the file', 'Branch for a new person', 'Why skipped', 'Warnings']);
+        fputcsv($handle, ['Line', 'Name', 'Result', 'Matched by', 'Employee ID given', 'Division/Unit in the file', 'Branch used', 'Why skipped', 'Warnings']);
 
         foreach ($plan['items'] as $item) {
             $row = $item['row'];
             fputcsv($handle, [
                 $row['line'], $row['last_name'].', '.$row['first_name'], $item['action'], $item['how'], $row['data']['employee_id'] ?? ($item['generated_id'] ? "{$item['generated_id']} (new)" : ''),
-                $row['station'], $item['branch_id'] ?? '', $item['problem'], implode(' | ', $row['warnings']),
+                $row['station'], $item['branch'] ?? '', $item['problem'], implode(' | ', $row['warnings']),
             ]);
         }
 

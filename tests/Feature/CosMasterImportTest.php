@@ -8,7 +8,7 @@ use App\Services\CosMasterImport;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
-const MASTER_HEADERS = [null, 'STATUS', 'LBP ACCOUNT', 'Last Name', 'First Name', 'Middle Name', 'Extn.', null, 'Gender', 'Date of Birth', 'Age', 'Civil Status', 'Religion', 'Blood Type', 'Professional Eligibility / License', 'Contact Number', null, 'Address', 'Email Address', 'Educational Attainment', 'Courses', '  Year Level/ Earned Units', 'Academic Honors Received  ', 'Employee ID', 'Station/Division/Unit', 'Region', 'Position/Designation', 'Nature of Work', 'Driver License  Number  ', 'Date Hired', 'End1', 'Rehire', 'End2', 'Rehire2', 'End3', 'Rehire3', 'Length in Service', 'SSS Number ', 'Pag-IBIG Number ', 'TIN Number ', 'PhilHealth Number  ', 'Emergency Contact Person ', 'Relationship', 'Contact Number ', 'Address', 'REMARK'];
+const MASTER_HEADERS = [null, 'STATUS', 'LBP ACCOUNT', 'Last Name', 'First Name', 'Middle Name', 'Extn.', null, 'Gender', 'Date of Birth', 'Age', 'Civil Status', 'Religion', 'Blood Type', 'Professional Eligibility / License', 'Contact Number', null, 'Address', 'Email Address', 'Educational Attainment', 'Courses', '  Year Level/ Earned Units', 'Academic Honors Received  ', 'Employee ID', 'Division/Unit', 'Branches', 'Region', 'Position/Designation', 'Nature of Work', 'Driver License  Number  ', 'Date Hired', 'End1', 'Rehire', 'End2', 'Rehire2', 'End3', 'Rehire3', 'Length in Service', 'SSS Number ', 'Pag-IBIG Number ', 'TIN Number ', 'PhilHealth Number  ', 'Emergency Contact Person ', 'Relationship', 'Contact Number ', 'Address', 'REMARK'];
 
 /**
  * A "COS Master File" workbook with fictional people. Each row is keyed by header text.
@@ -40,7 +40,7 @@ function masterWorkbook(array $people): string
 
 function person(array $overrides = []): array
 {
-    return [...['Last Name' => 'REYES', 'First Name' => 'MARIA', 'Middle Name' => 'LOPEZ', 'Gender' => 'F', 'Date of Birth' => '1990-04-12', 'Employee ID' => '20-001', 'Date Hired' => '2020-02-03', 'Station/Division/Unit' => 'Mintal P.O'], ...$overrides];
+    return [...['Last Name' => 'REYES', 'First Name' => 'MARIA', 'Middle Name' => 'LOPEZ', 'Gender' => 'F', 'Date of Birth' => '1990-04-12', 'Employee ID' => '20-001', 'Date Hired' => '2020-02-03'], ...$overrides];
 }
 
 function importPlan(array $people): array
@@ -186,61 +186,61 @@ it('refuses a workbook without the master sheet', function () {
     $this->artisan('hr:import-cos-master', ['file' => $path])->assertFailed();
 });
 
-it('makes the file\'s Station / Division / Unit text a unit with no branch and leaves branches alone', function () {
+it('sets the branch from the Branches column and puts the Division/Unit under it', function () {
     $branch = Branch::factory()->create(['name' => 'Cotabato City Post Office']);
-    $employee = Employee::factory()->create(['employee_id' => '20-001', 'last_name' => 'Reyes', 'first_name' => 'Maria', 'date_of_birth' => '1990-04-12', 'station_id' => $branch->id]);
-    $branches = Branch::query()->count();
+    $employee = Employee::factory()->create(['employee_id' => '20-001', 'last_name' => 'Reyes', 'first_name' => 'Maria', 'date_of_birth' => '1990-04-12', 'station_id' => null]);
 
-    [$import, $plan] = importPlan([person(['Station/Division/Unit' => 'Datu Odin Sinsuat Maguindanao Del Norte Post Office'])]);
+    [$import, $plan] = importPlan([person(['Branches' => 'Cotabato City Post Office, Maguindanao', 'Division/Unit' => 'Accounting Section, AdFin Division'])]);
     $result = $import->apply($plan);
 
     $employee = $employee->fresh();
-    $unit = $employee->unit;
 
-    expect($result['units'])->toBe(1)
-        ->and($unit->name)->toBe('Datu Odin Sinsuat Maguindanao Del Norte Post Office')
-        ->and($unit->branch_id)->toBeNull()
+    expect($result)->toMatchArray(['units' => 1, 'branches' => 0])
         ->and($employee->station_id)->toBe($branch->id)
-        ->and(Branch::query()->count())->toBe($branches)
+        ->and($employee->unit->name)->toBe('Accounting Section, AdFin Division')
+        ->and($employee->unit->branch_id)->toBe($branch->id)
         ->and($employee->employmentPeriods()->first()->station_id)->toBe($branch->id)
+        ->and($plan['branches'])->toBe(['existing' => 1, 'new' => []])
         ->and($plan['units'])->toBe(['existing' => 0, 'new' => 1]);
 });
 
-it('reuses an existing unit with the same name, and keeps the branch that unit is under', function () {
+it('joins the spellings of one branch, creates the ones that are missing, and reuses existing units', function () {
     $mintal = Branch::factory()->create(['name' => 'Mintal Post Office']);
-    $unit = BranchUnit::factory()->create(['branch_id' => $mintal->id, 'name' => 'Accounting Section']);
+    $unit = BranchUnit::factory()->create(['branch_id' => $mintal->id, 'name' => 'Records Unit']);
 
     [$import, $plan] = importPlan([
-        person(['Employee ID' => '20-070', 'Last Name' => 'A', 'Station/Division/Unit' => 'accounting section']),
-        person(['Employee ID' => '20-071', 'Last Name' => 'B', 'Station/Division/Unit' => 'Accounting Section']),
+        person(['Employee ID' => '20-020', 'Last Name' => 'A', 'Branches' => 'Tandag City Post Office, Surigao del Sur']),
+        person(['Employee ID' => '20-021', 'Last Name' => 'B', 'Branches' => 'Tandag City P.O']),
+        person(['Employee ID' => '20-022', 'Last Name' => 'C', 'Branches' => 'Tandag P.O']),
+        person(['Employee ID' => '20-023', 'Last Name' => 'D', 'Branches' => 'Bunawan']),
+        person(['Employee ID' => '20-024', 'Last Name' => 'E', 'Branches' => 'Mintal P.O', 'Division/Unit' => 'records unit']),
     ]);
     $result = $import->apply($plan);
 
-    $a = Employee::query()->where('employee_id', '20-070')->firstOrFail();
-
-    expect($result['units'])->toBe(0)
-        ->and(BranchUnit::query()->count())->toBe(1)
-        ->and($a->unit_id)->toBe($unit->id)
-        ->and($a->station_id)->toBe($mintal->id)
+    expect($result)->toMatchArray(['branches' => 2, 'units' => 0])
+        ->and(Branch::query()->orderBy('name')->pluck('name')->all())->toBe(['Bunawan Post Office', 'Mintal Post Office', 'Tandag City Post Office'])
+        ->and(Employee::query()->where('employee_id', '20-022')->first()->station->name)->toBe('Tandag City Post Office')
+        ->and(Employee::query()->where('employee_id', '20-024')->first()->unit_id)->toBe($unit->id)
+        ->and($plan['branches']['new'])->toBe(['Tandag City Post Office' => 3, 'Bunawan Post Office' => 1])
         ->and($plan['units'])->toBe(['existing' => 1, 'new' => 0]);
 });
 
-it('gives a new person a branch only when an existing branch matches, and never creates one', function () {
-    $mintal = Branch::factory()->create(['name' => 'Mintal Post Office']);
+it('keeps a unit with no branch when the row has no branch, and places a waiting unit when a branch is given', function () {
+    $waiting = BranchUnit::factory()->unplaced()->create(['name' => 'Waiting Unit']);
 
     [$import, $plan] = importPlan([
-        person(['Employee ID' => '20-040', 'Last Name' => 'A', 'Station/Division/Unit' => 'Mintal P.O']),
-        person(['Employee ID' => '20-041', 'Last Name' => 'B', 'Station/Division/Unit' => 'Somewhere New Post Office']),
+        person(['Employee ID' => '20-030', 'Last Name' => 'A', 'Division/Unit' => 'Loose Unit']),
+        person(['Employee ID' => '20-031', 'Last Name' => 'B', 'Branches' => 'Tagum City Post Office', 'Division/Unit' => 'Waiting Unit']),
     ]);
     $import->apply($plan);
 
-    $a = Employee::query()->where('employee_id', '20-040')->firstOrFail();
-    $b = Employee::query()->where('employee_id', '20-041')->firstOrFail();
+    $a = Employee::query()->where('employee_id', '20-030')->firstOrFail();
+    $b = Employee::query()->where('employee_id', '20-031')->firstOrFail();
 
-    expect($a->station_id)->toBe($mintal->id)->and($a->unit->name)->toBe('Mintal P.O')
-        ->and($b->station_id)->toBeNull()->and($b->unit->name)->toBe('Somewhere New Post Office')
-        ->and(Branch::query()->count())->toBe(1)
-        ->and($plan['branchesForNew'])->toBe(['found' => 1, 'none' => 1]);
+    expect($a->unit->name)->toBe('Loose Unit')->and($a->unit->branch_id)->toBeNull()->and($a->station_id)->toBeNull()
+        ->and($b->unit_id)->toBe($waiting->id)
+        ->and($waiting->fresh()->branch_id)->toBe($b->station_id)
+        ->and($b->station->name)->toBe('Tagum City Post Office');
 });
 
 it('adds both people when two rows in the file share an Employee ID, the second with a temporary ID', function () {
