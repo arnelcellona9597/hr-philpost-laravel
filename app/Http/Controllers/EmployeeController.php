@@ -409,10 +409,10 @@ class EmployeeController extends Controller
     }
 
     /**
-     * @return array{fields: list<array<string, mixed>>, branches: list<array{value: int, label: string}>, positions: list<string>}
+     * @return array{fields: list<array<string, mixed>>, branches: list<array{value: int, label: string}>, units: list<array{value: int, label: string}>, positions: list<string>}
      */
     private function formData(): array
     {
-        return ['fields' => ImportModules::find('employees')['fields'], 'branches' => Choices::branches(), 'positions' => Choices::positions()];
+        return ['fields' => ImportModules::find('employees')['fields'], 'branches' => Choices::branches(), 'units' => Choices::units(), 'positions' => Choices::positions()];
     }
 }

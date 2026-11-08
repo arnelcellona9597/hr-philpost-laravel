@@ -104,7 +104,7 @@ class RecordForm
     public static function column(array $field): string
     {
         return match ($field['kind']) {
-            'branch' => "{$field['name']}_id",
+            'branch', 'unit' => "{$field['name']}_id",
             'employee' => 'employee_id',
             default => $field['name'],
         };
@@ -144,6 +144,7 @@ class RecordForm
                 return HrDate::isValid($raw) ? [$raw, null] : [null, "{$label} must be a valid date"];
 
             case 'branch':
+            case 'unit':
             case 'employee':
                 return ctype_digit($raw) ? [(int) $raw, null] : [null, "Select a valid {$field['kind']}"];
 

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\ImportJobStatus;
 use App\Exceptions\UserFacingException;
 use App\Models\Branch;
+use App\Models\BranchUnit;
 use App\Models\Employee;
 use App\Models\ImportJob;
 use App\Models\User;
@@ -426,6 +427,17 @@ class DataImporter
                     ? ['ref' => ['kind' => 'branch', 'pending' => $key]]
                     : ['error' => "branch \"{$text}\" does not exist — add it on the Branches sheet or the Branches page first"];
 
+            case 'unit':
+                $ids = $lookups['unitsByName'][$key] ?? [];
+
+                if (count($ids) === 1) {
+                    return ['ref' => ['kind' => 'unit', 'id' => $ids[0]]];
+                }
+
+                return ['error' => $ids === []
+                    ? "unit \"{$text}\" does not exist — add it on the Units page (under Branches) first"
+                    : "more than one branch has a unit called \"{$text}\" — give the unit a name that is different"];
+
             case 'employee':
                 $id = $lookups['employeeById'][$key] ?? null;
 
@@ -610,6 +622,7 @@ class DataImporter
         $lookups = [
             'branchByName' => $branches->mapWithKeys(fn (Branch $branch): array => [mb_strtolower($branch->name) => $branch->id])->all(),
             'branchByCode' => $branches->filter(fn (Branch $branch): bool => filled($branch->code))->mapWithKeys(fn (Branch $branch): array => [mb_strtolower($branch->code) => $branch->id])->all(),
+            'unitsByName' => BranchUnit::query()->get(['id', 'name'])->groupBy(fn (BranchUnit $unit): string => mb_strtolower($unit->name))->map(fn ($group): array => $group->pluck('id')->all())->all(),
             'employeeById' => $employees->mapWithKeys(fn (Employee $employee): array => [mb_strtolower($employee->employee_id) => $employee->id])->all(),
             'employeeCodes' => $employees->pluck('employee_id', 'id')->all(),
             'pendingBranches' => [],

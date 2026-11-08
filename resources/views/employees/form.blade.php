@@ -12,7 +12,7 @@
     <x-module-form
         :fields="$fields"
         :values="$values"
-        :choices="['station' => $branches]"
+        :choices="['station' => $branches, 'unit' => $units]"
         :suggestions="['position' => $positions]"
         :submit-label="$employee ? 'Save changes' : 'Add employee'"
         :cancel-href="$employee ? route('employees.show', $employee) : route('employees.index')"

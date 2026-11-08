@@ -63,6 +63,7 @@ class BranchController extends Controller
     {
         Gate::authorize('view', $branch);
 
+        $branch->load(['units' => fn ($query) => $query->withCount('employees')->orderBy('name')]);
         $employees = $branch->employees()->orderBy('employment_status')->orderBy('full_name')->limit(2000)->get();
         $active = $employees->where('employment_status', EmploymentStatus::Active);
 

@@ -6,6 +6,7 @@ use App\Enums\LeaveStatus;
 use App\Models\Application;
 use App\Models\AuditLog;
 use App\Models\Branch;
+use App\Models\BranchUnit;
 use App\Models\Employee;
 use App\Models\Holiday;
 use App\Models\ImportJob;
@@ -339,4 +340,27 @@ it('imports and exports bank details, keeping leading zeros', function () {
     $column = array_search('Bank Account Number', $headers, true) + 1;
 
     expect($sheet->getCell([$column, 2])->getValue())->toBe('0012345678');
+});
+
+it('sets an employee\'s unit, and so their branch, from the Station / Division / Unit column', function () {
+    $branch = Branch::factory()->create(['name' => 'Mintal Post Office']);
+    BranchUnit::factory()->create(['branch_id' => $branch->id, 'name' => 'Accounting Section']);
+
+    $check = importFile(dataWorkbook(['Employees' => [[...EMPLOYEE_HEADERS, 'Station / Division / Unit'], [...employeeRow(), 'accounting section']]]))->assertOk()->assertSee('All rows passed every check');
+    $this->post('/data/import/commit', ['token' => $check->viewData('token')])->assertRedirect('/data');
+
+    $employee = Employee::query()->sole();
+
+    expect($employee->unit->name)->toBe('Accounting Section')->and($employee->station_id)->toBe($branch->id);
+});
+
+it('refuses a unit that does not exist or is ambiguous', function () {
+    BranchUnit::factory()->create(['name' => 'Twin Section']);
+    BranchUnit::factory()->create(['name' => 'Twin Section']);
+
+    foreach (['Nowhere Unit' => 'does not exist', 'Twin Section' => 'more than one branch has a unit'] as $unit => $message) {
+        importFile(dataWorkbook(['Employees' => [[...EMPLOYEE_HEADERS, 'Station / Division / Unit'], [...employeeRow(), $unit]]]))->assertOk()->assertSee($message, false);
+    }
+
+    expect(Employee::query()->count())->toBe(0);
 });

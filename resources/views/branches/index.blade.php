@@ -22,6 +22,7 @@
             <a href="{{ route('branches.index') }}" @class(['rounded-md px-3 py-1.5', 'bg-primary-soft font-medium text-primary-ink' => ! $showAll, 'text-fg-2' => $showAll])>Active only</a>
             <a href="{{ route('branches.index', ['scope' => 'all']) }}" @class(['rounded-md px-3 py-1.5', 'bg-primary-soft font-medium text-primary-ink' => $showAll, 'text-fg-2' => ! $showAll])>All statuses</a>
         </div>
+        <a class="btn-secondary" href="{{ route('branches.units.index') }}"><x-icon name="building" /> Units</a>
         <a class="btn-primary" href="{{ route('branches.create') }}"><x-icon name="plus" /> Add branch</a>
     </x-slot:actions>
 

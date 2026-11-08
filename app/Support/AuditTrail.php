@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\Application;
 use App\Models\AuditLog;
 use App\Models\Branch;
+use App\Models\BranchUnit;
 use App\Models\Certificate;
 use App\Models\CertificateTemplate;
 use App\Models\Concerns\IsSingleton;
@@ -58,6 +59,7 @@ class AuditTrail
         PayChange::class => ['pay-changes', 'label'],
         PositionChange::class => ['position-changes', 'label'],
         Branch::class => ['branches', 'name'],
+        BranchUnit::class => ['branch-units', 'name'],
         Application::class => ['applications', 'applicant_name'],
         WellnessLeave::class => ['wellness-leaves', 'full_name'],
         ItrSubmission::class => ['itr-submissions', 'full_name'],
