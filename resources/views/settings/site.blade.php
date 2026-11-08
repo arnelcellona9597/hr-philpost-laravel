@@ -3,7 +3,7 @@
     $themeLabels = ['system' => 'Follow each device (system setting)', 'light' => 'Light mode', 'dark' => 'Dark mode'];
 @endphp
 
-<x-layouts.app title="Branding &amp; Theme" heading="Branding &amp; theme" description="Company name, logo, colors and the default light/dark mode for everyone.">
+<x-layouts.app title="Branding & Theme" heading="Branding & theme" description="Company name, logo, colors and the default light/dark mode for everyone.">
     @if ($errors->any())
         <div class="mb-4 rounded-lg bg-danger-soft px-4 py-3 text-sm text-danger" role="alert">{{ $errors->first() }}</div>
     @endif
@@ -36,6 +36,21 @@
                         @endif
                     </div>
                     <p class="field-help">PNG, JPG or WEBP up to 2 MB. A square or wide logo on a transparent background works best.</p>
+                </div>
+                <div>
+                    <span class="label">Square icon (favicon)</span>
+                    <div class="flex flex-wrap items-center gap-4">
+                        @if ($settings->favicon_id)
+                            <img src="{{ route('files.show', $settings->favicon_id) }}" alt="Current icon" class="size-14 rounded-lg border border-line bg-white object-contain p-1" />
+                        @else
+                            <span class="text-sm text-muted">No icon — the logo is used instead.</span>
+                        @endif
+                        <input class="input max-w-sm" type="file" name="favicon" accept="image/png,image/jpeg,image/webp,image/gif" aria-label="Upload square icon" />
+                        @if ($settings->favicon_id)
+                            <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="remove_favicon" value="1" class="size-4" /> Remove icon</label>
+                        @endif
+                    </div>
+                    <p class="field-help">Shown in the browser tab and in the collapsed sidebar. A square PNG of at least 64 × 64 pixels works best, up to 2 MB.</p>
                 </div>
             </fieldset>
 

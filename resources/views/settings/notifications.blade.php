@@ -3,7 +3,7 @@
     $fieldError = fn (string $name) => $errors->first($name);
 @endphp
 
-<x-layouts.app title="Email Settings" heading="Email &amp; notifications" description="Automatic emails, sending limits, templates and the mail server status.">
+<x-layouts.app title="Email Settings" heading="Email & notifications" description="Automatic emails, sending limits, templates and the mail server status.">
     <div class="grid gap-6 xl:grid-cols-3">
         <form method="post" action="{{ route('settings.notifications') }}" class="card space-y-5 p-5 xl:col-span-2" data-dirty-guard>
             @csrf
