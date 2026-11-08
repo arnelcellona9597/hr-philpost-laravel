@@ -42,9 +42,9 @@ function person(array $overrides = []): array
     return [...['Last Name' => 'REYES', 'First Name' => 'MARIA', 'Middle Name' => 'LOPEZ', 'Gender' => 'F', 'Date of Birth' => '1990-04-12', 'Employee ID' => '20-001', 'Date Hired' => '2020-02-03', 'Station/Division/Unit' => 'Mintal P.O'], ...$overrides];
 }
 
-function importPlan(array $people, array $overrides = []): array
+function importPlan(array $people): array
 {
-    $import = new CosMasterImport($overrides);
+    $import = new CosMasterImport;
 
     return [$import, $import->plan($import->read(masterWorkbook($people)))];
 }
@@ -151,24 +151,6 @@ it('replaces the old periods with the file\'s and keeps a person with no end dat
         ->and($employee->fresh()->employment_status)->toBe(EmploymentStatus::Active);
 });
 
-it('uses one branch for every way an office is written, and reuses branches that exist', function () {
-    Branch::factory()->create(['name' => 'Mintal Post Office']);
-
-    [$import, $plan] = importPlan([
-        person(['Employee ID' => '20-020', 'Last Name' => 'A', 'Station/Division/Unit' => 'Mintal P.O']),
-        person(['Employee ID' => '20-021', 'Last Name' => 'B', 'Station/Division/Unit' => 'Mintal Post Office, Metro Davao']),
-        person(['Employee ID' => '20-022', 'Last Name' => 'C', 'Station/Division/Unit' => 'DCCPO']),
-        person(['Employee ID' => '20-023', 'Last Name' => 'D', 'Station/Division/Unit' => 'Davao City Central Post Office, Metro Davao']),
-        person(['Employee ID' => '20-024', 'Last Name' => 'E', 'Station/Division/Unit' => 'Weird Place']),
-    ], ['weird place' => 'Fixed Office']);
-
-    $result = $import->apply($plan);
-
-    expect($result['branches'])->toBe(2)
-        ->and(Branch::query()->orderBy('name')->pluck('name')->all())->toBe(['Davao City Central Post Office', 'Fixed Office', 'Mintal Post Office'])
-        ->and(Employee::query()->where('employee_id', '20-020')->first()->station->name)->toBe('Mintal Post Office');
-});
-
 it('leaves unreadable values unchanged and says why', function () {
     $maria = Employee::factory()->create(['employee_id' => '20-001', 'last_name' => 'Reyes', 'first_name' => 'Maria', 'date_of_birth' => '1990-04-12', 'sss' => '12-3456789-0']);
 
@@ -201,13 +183,36 @@ it('refuses a workbook without the master sheet', function () {
     $this->artisan('hr:import-cos-master', ['file' => $path])->assertFailed();
 });
 
-it('treats "Tandag City Post Office" and "Tandag P.O" as one office, using the most common spelling', function () {
-    [$import, $plan] = importPlan([
-        person(['Employee ID' => '20-030', 'Last Name' => 'A', 'Station/Division/Unit' => 'Tandag City Post Office, Surigao del Sur']),
-        person(['Employee ID' => '20-031', 'Last Name' => 'B', 'Station/Division/Unit' => 'Tandag City P.O']),
-        person(['Employee ID' => '20-032', 'Last Name' => 'C', 'Station/Division/Unit' => 'Tandag P.O']),
-        person(['Employee ID' => '20-033', 'Last Name' => 'D', 'Station/Division/Unit' => 'Bunawan']),
-    ]);
+it('puts the file\'s station text in Station / Division / Unit and leaves branches alone', function () {
+    $branch = Branch::factory()->create(['name' => 'Cotabato City Post Office']);
+    $employee = Employee::factory()->create(['employee_id' => '20-001', 'last_name' => 'Reyes', 'first_name' => 'Maria', 'date_of_birth' => '1990-04-12', 'station_id' => $branch->id, 'station_unit' => null]);
+    $branches = Branch::query()->count();
 
-    expect(collect($plan['items'])->pluck('station')->all())->toBe(['Tandag City Post Office', 'Tandag City Post Office', 'Tandag City Post Office', 'Bunawan Post Office']);
+    [$import, $plan] = importPlan([person(['Station/Division/Unit' => 'Datu Odin Sinsuat Maguindanao Del Norte Post Office'])]);
+    $import->apply($plan);
+
+    $employee = $employee->fresh();
+
+    expect($employee->station_unit)->toBe('Datu Odin Sinsuat Maguindanao Del Norte Post Office')
+        ->and($employee->station_id)->toBe($branch->id)
+        ->and(Branch::query()->count())->toBe($branches)
+        ->and($employee->employmentPeriods()->first()->station_id)->toBe($branch->id);
+});
+
+it('gives a new person a branch only when an existing branch matches, and never creates one', function () {
+    $mintal = Branch::factory()->create(['name' => 'Mintal Post Office']);
+
+    [$import, $plan] = importPlan([
+        person(['Employee ID' => '20-040', 'Last Name' => 'A', 'Station/Division/Unit' => 'Mintal P.O']),
+        person(['Employee ID' => '20-041', 'Last Name' => 'B', 'Station/Division/Unit' => 'Somewhere New Post Office']),
+    ]);
+    $import->apply($plan);
+
+    $a = Employee::query()->where('employee_id', '20-040')->firstOrFail();
+    $b = Employee::query()->where('employee_id', '20-041')->firstOrFail();
+
+    expect($a->station_id)->toBe($mintal->id)->and($a->station_unit)->toBe('Mintal P.O')
+        ->and($b->station_id)->toBeNull()->and($b->station_unit)->toBe('Somewhere New Post Office')
+        ->and(Branch::query()->count())->toBe(1)
+        ->and($plan['branchesForNew'])->toBe(['found' => 1, 'none' => 1]);
 });

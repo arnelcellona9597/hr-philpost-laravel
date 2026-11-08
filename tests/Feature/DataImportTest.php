@@ -69,7 +69,7 @@ beforeEach(function () {
 it('previews without saving, then commits everything and keeps the history', function () {
     $check = importFile(dataWorkbook([
         'Branches' => [['Branch Name', 'Code'], ['Main Office', 'MO']],
-        'Employees' => [[...EMPLOYEE_HEADERS, 'Station / Division / Unit'], [...employeeRow(), 'Main Office']],
+        'Employees' => [[...EMPLOYEE_HEADERS, 'Branch'], [...employeeRow(), 'Main Office']],
     ]))->assertOk()->assertSee('All rows passed every check');
 
     expect(Employee::query()->count())->toBe(0)->and(Branch::query()->count())->toBe(0);
@@ -132,7 +132,7 @@ it('matches lists case-insensitively and reads real, serial and named dates', fu
 });
 
 it('lists every cell problem and saves nothing', function (array $row, string $message) {
-    $response = importFile(dataWorkbook(['Employees' => [[...EMPLOYEE_HEADERS, 'Date Hired', 'SSS Number', 'Station / Division / Unit'], $row]]))->assertOk();
+    $response = importFile(dataWorkbook(['Employees' => [[...EMPLOYEE_HEADERS, 'Date Hired', 'SSS Number', 'Branch'], $row]]))->assertOk();
 
     $response->assertSee($message, false);
 
