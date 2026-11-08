@@ -285,6 +285,22 @@ document.querySelectorAll('form[data-autosubmit] select, select[data-autosubmit]
   select.addEventListener('change', () => select.form?.requestSubmit())
 })
 
+// The Division / Unit filter lists only the units of the branches picked in the Branch filter.
+document.querySelectorAll('select[data-unit-filter]').forEach((units) => {
+  const branches = units.form?.querySelector('select[data-branch-filter]')
+  if (!branches) return
+  const narrow = () => {
+    const chosen = [...branches.selectedOptions].map((option) => option.value)
+    units.querySelectorAll('optgroup').forEach((group) => {
+      const shown = chosen.length === 0 || chosen.includes(group.dataset.branch)
+      group.hidden = !shown
+      if (!shown) group.querySelectorAll('option').forEach((option) => { option.selected = false })
+    })
+  }
+  branches.addEventListener('change', narrow)
+  narrow()
+})
+
 // The rows-per-page choice is remembered in this browser, so every list opens with it next time.
 document.querySelectorAll('form[data-page-size] select[name=perPage]').forEach((select) => {
   select.addEventListener('change', () => {
