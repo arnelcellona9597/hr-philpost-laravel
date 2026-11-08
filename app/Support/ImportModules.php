@@ -191,7 +191,7 @@ class ImportModules
             self::field('academic_honors', 'Academic Honors Received', 'text', ['width' => 24] + $education),
             self::field('employee_id', 'Employee ID', 'text', ['required' => true] + $employment),
             self::field('station', 'Branch', 'branch', ['width' => 26] + $employment),
-            self::field('station_unit', 'Station / Division / Unit', 'text', ['width' => 30] + $employment),
+            self::field('unit', 'Station / Division / Unit', 'unit', ['width' => 30] + $employment),
             self::select('region', 'Region', Region::class, $employment),
             self::field('position', 'Position / Designation', 'text', ['width' => 26] + $employment),
             self::field('nature_of_work', 'Nature of Work', 'text', $employment),

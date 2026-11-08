@@ -195,7 +195,7 @@ class DataWorkbook
         }
 
         $value = match ($field['kind']) {
-            'branch' => $record->getRelationValue($field['name'])?->name,
+            'branch', 'unit' => $record->getRelationValue($field['name'])?->name,
             'employee' => $record->getRelationValue('employee')?->employee_id,
             default => $record->getAttribute($field['name']),
         };

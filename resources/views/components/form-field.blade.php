@@ -41,7 +41,7 @@
                 <option value="{{ $option }}" @selected($option === (string) $value)>{{ $option }}</option>
             @endforeach
         </select>
-    @elseif ($kind === 'branch' || $kind === 'employee')
+    @elseif ($kind === 'branch' || $kind === 'unit' || $kind === 'employee')
         <select class="input" @required($required) @if ($kind === 'employee') data-combobox @endif {{ $common }}>
             <option value="">{{ $required ? 'Select…' : '—' }}</option>
             @foreach ($choices as $choice)

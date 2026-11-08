@@ -61,13 +61,13 @@ class ImportCosMaster extends Command
 
         $result = $import->apply($plan);
 
-        $this->info(sprintf('Done: %d employees updated, %d added, %d employment periods written. No branches were created or changed.', $result['updated'], $result['created'], $result['periods']));
+        $this->info(sprintf('Done: %d employees updated, %d added, %d employment periods written, %d units created. No branches were created or changed.', $result['updated'], $result['created'], $result['periods'], $result['units']));
 
         return self::SUCCESS;
     }
 
     /**
-     * @param  array{items: list<array<string, mixed>>, branchesForNew: array{found: int, none: int}, counts: array<string, int>, missing: list<string>}  $plan
+     * @param  array{items: list<array<string, mixed>>, branchesForNew: array{found: int, none: int}, units: array{existing: int, new: int}, counts: array<string, int>, missing: list<string>}  $plan
      */
     private function summary(array $plan, int $rows, string $report): void
     {
@@ -82,7 +82,8 @@ class ImportCosMaster extends Command
         $how = collect($plan['items'])->where('action', 'update')->countBy('how')->map(fn (int $count, string $name): array => [$name, $count])->values()->all();
         $this->table(['Matched by', 'People'], $how);
 
-        $this->line(sprintf('Station / Division / Unit is set from the file for everyone. Branches are not touched; of the new people, %d match an existing branch and %d are left without one.', $plan['branchesForNew']['found'], $plan['branchesForNew']['none']));
+        $this->line(sprintf('Station / Division / Unit: %d units already exist and are reused; %d new units will be created with no branch yet, for you to place on the Units page.', $plan['units']['existing'], $plan['units']['new']));
+        $this->line(sprintf('Branches are not touched; of the new people, %d match an existing branch and %d are left without one.', $plan['branchesForNew']['found'], $plan['branchesForNew']['none']));
 
         $warnings = collect($plan['items'])->sum(fn (array $item): int => count($item['row']['warnings']));
         $this->line("{$warnings} warnings (values left unchanged); every one is in the report.");

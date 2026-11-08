@@ -38,7 +38,7 @@ class EmployeeColumns
         'Contact' => ['email', 'contact_number', 'address'],
         'Personal' => ['gender', 'date_of_birth', 'age', 'civil_status', 'religion', 'blood_type'],
         'Education' => ['educational_attainment', 'courses', 'professional_eligibility'],
-        'Employment' => ['station_unit', 'region', 'nature_of_work', 'last_day_of_service', 'remarks'],
+        'Employment' => ['unit', 'region', 'nature_of_work', 'last_day_of_service', 'remarks'],
         'Government IDs' => ['sss', 'tin', 'pagibig', 'philhealth'],
         'Bank' => ['bank_name', 'bank_account_number'],
         'Emergency contact' => ['emergency_contact_name', 'emergency_contact_number'],

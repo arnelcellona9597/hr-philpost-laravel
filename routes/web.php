@@ -4,6 +4,7 @@ use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\AuthenticatedSessionController;
 use App\Http\Controllers\BranchController;
+use App\Http\Controllers\BranchUnitController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\CertificateTemplateController;
 use App\Http\Controllers\ContractController;
@@ -123,6 +124,13 @@ Route::middleware(RequireActiveSession::class)->group(function () {
         Route::post('/separate', 'separate')->name('separate');
         Route::put('/{period}', 'update')->name('update');
         Route::delete('/{period}', 'destroy')->name('destroy');
+    });
+
+    Route::prefix('branches/units')->name('branches.units.')->controller(BranchUnitController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/', 'store')->name('store');
+        Route::put('/{unit}', 'update')->name('update')->whereNumber('unit');
+        Route::delete('/{unit}', 'destroy')->name('destroy')->whereNumber('unit');
     });
 
     Route::prefix('branches')->name('branches.')->controller(BranchController::class)->group(function () {

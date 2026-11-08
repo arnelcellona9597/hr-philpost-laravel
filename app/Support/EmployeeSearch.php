@@ -32,7 +32,7 @@ class EmployeeSearch
         'updatedAt' => 'updated_at',
     ];
 
-    private const TEXT_COLUMNS = ['full_name', 'employee_id', 'email', 'position', 'station_unit', 'contact_number', 'sss', 'tin', 'pagibig', 'philhealth', 'bank_account_number'];
+    private const TEXT_COLUMNS = ['full_name', 'employee_id', 'email', 'position', 'contact_number', 'sss', 'tin', 'pagibig', 'philhealth', 'bank_account_number'];
 
     public string $text;
 
@@ -118,6 +118,8 @@ class EmployeeSearch
                 foreach (self::TEXT_COLUMNS as $column) {
                     $words->orWhere($column, 'like', self::contains($word));
                 }
+
+                $words->orWhereHas('unit', fn (Builder $unit) => $unit->where('name', 'like', self::contains($word)));
             });
         }
 

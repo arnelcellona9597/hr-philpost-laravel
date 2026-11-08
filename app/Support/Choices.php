@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Enums\EmploymentStatus;
 use App\Models\Branch;
+use App\Models\BranchUnit;
 use App\Models\Employee;
 
 /**
@@ -18,6 +19,20 @@ class Choices
     {
         return Branch::query()->orderBy('name')->get(['id', 'name'])
             ->map(fn (Branch $branch): array => ['value' => $branch->id, 'label' => $branch->name])
+            ->all();
+    }
+
+    /**
+     * Units labelled with their branch, "Mintal Post Office › Accounting Section", branch by branch.
+     *
+     * @return list<array{value: int, label: string}>
+     */
+    public static function units(): array
+    {
+        return BranchUnit::query()->with('branch:id,name')->get()
+            ->sortBy(fn (BranchUnit $unit): string => mb_strtolower(($unit->branch?->name ?? '~').'|'.$unit->name))
+            ->map(fn (BranchUnit $unit): array => ['value' => $unit->id, 'label' => $unit->label()])
+            ->values()
             ->all();
     }
 

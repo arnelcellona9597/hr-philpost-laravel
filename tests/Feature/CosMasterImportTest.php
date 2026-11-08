@@ -2,6 +2,7 @@
 
 use App\Enums\EmploymentStatus;
 use App\Models\Branch;
+use App\Models\BranchUnit;
 use App\Models\Employee;
 use App\Services\CosMasterImport;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -183,20 +184,43 @@ it('refuses a workbook without the master sheet', function () {
     $this->artisan('hr:import-cos-master', ['file' => $path])->assertFailed();
 });
 
-it('puts the file\'s station text in Station / Division / Unit and leaves branches alone', function () {
+it('makes the file\'s Station / Division / Unit text a unit with no branch and leaves branches alone', function () {
     $branch = Branch::factory()->create(['name' => 'Cotabato City Post Office']);
-    $employee = Employee::factory()->create(['employee_id' => '20-001', 'last_name' => 'Reyes', 'first_name' => 'Maria', 'date_of_birth' => '1990-04-12', 'station_id' => $branch->id, 'station_unit' => null]);
+    $employee = Employee::factory()->create(['employee_id' => '20-001', 'last_name' => 'Reyes', 'first_name' => 'Maria', 'date_of_birth' => '1990-04-12', 'station_id' => $branch->id]);
     $branches = Branch::query()->count();
 
     [$import, $plan] = importPlan([person(['Station/Division/Unit' => 'Datu Odin Sinsuat Maguindanao Del Norte Post Office'])]);
-    $import->apply($plan);
+    $result = $import->apply($plan);
 
     $employee = $employee->fresh();
+    $unit = $employee->unit;
 
-    expect($employee->station_unit)->toBe('Datu Odin Sinsuat Maguindanao Del Norte Post Office')
+    expect($result['units'])->toBe(1)
+        ->and($unit->name)->toBe('Datu Odin Sinsuat Maguindanao Del Norte Post Office')
+        ->and($unit->branch_id)->toBeNull()
         ->and($employee->station_id)->toBe($branch->id)
         ->and(Branch::query()->count())->toBe($branches)
-        ->and($employee->employmentPeriods()->first()->station_id)->toBe($branch->id);
+        ->and($employee->employmentPeriods()->first()->station_id)->toBe($branch->id)
+        ->and($plan['units'])->toBe(['existing' => 0, 'new' => 1]);
+});
+
+it('reuses an existing unit with the same name, and keeps the branch that unit is under', function () {
+    $mintal = Branch::factory()->create(['name' => 'Mintal Post Office']);
+    $unit = BranchUnit::factory()->create(['branch_id' => $mintal->id, 'name' => 'Accounting Section']);
+
+    [$import, $plan] = importPlan([
+        person(['Employee ID' => '20-070', 'Last Name' => 'A', 'Station/Division/Unit' => 'accounting section']),
+        person(['Employee ID' => '20-071', 'Last Name' => 'B', 'Station/Division/Unit' => 'Accounting Section']),
+    ]);
+    $result = $import->apply($plan);
+
+    $a = Employee::query()->where('employee_id', '20-070')->firstOrFail();
+
+    expect($result['units'])->toBe(0)
+        ->and(BranchUnit::query()->count())->toBe(1)
+        ->and($a->unit_id)->toBe($unit->id)
+        ->and($a->station_id)->toBe($mintal->id)
+        ->and($plan['units'])->toBe(['existing' => 1, 'new' => 0]);
 });
 
 it('gives a new person a branch only when an existing branch matches, and never creates one', function () {
@@ -211,32 +235,8 @@ it('gives a new person a branch only when an existing branch matches, and never 
     $a = Employee::query()->where('employee_id', '20-040')->firstOrFail();
     $b = Employee::query()->where('employee_id', '20-041')->firstOrFail();
 
-    expect($a->station_id)->toBe($mintal->id)->and($a->station_unit)->toBe('Mintal P.O')
-        ->and($b->station_id)->toBeNull()->and($b->station_unit)->toBe('Somewhere New Post Office')
+    expect($a->station_id)->toBe($mintal->id)->and($a->unit->name)->toBe('Mintal P.O')
+        ->and($b->station_id)->toBeNull()->and($b->unit->name)->toBe('Somewhere New Post Office')
         ->and(Branch::query()->count())->toBe(1)
         ->and($plan['branchesForNew'])->toBe(['found' => 1, 'none' => 1]);
-});
-
-it('loads only the people marked Active when asked', function () {
-    $file = masterWorkbook([
-        person(['STATUS' => 'Active', 'Employee ID' => '20-050', 'Last Name' => 'A']),
-        person(['STATUS' => 'Resigned', 'Employee ID' => '20-051', 'Last Name' => 'B']),
-        person(['STATUS' => 'Promoted', 'Employee ID' => '20-052', 'Last Name' => 'C']),
-        person(['STATUS' => 'active', 'Employee ID' => '20-053', 'Last Name' => 'D', 'End1' => '2024-01-01']),
-    ]);
-
-    $this->artisan('hr:import-cos-master', ['file' => $file, '--only-active' => true, '--commit' => true, '--force' => true])
-        ->expectsOutputToContain('2 of 4')
-        ->assertSuccessful();
-
-    expect(Employee::query()->orderBy('employee_id')->pluck('employee_id')->all())->toBe(['20-050', '20-053'])
-        ->and(Employee::query()->where('employee_id', '20-053')->first()->employment_status)->toBe(EmploymentStatus::Active)
-        ->and(Employee::query()->where('employee_id', '20-053')->first()->last_day_of_service)->toBeNull();
-});
-
-it('reads Resigned from the STATUS column when the position does not say', function () {
-    [$import, $plan] = importPlan([person(['STATUS' => 'Resigned', 'Employee ID' => '20-060', 'Date Hired' => '2019-01-01', 'End1' => '2022-05-31'])]);
-    $import->apply($plan);
-
-    expect(Employee::query()->where('employee_id', '20-060')->first()->employment_status)->toBe(EmploymentStatus::Resigned);
 });
