@@ -27,7 +27,8 @@ use Throwable;
  *
  * People are matched by Employee ID, else by name and birth date. A value from the file replaces the stored
  * one only when it is present and valid, so a blank or unreadable cell never erases anything. Nobody is
- * deleted. `plan()` changes nothing; `apply()` saves a plan in one transaction.
+ * deleted. The file's Station/Division/Unit text goes into the employee's Station / Division / Unit field; branches
+ * are never created or changed, and a new person gets a branch only when an existing one matches the text. `plan()` changes nothing; `apply()` saves a plan in one transaction.
  *
  * @phpstan-type Row array{line: int, last_name: string, first_name: string, middle_name: ?string, data: array<string, mixed>, periods: list<array{from: string, to: ?string}>, warnings: list<string>, station: string, status_hint: ?EmploymentStatus}
  */
@@ -62,11 +63,6 @@ class CosMasterImport
     ];
 
     /**
-     * @param  array<string, string>  $stationOverrides  file text (lower case) => the office's name
-     */
-    public function __construct(private array $stationOverrides = []) {}
-
-    /**
      * @return list<Row>
      */
     public function read(string $path): array
@@ -94,21 +90,20 @@ class CosMasterImport
      * What applying the rows would do, without changing anything.
      *
      * @param  list<Row>  $rows
-     * @return array{items: list<array<string, mixed>>, stations: array<string, array{canonical: string, exists: bool, people: int}>, counts: array<string, int>, missing: list<string>}
+     * @return array{items: list<array<string, mixed>>, branchesForNew: array{found: int, none: int}, counts: array<string, int>, missing: list<string>}
      */
     public function plan(array $rows): array
     {
         $existing = Employee::query()->get(['id', 'employee_id', 'last_name', 'first_name', 'date_of_birth']);
         $byId = $existing->keyBy(fn (Employee $employee): string => mb_strtolower($employee->employee_id));
         $byName = $existing->groupBy(fn (Employee $employee): string => $this->nameKey($employee->last_name, $employee->first_name));
-        $branches = Branch::query()->pluck('id', 'name')->mapWithKeys(fn (int $id, string $name): array => [mb_strtolower($name) => $id]);
         $usedIds = $existing->pluck('employee_id')->map(fn (string $id): string => mb_strtolower($id))->flip()->all();
         $claimed = [];
-        $officeNames = $this->officeNames($rows, $branches->keys()->all());
+        $branchByLooseName = Branch::query()->get(['id', 'name'])->mapWithKeys(fn (Branch $branch): array => [StationNames::looseKey($branch->name) => $branch->id]);
         $seenIds = [];
         $temp = 0;
         $items = [];
-        $stations = [];
+        $branchesForNew = ['found' => 0, 'none' => 0];
         $counts = ['update' => 0, 'new' => 0, 'skip' => 0];
 
         foreach ($rows as $row) {
@@ -165,12 +160,12 @@ class CosMasterImport
                 $seenIds[mb_strtolower($employeeId)] ??= true;
             }
 
-            $station = $row['station'] === '' ? '' : ($officeNames[mb_strtolower($row['station'])] ?? '');
             $generated = null;
+            $branchId = null;
 
-            if ($station !== '') {
-                $stations[$row['station']] ??= ['canonical' => $station, 'exists' => $branches->has(mb_strtolower($station)), 'people' => 0];
-                $stations[$row['station']]['people']++;
+            if ($problem === null && $match === null) {
+                $branchId = $row['station'] === '' ? null : $branchByLooseName->get(StationNames::looseKey(StationNames::canonical($row['station'])));
+                $branchesForNew[$branchId === null ? 'none' : 'found']++;
             }
 
             if ($problem === null && $match === null && $employeeId === null) {
@@ -183,28 +178,26 @@ class CosMasterImport
 
             $action = $problem !== null ? 'skip' : ($match !== null ? 'update' : 'new');
             $counts[$action]++;
-            $items[] = ['row' => $row, 'action' => $action, 'employee_id' => $match?->id, 'how' => $how, 'problem' => $problem, 'station' => $station, 'generated_id' => $generated];
+            $items[] = ['row' => $row, 'action' => $action, 'employee_id' => $match?->id, 'how' => $how, 'problem' => $problem, 'branch_id' => $branchId, 'generated_id' => $generated];
         }
 
         $missing = $existing->reject(fn (Employee $employee): bool => isset($claimed[$employee->id]))->map(fn (Employee $employee): string => $employee->employee_id)->values()->all();
 
-        return ['items' => $items, 'stations' => $stations, 'counts' => $counts, 'missing' => $missing];
+        return ['items' => $items, 'branchesForNew' => $branchesForNew, 'counts' => $counts, 'missing' => $missing];
     }
 
     /**
      * Save a plan: new branches, new and updated employees and their employment periods, in one transaction.
      *
-     * @param  array{items: list<array<string, mixed>>, stations: array<string, array{canonical: string, exists: bool, people: int}>, counts: array<string, int>, missing: list<string>}  $plan
-     * @return array{created: int, updated: int, branches: int, periods: int}
+     * @param  array{items: list<array<string, mixed>>, branchesForNew: array{found: int, none: int}, counts: array<string, int>, missing: list<string>}  $plan
+     * @return array{created: int, updated: int, periods: int}
      */
     public function apply(array $plan): array
     {
-        $result = ['created' => 0, 'updated' => 0, 'branches' => 0, 'periods' => 0];
+        $result = ['created' => 0, 'updated' => 0, 'periods' => 0];
 
         DB::transaction(function () use ($plan, &$result): void {
             (function () use ($plan, &$result): void {
-                $branches = Branch::query()->pluck('id', 'name')->mapWithKeys(fn (int $id, string $name): array => [mb_strtolower($name) => $id])->all();
-
                 foreach ($plan['items'] as $item) {
                     if ($item['action'] === 'skip') {
                         continue;
@@ -212,19 +205,6 @@ class CosMasterImport
 
                     $row = $item['row'];
                     $data = $row['data'];
-                    $stationId = null;
-
-                    if ($item['station'] !== '') {
-                        $key = mb_strtolower($item['station']);
-
-                        if (! isset($branches[$key])) {
-                            $branches[$key] = Branch::query()->create(['name' => $item['station']])->id;
-                            $result['branches']++;
-                        }
-
-                        $stationId = $branches[$key];
-                    }
-
                     $periods = $row['periods'];
                     $status = $row['status_hint'];
 
@@ -237,8 +217,8 @@ class CosMasterImport
 
                     $data = array_filter($data, fn (mixed $value): bool => $value !== null && $value !== '');
 
-                    if ($stationId !== null) {
-                        $data['station_id'] = $stationId;
+                    if ($item['action'] === 'new' && $item['branch_id'] !== null) {
+                        $data['station_id'] = $item['branch_id'];
                     }
 
                     if ($item['action'] === 'new') {
@@ -258,7 +238,7 @@ class CosMasterImport
                     }
 
                     if ($periods !== []) {
-                        $result['periods'] += $this->replacePeriods($employee, $periods, $status, $stationId);
+                        $result['periods'] += $this->replacePeriods($employee, $periods, $status);
                     }
                 }
             })();
@@ -272,7 +252,7 @@ class CosMasterImport
      *
      * @param  list<array{from: string, to: ?string}>  $periods
      */
-    private function replacePeriods(Employee $employee, array $periods, ?EmploymentStatus $status, ?int $stationId): int
+    private function replacePeriods(Employee $employee, array $periods, ?EmploymentStatus $status): int
     {
         EmploymentPeriod::query()->where('employee_id', $employee->id)->delete();
 
@@ -283,7 +263,7 @@ class CosMasterImport
                 'separated_on' => $period['to'],
                 'separation_type' => $period['to'] === null ? null : ($isLast ? ($status ?? EmploymentStatus::Resigned) : EmploymentStatus::Resigned),
                 'position' => $employee->position,
-                'station_id' => $stationId ?? $employee->station_id,
+                'station_id' => $employee->station_id,
                 'classification' => $employee->classification,
             ]);
             $record->employee_id = $employee->id;
@@ -293,48 +273,6 @@ class CosMasterImport
         app(EmploymentHistoryService::class)->syncEmployeeFromLatest($employee->fresh());
 
         return count($periods);
-    }
-
-    /**
-     * The office each way of writing a station stands for, keyed by the file's text in lower case. Spellings of one
-     * office become the existing branch's name, else the most common spelling. The overrides win.
-     *
-     * @param  list<Row>  $rows
-     * @param  list<string>  $branchNames  existing branch names in lower case
-     * @return array<string, string>
-     */
-    private function officeNames(array $rows, array $branchNames): array
-    {
-        $variants = [];
-
-        foreach ($rows as $row) {
-            if ($row['station'] !== '') {
-                $canonical = StationNames::canonical($row['station']);
-                $variants[mb_strtolower($row['station'])] = ['canonical' => $canonical, 'count' => ($variants[mb_strtolower($row['station'])]['count'] ?? 0) + 1];
-            }
-        }
-
-        $groups = [];
-
-        foreach ($variants as $variant) {
-            $groups[StationNames::looseKey($variant['canonical'])][$variant['canonical']] = ($groups[StationNames::looseKey($variant['canonical'])][$variant['canonical']] ?? 0) + $variant['count'];
-        }
-
-        $chosen = [];
-
-        foreach ($groups as $key => $spellings) {
-            $existing = collect($branchNames)->first(fn (string $name): bool => StationNames::looseKey($name) === $key);
-            arsort($spellings);
-            $chosen[$key] = $existing !== null ? Branch::query()->where('name', $existing)->value('name') : array_key_first($spellings);
-        }
-
-        $names = [];
-
-        foreach ($variants as $text => $variant) {
-            $names[$text] = $this->stationOverrides[$text] ?? $chosen[StationNames::looseKey($variant['canonical'])];
-        }
-
-        return $names;
     }
 
     /**
@@ -423,6 +361,7 @@ class CosMasterImport
         $data['educational_attainment'] = $this->education($text('educational_attainment'), $warnings);
         $data['region'] = $this->region($text('region'), $warnings);
         $data['email'] = $this->email($text('email'), $warnings);
+        $data['station_unit'] = $text('station');
         $data['bank_name'] = $data['bank_account_number'] !== null ? 'Land Bank of the Philippines' : null;
 
         foreach (['sss', 'pagibig', 'tin', 'philhealth'] as $kind) {
