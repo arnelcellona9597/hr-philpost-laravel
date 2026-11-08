@@ -2,6 +2,7 @@
 
 use App\Console\Commands\ClearRecords;
 use App\Enums\RemittanceKind;
+use App\Models\Branch;
 use App\Models\CertificateTemplate;
 use App\Models\ContractScope;
 use App\Models\ContractSetting;
@@ -89,4 +90,16 @@ it('deletes nothing unless DELETE is typed', function () {
         ->assertFailed();
 
     expect(Employee::query()->count())->toBe($employees)->and($employees)->toBeGreaterThan(0);
+});
+
+it('can keep the branches and the settings', function () {
+    $contract = ContractSetting::current();
+    $contract->update(['area_director_name' => 'Typed by HR']);
+    $branches = Branch::query()->count();
+
+    $this->artisan('hr:clear-records', ['--force' => true, '--keep-branches' => true, '--keep-settings' => true])->assertSuccessful();
+
+    expect(Employee::query()->count())->toBe(0)
+        ->and(Branch::query()->count())->toBe($branches)->and($branches)->toBeGreaterThan(0)
+        ->and(ContractSetting::current()->area_director_name)->toBe('Typed by HR');
 });
