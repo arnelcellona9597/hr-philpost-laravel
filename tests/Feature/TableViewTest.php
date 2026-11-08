@@ -56,7 +56,7 @@ it('shows the usual employee columns until the person chooses others', function 
 
     $page = $this->get('/employees')->assertOk()->assertDontSee('razul@example.test');
 
-    expect(tableHeaders($page))->toBe('Employee ID Name Position Station Classification Status Date hired Service');
+    expect(tableHeaders($page))->toBe('Employee ID Name Position Branch Classification Status Date hired Service');
 });
 
 it('lets the person choose employee columns and remembers them', function () {
