@@ -16,7 +16,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
-#[Signature('hr:clear-records {--force : Delete without asking}')]
+#[Signature('hr:clear-records {--force : Delete without asking} {--keep-branches : Leave the branch list as it is} {--keep-settings : Leave the signatory and employer names in settings as they are}')]
 #[Description('Delete every employee record and its history, keeping user accounts, templates and settings')]
 class ClearRecords extends Command
 {
@@ -59,11 +59,17 @@ class ClearRecords extends Command
             $removed = [];
 
             foreach (self::TABLES as $table) {
+                if ($table === 'branches' && $this->option('keep-branches')) {
+                    continue;
+                }
+
                 $removed[$table] = DB::table($table)->delete();
             }
 
             $removed['wage_orders (demo only)'] = DB::table('wage_orders')->where('order_number', 'like', 'DEMO-%')->delete();
-            $this->blankSettings();
+            if (! $this->option('keep-settings')) {
+                $this->blankSettings();
+            }
 
             return $removed;
         }));
@@ -76,7 +82,7 @@ class ClearRecords extends Command
         Cache::flush();
 
         $this->table(['Table', 'Rows removed'], array_map(null, array_keys($removed), array_values($removed)));
-        $this->info('Done. User accounts, templates, scopes, holidays and wage rates were kept.');
+        $this->info('Done. User accounts, templates, scopes, holidays and wage rates were kept'.($this->option('keep-branches') ? ', and so were the branches' : '').($this->option('keep-settings') ? ' and the settings' : '').'.');
 
         return self::SUCCESS;
     }
