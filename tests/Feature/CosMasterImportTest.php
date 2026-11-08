@@ -254,3 +254,44 @@ it('adds both people when two rows in the file share an Employee ID, the second 
         ->and(Employee::query()->where('last_name', 'SECOND')->value('employee_id'))->toBe('TEMP-0001')
         ->and($plan['items'][1]['row']['warnings'][0])->toContain('used by someone earlier in the file');
 });
+
+it('gives people the Employee IDs HR decided on instead of temporary ones', function () {
+    $file = masterWorkbook([
+        person(['Employee ID' => '00-012', 'Last Name' => 'DOLORITO', 'First Name' => 'BENJIE', 'Date of Birth' => '1980-12-28']),
+        person(['Employee ID' => '00-012', 'Last Name' => 'ENCISO', 'First Name' => 'DARIEL MAMOLO', 'Date of Birth' => '1993-07-13']),
+    ]);
+
+    $this->artisan('hr:import-cos-master', ['file' => $file, '--id' => ['ENCISO, Dariel=00-013'], '--commit' => true, '--force' => true])->assertSuccessful();
+
+    expect(Employee::query()->where('last_name', 'DOLORITO')->value('employee_id'))->toBe('00-012')
+        ->and(Employee::query()->where('last_name', 'ENCISO')->value('employee_id'))->toBe('00-013')
+        ->and(Employee::query()->where('employee_id', 'like', 'TEMP-%')->count())->toBe(0);
+});
+
+it('refuses an ID correction for an unknown person, an ambiguous name or an ID used in the file', function (string $setting) {
+    $file = masterWorkbook([
+        person(['Employee ID' => '20-001', 'Last Name' => 'SAME', 'First Name' => 'ONE']),
+        person(['Employee ID' => '20-002', 'Last Name' => 'SAME', 'First Name' => 'ONEL']),
+    ]);
+
+    $this->artisan('hr:import-cos-master', ['file' => $file, '--id' => [$setting]])->assertFailed();
+    expect(Employee::query()->count())->toBe(0);
+})->with(['NOBODY, Name=21-000', 'SAME, One=21-001', 'SAME, Onel=20-001', 'no equals sign']);
+
+it('replaces a temporary ID with the real one when the person is loaded again', function () {
+    $employee = Employee::factory()->create(['employee_id' => 'TEMP-0001', 'last_name' => 'Enciso', 'first_name' => 'Dariel', 'date_of_birth' => '1993-07-13']);
+
+    [$import, $plan] = importPlan([person(['Employee ID' => '00-013', 'Last Name' => 'ENCISO', 'First Name' => 'DARIEL', 'Date of Birth' => '1993-07-13'])]);
+    $import->apply($plan);
+
+    expect($employee->fresh()->employee_id)->toBe('00-013')->and(Employee::query()->count())->toBe(1);
+});
+
+it('does not change an ordinary Employee ID when a person is loaded again', function () {
+    $employee = Employee::factory()->create(['employee_id' => '19-001', 'last_name' => 'Reyes', 'first_name' => 'Maria', 'date_of_birth' => '1990-04-12']);
+
+    [$import, $plan] = importPlan([person(['Employee ID' => '20-777'])]);
+    $import->apply($plan);
+
+    expect($employee->fresh()->employee_id)->toBe('19-001');
+});

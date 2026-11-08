@@ -9,7 +9,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
 
-#[Signature('hr:import-cos-master {file : The COS Master File workbook (.xlsx)} {--commit : Save the changes. Without it nothing is changed} {--only-active : Load only the people whose STATUS in the file is Active} {--force : With --commit, do not ask first}')]
+#[Signature('hr:import-cos-master {file : The COS Master File workbook (.xlsx)} {--commit : Save the changes. Without it nothing is changed} {--only-active : Load only the people whose STATUS in the file is Active} {--id=* : Set the Employee ID of a person, as "LAST NAME, FIRST NAME=ID" (repeat for each person)} {--force : With --commit, do not ask first}')]
 #[Description('Load the COS Master File sheet over the employees: update matches, add new people, never delete')]
 class ImportCosMaster extends Command
 {
@@ -29,6 +29,7 @@ class ImportCosMaster extends Command
         try {
             $import = new CosMasterImport;
             $rows = $import->read($path);
+            $rows = $import->correctIds($rows, $this->idCorrections());
             $total = count($rows);
 
             if ($this->option('only-active')) {
@@ -64,6 +65,26 @@ class ImportCosMaster extends Command
         $this->info(sprintf('Done: %d employees updated, %d added, %d employment periods written, %d branches and %d units created.', $result['updated'], $result['created'], $result['periods'], $result['branches'], $result['units']));
 
         return self::SUCCESS;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function idCorrections(): array
+    {
+        $corrections = [];
+
+        foreach ((array) $this->option('id') as $setting) {
+            [$name, $id] = array_pad(explode('=', (string) $setting, 2), 2, '');
+
+            if (trim($name) === '' || trim($id) === '') {
+                throw new RuntimeException("Use --id=\"LAST NAME, FIRST NAME=ID\", not \"{$setting}\".");
+            }
+
+            $corrections[trim($name)] = trim($id);
+        }
+
+        return $corrections;
     }
 
     /**
