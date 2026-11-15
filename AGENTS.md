@@ -155,3 +155,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - Run `vendor/bin/pest` to call the test runner directly. It accepts the same file path and `--filter=testName` arguments.
 
 </laravel-boost-guidelines>
+
+## Team handoff
+
+Three developers share this repo through separate Claude sessions. Before starting, read @HANDOFF.md. Before finishing, add a Log entry there and keep "Current state" accurate.
