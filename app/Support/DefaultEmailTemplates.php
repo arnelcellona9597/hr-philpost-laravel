@@ -63,20 +63,42 @@ class DefaultEmailTemplates
                 'key' => 'hired-requirements',
                 'name' => 'Requirements for employment (newly hired)',
                 'category' => 'Onboarding',
-                'subject' => 'Welcome to {{companyName}}: requirements for employment',
+                'subject' => 'Documentary requirements for employment at {{companyName}}',
                 'body' => <<<'TEXT'
-                    Hi {{firstName}},
+                    Dear {{firstName}},
 
-                    Congratulations! You have been hired as {{position}} at {{station}}.
+                    Congratulations on your selection as {{position}} at {{station}}. To process your Contract of Service (COS) engagement, please submit the following documentary requirements to the HR office:
 
-                    To complete your employment, please submit the following requirements to the HR office:
+                    • Three (3) sets of notarized, computerized Personal Data Sheet (PDS), Revised CS Form 212 (2025), downloadable at csc.gov.ph
+                    • Three (3) passport-size ID pictures with white background, attached to the PDS
+                    • Three (3) copies of handwriting specimen
+                    • Laboratory tests evaluated by a government physician, with a duly signed Medical Certificate: photocopy of vaccination card, CBC and blood typing, urinalysis, chest X-ray and drug test
+                    • Police Clearance
+                    • Documentary stamps (₱30.00), attached to the Medical Certificate
+                    • Government-issued ID, to be presented with the PDS
+                    • Landbank account details
 
+                    BIR requirements, to be submitted within ten (10) days upon assumption of duty:
+                    • TIN number or TIN verification
+                    • Notarized Sworn Declaration (Annex B-2), two (2) original copies with documentary stamps
+
+                    Attachments for your first salary:
+                    • Assumption to Duty
+                    • Notarized Sworn Declaration
+                    • DTR print-out (biometrics), duly signed by your supervisor, with Accomplishment Report
+
+                    Additional requirements for COS Letter Carriers only:
+                    • Photocopy of updated and valid Professional Driver's License
+                    • Photocopy of updated and valid OR/CR of your owned motorcycle
+
+                    Our records show that the following are still outstanding:
                     {{requirementsList}}
 
-                    If you have any questions, just reply to this email.
+                    Should you have any questions, please reply to this email.
 
-                    Thank you,
+                    Respectfully,
                     HR Office
+                    {{companyName}}
                     TEXT,
             ],
             [

@@ -2,11 +2,15 @@
 
 namespace App\Services;
 
+use App\Enums\Classification;
 use App\Enums\EmploymentStatus;
 use App\Exceptions\UserFacingException;
 use App\Models\Employee;
 use App\Models\EmploymentPeriod;
+use App\Models\PositionChange;
 use App\Support\HrDate;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -264,31 +268,88 @@ class EmploymentHistoryService
     /**
      * The history in order, with how long each period lasted and the gap before it, and the total.
      *
-     * @return array{rows: list<PeriodRow>, total: array{years: int, months: int, days: int}|null}
+     * @return array{rows: list<PeriodRow>, stints: list<array<string, mixed>>, total: array{years: int, months: int, days: int}|null}
      */
     public function summary(Employee $employee, ?string $today = null): array
     {
         $today ??= HrDate::today();
         $rows = [];
+        $stints = [];
         $previousEnd = null;
+        $changes = $employee->positionChanges()->whereNotNull('to_classification')->orderBy('effective_on')->orderBy('id')->get();
 
         foreach ($employee->employmentPeriods()->get() as $index => $period) {
             $hired = $period->hired_on->toDateString();
             $end = $period->separated_on?->toDateString();
+            $segments = $this->segments($period, $changes, $today);
 
             $rows[] = [
                 'number' => $index + 1,
                 'period' => $period,
                 'length' => HrDate::lengthOfService($hired, $end, $today),
                 'gap' => $previousEnd !== null ? HrDate::diff($previousEnd, $hired) : null,
+                'segments' => $segments,
             ];
+
+            foreach ($segments as $segment) {
+                $stints[] = ['number' => count($stints) + 1, 'period' => $period, ...$segment];
+            }
 
             $previousEnd = $end;
         }
 
         $lengths = array_values(array_filter(array_column($rows, 'length')));
 
-        return ['rows' => $rows, 'total' => $lengths === [] ? null : HrDate::sumSpans($lengths)];
+        return ['rows' => $rows, 'stints' => $stints, 'total' => $lengths === [] ? null : HrDate::sumSpans($lengths)];
+    }
+
+    /**
+     * One period split wherever the person changed classification inside it, such as a Contract of
+     * Service worker who became a Regular employee. Worked out when shown, so stored periods stay whole.
+     *
+     * @param  Collection<int, PositionChange>  $changes
+     * @return list<array{from: string, to: string|null, length: array{years: int, months: int, days: int}|null, position: string|null, classification: Classification|null}>
+     */
+    private function segments(EmploymentPeriod $period, Collection $changes, string $today): array
+    {
+        $hired = $period->hired_on->toDateString();
+        $end = $period->separated_on?->toDateString();
+
+        $current = ['from' => $hired, 'position' => $period->position, 'classification' => $period->classification];
+        $cuts = [];
+
+        foreach ($changes as $change) {
+            $on = $change->effective_on->toDateString();
+
+            if ($on <= $hired || $on > $today || ($end !== null && $on > $end)) {
+                continue;
+            }
+
+            $before = $cuts === [] ? ($change->from_classification ?? $period->classification) : end($cuts)['classification'];
+
+            if ($before === $change->to_classification) {
+                continue;
+            }
+
+            if ($cuts === []) {
+                $current['classification'] = $before;
+                $current['position'] = $change->from_position ?? $period->position;
+            }
+
+            $cuts[] = ['from' => $on, 'position' => $change->to_position ?? $period->position, 'classification' => $change->to_classification];
+        }
+
+        $starts = [$current, ...$cuts];
+        $segments = [];
+
+        foreach ($starts as $i => $start) {
+            $next = $starts[$i + 1]['from'] ?? null;
+            $to = $next !== null ? Carbon::parse($next)->subDay()->toDateString() : $end;
+
+            $segments[] = [...$start, 'to' => $to, 'length' => HrDate::lengthOfService($start['from'], $to, $today)];
+        }
+
+        return $segments;
     }
 
     /**

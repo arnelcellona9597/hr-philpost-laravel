@@ -436,3 +436,21 @@ it('keeps the single profile print working', function () {
 
     $this->get("/employees/{$employee->id}/print")->assertOk()->assertSee('EMPLOYEE PROFILE')->assertSee('ABUOMAR, RAZUL');
 });
+
+it('lists the birthday celebrants of a month, and of one birth year', function () {
+    Employee::factory()->create(['employee_id' => 'JAN-90', 'date_of_birth' => '1990-01-15']);
+    Employee::factory()->create(['employee_id' => 'JAN-85', 'date_of_birth' => '1985-01-31']);
+    Employee::factory()->create(['employee_id' => 'FEB-90', 'date_of_birth' => '1990-02-01']);
+
+    expect(searchIds('birthMonth=1'))->toEqualCanonicalizing(['JAN-90', 'JAN-85'])
+        ->and(searchIds('birthMonth=1&birthYear=1990'))->toBe(['JAN-90'])
+        ->and(searchIds('birthYear=1990'))->toEqualCanonicalizing(['JAN-90', 'FEB-90'])
+        ->and(searchIds('birthMonth=13&birthYear=abc'))->toHaveCount(3);
+});
+
+it('counts the birthday filter and keeps it in the export link', function () {
+    $response = $this->get('/employees?birthMonth=3&birthYear=1992')->assertOk()->assertSee('Birthday celebrants');
+
+    expect($response->viewData('search')->activeFilterCount())->toBe(2);
+    $response->assertSee('birthMonth=3', false);
+});

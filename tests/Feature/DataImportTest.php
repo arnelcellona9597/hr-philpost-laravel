@@ -16,11 +16,14 @@ use App\Models\Message;
 use App\Models\User;
 use App\Models\WellnessLeave;
 use App\Services\DataImporter;
+use App\Support\ImportModules;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 /**
@@ -363,4 +366,34 @@ it('refuses a unit that does not exist or is ambiguous', function () {
     }
 
     expect(Employee::query()->count())->toBe(0);
+});
+
+function exportedSheet($response): Worksheet
+{
+    $path = tempnam(sys_get_temp_dir(), 'export').'.xlsx';
+    file_put_contents($path, $response->streamedContent());
+
+    return IOFactory::load($path)->getSheetByName('Employees');
+}
+
+it('exports every record that matches the branch and unit filters, not just one page', function () {
+    $branch = Branch::factory()->create();
+    $unit = BranchUnit::factory()->create(['branch_id' => $branch->id]);
+    Employee::factory()->count(8)->create(['station_id' => $branch->id, 'unit_id' => $unit->id]);
+    Employee::factory()->count(3)->create();
+
+    $sheet = exportedSheet($this->get("/data/export?module=employees&branch[]={$branch->id}&unit[]={$unit->id}&perPage=5"));
+
+    expect($sheet->getHighestDataRow())->toBe(9)
+        ->and($sheet->getHighestDataColumn())->toBe(Coordinate::stringFromColumnIndex(count(ImportModules::find('employees')['fields'])));
+});
+
+it('exports only the columns chosen on the employee list', function () {
+    Employee::factory()->count(2)->create();
+
+    $sheet = exportedSheet($this->get('/data/export?module=employees&cols[]=position&cols[]=date_of_birth'));
+    $headers = collect(range(1, 12))->map(fn (int $column): ?string => $sheet->getCell([$column, 1])->getValue())->filter()->values()->all();
+
+    expect($headers)->toBe(['Last Name', 'First Name', 'Middle Name', 'Extn.', 'Date of Birth', 'Employee ID', 'Position / Designation'])
+        ->and($sheet->getHighestDataRow())->toBe(3);
 });
