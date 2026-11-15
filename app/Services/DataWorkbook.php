@@ -70,7 +70,7 @@ class DataWorkbook
     }
 
     /**
-     * @param  list<array{module: Module, query: Builder<Model>}>  $requests
+     * @param  list<array{module: Module, query: Builder<Model>, only?: list<string>|null}>  $requests
      */
     public function build(array $requests): Spreadsheet
     {
@@ -80,7 +80,7 @@ class DataWorkbook
 
         foreach ($requests as $request) {
             $records = $request['query']->get();
-            $sheets[] = ['module' => $request['module'], 'records' => $records, 'remaining' => $this->remainingDays($request['module'], $records)];
+            $sheets[] = ['module' => $request['module'], 'records' => $records, 'remaining' => $this->remainingDays($request['module'], $records), 'only' => $request['only'] ?? null];
         }
 
         if (count($sheets) > 1) {
@@ -88,7 +88,7 @@ class DataWorkbook
         }
 
         foreach ($sheets as $sheet) {
-            $this->addSheet($spreadsheet, $sheet['module'], $sheet['records'], $sheet['remaining']);
+            $this->addSheet($spreadsheet, $sheet['module'], $sheet['records'], $sheet['remaining'], $sheet['only']);
         }
 
         $spreadsheet->setActiveSheetIndex(0);
@@ -121,11 +121,12 @@ class DataWorkbook
      * @param  Module  $module
      * @param  Collection<int, Model>  $records
      * @param  array<int, int>  $remaining
+     * @param  list<string>|null  $only  field names to write; null writes them all
      */
-    private function addSheet(Spreadsheet $spreadsheet, array $module, Collection $records, array $remaining): void
+    private function addSheet(Spreadsheet $spreadsheet, array $module, Collection $records, array $remaining, ?array $only = null): void
     {
         $sheet = $spreadsheet->createSheet()->setTitle($module['sheet']);
-        $fields = array_values($module['fields']);
+        $fields = array_values(array_filter($module['fields'], fn (array $field): bool => $only === null || in_array($field['name'], $only, true)));
 
         foreach ($fields as $index => $field) {
             $letter = Coordinate::stringFromColumnIndex($index + 1);

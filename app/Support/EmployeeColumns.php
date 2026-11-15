@@ -94,6 +94,32 @@ class EmployeeColumns
     }
 
     /**
+     * The workbook columns that match the table columns the person chose, or null to export every column.
+     * Nothing chosen (the usual set) means the full workbook, which also imports back cleanly.
+     *
+     * @return list<string>|null
+     */
+    public static function exportFields(Request $request): ?array
+    {
+        if ($request->query('cols') === null && self::valid(explode(',', (string) $request->cookie(self::COOKIE))) === []) {
+            return null;
+        }
+
+        $fields = ['employee_id'];
+
+        foreach (self::choose($request)['columns'] as $key) {
+            array_push($fields, ...match ($key) {
+                'name' => ['last_name', 'first_name', 'middle_name', 'extension'],
+                'status' => ['employment_status'],
+                'service' => ['length_of_service'],
+                default => [$key],
+            });
+        }
+
+        return array_values(array_unique($fields));
+    }
+
+    /**
      * What a column shows for one employee as plain text, for printouts and Word files.
      *
      * @param  array{label: string, sort: string|null, group: string, field: array<string, mixed>|null}  $column

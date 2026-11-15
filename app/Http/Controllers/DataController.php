@@ -8,6 +8,7 @@ use App\Models\ImportJob;
 use App\Services\DataImporter;
 use App\Services\DataWorkbook;
 use App\Services\PendingImports;
+use App\Support\EmployeeColumns;
 use App\Support\EmployeeSearch;
 use App\Support\HrDate;
 use App\Support\ImportModules;
@@ -66,7 +67,7 @@ class DataController extends Controller
 
             [$query, $filtered] = $this->filtered($request, $module, $workbook->query($module));
             $year = $this->year($request);
-            $requests = [['module' => $module, 'query' => $query]];
+            $requests = [['module' => $module, 'query' => $query, 'only' => $slug === 'employees' ? EmployeeColumns::exportFields($request) : null]];
             $name = 'hr-'.Str::slug($module['sheet']).($year && in_array($slug, self::YEARLY, true) ? "-{$year}" : ($filtered ? '-filtered' : ''));
         }
 
