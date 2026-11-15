@@ -22,7 +22,7 @@ Three developers work on this site, each with their own Claude Code session on a
 - Two people must not edit the same area at once: say in the Log or chat what you are starting.
 
 ## Current state
-- Live site: https://phlposthr.com, deployed manually. **Live commit:** record the short hash here after each deploy (last known base: `0e8febb`, before the premium login and the four June requests below).
+- Live site: https://phlposthr.com, deployed manually. **Live commit:** record the short hash here after each deploy (last known base: `0e8febb`, before the premium login and the changes in the log below).
 - Open items on the live site: run the active-employee import and the minimum-wage command (dry run first), wage rates for Region XII and BARMM are missing, 27 people have TEMP employee IDs to replace, two employees lack a region.
 
 ## Log (newest first)
