@@ -50,18 +50,20 @@
             <p>No employment history recorded.</p>
         @else
             <table class="w-full border-collapse">
-                <thead><tr class="bg-[#e8eef8]"><th class="{{ $cell }}">No.</th><th class="{{ $cell }}">From</th><th class="{{ $cell }}">To</th><th class="{{ $cell }}">Length</th><th class="{{ $cell }}">Position</th><th class="{{ $cell }}">Station</th><th class="{{ $cell }}">Status</th></tr></thead>
+                <thead><tr class="bg-[#e8eef8]"><th class="{{ $cell }}">No.</th><th class="{{ $cell }}">From</th><th class="{{ $cell }}">To</th><th class="{{ $cell }}">Length</th><th class="{{ $cell }}">Classification</th><th class="{{ $cell }}">Position</th><th class="{{ $cell }}">Station</th><th class="{{ $cell }}">Status</th></tr></thead>
                 <tbody>
-                    @foreach ($employment['rows'] as $row)
-                        @php($period = $row['period'])
+                    @foreach ($employment['stints'] as $stint)
+                        @php($period = $stint['period'])
+                        @php($isLast = $stint['to'] === $period->separated_on?->toDateString())
                         <tr class="break-inside-avoid">
-                            <td class="{{ $cell }}">{{ $row['number'] }}</td>
-                            <td class="{{ $cell }} whitespace-nowrap">{{ HrDate::format($period->hired_on) }}</td>
-                            <td class="{{ $cell }} whitespace-nowrap">{{ $period->separated_on ? HrDate::format($period->separated_on) : ($period->separation_type ? 'Date unknown' : 'Present') }}</td>
-                            <td class="{{ $cell }}">{{ HrDate::formatSpan($row['length']) ?: 'Less than a day' }}</td>
-                            <td class="{{ $cell }}">{{ $period->position }}</td>
+                            <td class="{{ $cell }}">{{ $stint['number'] }}</td>
+                            <td class="{{ $cell }} whitespace-nowrap">{{ HrDate::format($stint['from']) }}</td>
+                            <td class="{{ $cell }} whitespace-nowrap">{{ $stint['to'] ? HrDate::format($stint['to']) : ($period->separation_type ? 'Date unknown' : 'Present') }}</td>
+                            <td class="{{ $cell }}">{{ HrDate::formatSpan($stint['length']) ?: 'Less than a day' }}</td>
+                            <td class="{{ $cell }}">{{ $stint['classification']?->historyLabel() }}</td>
+                            <td class="{{ $cell }}">{{ $stint['position'] }}</td>
                             <td class="{{ $cell }}">{{ $period->station?->name }}</td>
-                            <td class="{{ $cell }}">{{ $period->separation_type?->value ?? 'Active' }}</td>
+                            <td class="{{ $cell }}">{{ $isLast ? ($period->separation_type?->value ?? 'Active') : 'Reclassified' }}</td>
                         </tr>
                     @endforeach
                 </tbody>
