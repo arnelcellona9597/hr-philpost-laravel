@@ -143,6 +143,19 @@
                     </div>
                 </div>
                 <div>
+                    <span class="label">Birthday celebrants</span>
+                    <div class="flex items-center gap-2">
+                        <select class="input" name="birthMonth" aria-label="Birthday month">
+                            <option value="">Any month</option>
+                            @foreach (range(1, 12) as $month)
+                                <option value="{{ $month }}" @selected($search->birthMonth === $month)>{{ date('F', mktime(0, 0, 0, $month, 1)) }}</option>
+                            @endforeach
+                        </select>
+                        <input class="input" type="number" min="1900" max="2100" name="birthYear" value="{{ $search->birthYear }}" aria-label="Year of birth" placeholder="year born" />
+                    </div>
+                    <p class="mt-1 text-xs text-muted">Pick a month to list who celebrates a birthday then.</p>
+                </div>
+                <div>
                     <span class="label">Length of service (years)</span>
                     <div class="flex items-center gap-2">
                         <input class="input" type="number" min="0" max="80" name="losMin" value="{{ $search->losMin }}" aria-label="Minimum years of service" placeholder="min" />

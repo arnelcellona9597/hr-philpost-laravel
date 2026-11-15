@@ -77,6 +77,10 @@ class EmployeeSearch
 
     public ?int $losMax;
 
+    public ?int $birthMonth;
+
+    public ?int $birthYear;
+
     public string $sort;
 
     public int $limit;
@@ -100,6 +104,8 @@ class EmployeeSearch
         $this->ageMax = self::number($request, 'ageMax');
         $this->losMin = self::number($request, 'losMin');
         $this->losMax = self::number($request, 'losMax');
+        $this->birthMonth = self::within(self::number($request, 'birthMonth'), 1, 12);
+        $this->birthYear = self::within(self::number($request, 'birthYear'), 1900, 2100);
 
         $sort = (string) $request->query('sort', 'fullName');
         $this->sort = isset(self::SORTS[ltrim($sort, '-')]) ? $sort : 'fullName';
@@ -151,6 +157,10 @@ class EmployeeSearch
         $query->when($this->ageMin !== null, fn (Builder $filtered) => $filtered->where('date_of_birth', '<=', HrDate::addYears($today, -$this->ageMin)));
         $query->when($this->ageMax !== null, fn (Builder $filtered) => $filtered->where('date_of_birth', '>', HrDate::addYears($today, -($this->ageMax + 1))));
 
+        // Birthday celebrants: everyone born in the chosen month, optionally of one birth year.
+        $query->when($this->birthMonth !== null, fn (Builder $filtered) => $filtered->whereMonth('date_of_birth', $this->birthMonth));
+        $query->when($this->birthYear !== null, fn (Builder $filtered) => $filtered->whereYear('date_of_birth', $this->birthYear));
+
         // Length of service in whole years, measured from the hire date to today.
         $query->when($this->losMin !== null, fn (Builder $filtered) => $filtered->where('date_hired', '<=', HrDate::addYears($today, -$this->losMin)));
         $query->when($this->losMax !== null, fn (Builder $filtered) => $filtered->where('date_hired', '>', HrDate::addYears($today, -($this->losMax + 1))));
@@ -166,7 +176,7 @@ class EmployeeSearch
     public function activeFilterCount(): int
     {
         $lists = [$this->status, $this->classification, $this->branch, $this->unit, $this->gender, $this->region, $this->civilStatus, $this->bloodType, $this->education];
-        $singles = [$this->position ?: null, $this->hiredFrom, $this->hiredTo, $this->ageMin, $this->ageMax, $this->losMin, $this->losMax];
+        $singles = [$this->position ?: null, $this->hiredFrom, $this->hiredTo, $this->ageMin, $this->ageMax, $this->losMin, $this->losMax, $this->birthMonth, $this->birthYear];
 
         return array_sum(array_map(count(...), $lists)) + count(array_filter($singles, fn (mixed $value): bool => $value !== null));
     }
@@ -200,5 +210,10 @@ class EmployeeSearch
         $value = $request->query($key);
 
         return is_string($value) && ctype_digit($value) ? (int) $value : null;
+    }
+
+    private static function within(?int $value, int $min, int $max): ?int
+    {
+        return $value !== null && $value >= $min && $value <= $max ? $value : null;
     }
 }
