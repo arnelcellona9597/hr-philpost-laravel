@@ -701,3 +701,86 @@
 #ed-indicator { position: absolute; left: 0; right: 0; height: 3px; border-radius: 3px; background: var(--brand-primary); box-shadow: 0 0 0 3px rgb(0 83 155 / 0.15); pointer-events: none; z-index: 6; }
 #ed-ghost { position: fixed; z-index: 80; pointer-events: none; padding: 6px 10px; border-radius: 8px; background: var(--surface); color: var(--fg); border: 1px solid var(--border-strong); box-shadow: var(--elev-pop); font-size: 13px; font-weight: 500; transform: translate(12px, 8px); }
 body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; user-select: none; }
+
+/* Sign-in and account pages: the main office photo, a deep navy veil and a frosted card. The card is always dark, whatever the theme. */
+.auth-stage {
+  background: #07101f;
+}
+.auth-photo {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background-position: center;
+  background-size: cover;
+  transform: scale(1.04);
+  animation: auth-drift 38s ease-in-out infinite alternate;
+}
+.auth-veil {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgb(7 18 38 / 0.35), transparent 60%),
+    linear-gradient(105deg, rgb(6 16 34 / 0.94) 0%, rgb(8 26 56 / 0.82) 42%, rgb(7 18 38 / 0.62) 100%);
+}
+.auth-rule {
+  background: linear-gradient(90deg, var(--brand-accent), transparent);
+}
+.auth-glass {
+  color-scheme: dark;
+  --surface: rgb(12 21 40 / 0.55);
+  --surface-2: rgb(255 255 255 / 0.06);
+  --surface-3: rgb(255 255 255 / 0.1);
+  --border: rgb(255 255 255 / 0.14);
+  --border-strong: rgb(255 255 255 / 0.28);
+  --fg: #f4f6fa;
+  --fg-2: #cdd3df;
+  --muted: #9aa4b6;
+  --primary-ink: color-mix(in oklab, var(--brand-primary) 45%, white);
+  --success-soft: color-mix(in oklab, var(--brand-success) 28%, transparent);
+  --success: color-mix(in oklab, var(--brand-success) 55%, white);
+  --warning-soft: color-mix(in oklab, var(--brand-warning) 22%, transparent);
+  --warning: color-mix(in oklab, var(--brand-warning) 65%, white);
+  --danger-soft: color-mix(in oklab, var(--brand-danger) 28%, transparent);
+  --danger: color-mix(in oklab, var(--brand-danger) 45%, white);
+  --primary-soft: rgb(255 255 255 / 0.1);
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(22px) saturate(1.2);
+  -webkit-backdrop-filter: blur(22px) saturate(1.2);
+  box-shadow:
+    0 30px 70px -20px rgb(0 0 0 / 0.65),
+    inset 0 1px 0 rgb(255 255 255 / 0.12);
+}
+.auth-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0 1.5rem auto;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: linear-gradient(90deg, transparent, var(--brand-accent), transparent);
+}
+.auth-glass .input {
+  background: rgb(255 255 255 / 0.07);
+}
+.auth-rise {
+  animation: auth-rise 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes auth-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+@keyframes auth-drift {
+  to {
+    transform: scale(1.12) translate3d(-1.5%, -1%, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-photo,
+  .auth-rise {
+    animation: none;
+  }
+}

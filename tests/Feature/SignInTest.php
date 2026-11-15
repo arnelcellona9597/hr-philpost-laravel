@@ -365,3 +365,12 @@ it('says so when the code could not be emailed, and the break-glass code still w
 
     $this->post('/login/verify/resend')->assertSessionHasErrors(['code' => SignInService::NOT_SENT]);
 });
+
+it('shows the sign-in page over the main office photo, with the brand and a frosted card', function () {
+    $this->get('/login')->assertOk()
+        ->assertSee('images/login-background.jpg', false)
+        ->assertSee('auth-glass', false)
+        ->assertSee('Sign in');
+
+    expect(public_path('images/login-background.jpg'))->toBeFile();
+});
