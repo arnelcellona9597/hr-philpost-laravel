@@ -107,6 +107,16 @@
                                     </div>
                                     <span class="{{ $period->isOpen() ? 'badge-success' : 'badge-neutral' }}">{{ $period->separation_type?->value ?? 'Active' }}</span>
                                 </div>
+                                @if (count($row['segments']) > 1)
+                                    <ul class="mt-2 space-y-1 border-l-2 border-line pl-3 text-xs">
+                                        @foreach ($row['segments'] as $segment)
+                                            <li class="tabular">
+                                                <span class="font-medium">{{ $segment['classification']?->historyLabel() }}</span>
+                                                <span class="text-muted">· {{ HrDate::format($segment['from']) }} – {{ $segment['to'] ? HrDate::format($segment['to']) : 'present' }}{{ $segment['position'] ? ' · '.$segment['position'] : '' }}</span>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                @endif
                                 @if ($period->remarks)
                                     <p class="mt-1 text-xs text-fg-2">{{ $period->remarks }}</p>
                                 @endif

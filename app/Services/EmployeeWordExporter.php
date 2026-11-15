@@ -243,20 +243,22 @@ class EmployeeWordExporter
 
         $rows = [];
 
-        foreach ($summary['rows'] as $row) {
-            $period = $row['period'];
+        foreach ($summary['stints'] as $stint) {
+            $period = $stint['period'];
+            $isLast = $stint['to'] === $period->separated_on?->toDateString();
             $rows[] = [
-                (string) $row['number'],
-                HrDate::format($period->hired_on),
-                $period->separated_on ? HrDate::format($period->separated_on) : ($period->separation_type ? 'Date unknown' : 'Present'),
-                HrDate::formatSpan($row['length']) ?: 'Less than a day',
-                (string) $period->position,
+                (string) $stint['number'],
+                HrDate::format($stint['from']),
+                $stint['to'] ? HrDate::format($stint['to']) : ($period->separation_type ? 'Date unknown' : 'Present'),
+                HrDate::formatSpan($stint['length']) ?: 'Less than a day',
+                (string) $stint['classification']?->historyLabel(),
+                (string) $stint['position'],
                 (string) $period->station?->name,
-                $period->separation_type?->value ?? 'Active',
+                $isLast ? ($period->separation_type?->value ?? 'Active') : 'Reclassified',
             ];
         }
 
-        $this->grid($section, ['No.', 'From', 'To', 'Length', 'Position', 'Station', 'Status'], $rows);
+        $this->grid($section, ['No.', 'From', 'To', 'Length', 'Classification', 'Position', 'Station', 'Status'], $rows);
 
         if ($summary['total']) {
             $section->addText('Total service: '.HrDate::formatSpan($summary['total']), ['bold' => true], ['spaceBefore' => 40]);

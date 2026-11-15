@@ -429,3 +429,35 @@ it('keeps wage orders away from signed-out visitors', function () {
 
     $this->get('/wage-orders')->assertRedirectContains('/login');
 });
+
+it('shows a COS worker who became Regular as two separate employment stints', function () {
+    $this->travelTo('2026-11-15');
+    $employee = worker(['position' => 'Acting Letter Carrier', 'date_hired' => '2024-08-19']);
+
+    $this->post("/employees/{$employee->id}/positions", ['change_type' => 'Promotion', 'effective_on' => '2026-09-28', 'to_position' => 'Letter Carrier', 'to_classification' => 'Regular']);
+
+    $summary = app(EmploymentHistoryService::class)->summary($employee->fresh());
+    [$cos, $regular] = $summary['stints'];
+
+    expect($summary['rows'])->toHaveCount(1)
+        ->and($summary['stints'])->toHaveCount(2)
+        ->and($cos['from'])->toBe('2024-08-19')->and($cos['to'])->toBe('2026-09-27')
+        ->and($cos['classification'])->toBe(Classification::Cos)->and($cos['position'])->toBe('Acting Letter Carrier')
+        ->and($regular['from'])->toBe('2026-09-28')->and($regular['to'])->toBeNull()
+        ->and($regular['classification'])->toBe(Classification::Regular)->and($regular['position'])->toBe('Letter Carrier')
+        ->and($summary['total'])->toMatchArray(['years' => 2, 'months' => 2]);
+
+    $this->get("/employees/{$employee->id}/print")
+        ->assertSee('Contract of Service (COS)')->assertSee('Regular Employee')
+        ->assertSee('Sep 27, 2026')->assertSee('Sep 28, 2026')->assertSee('Present');
+    $this->get("/employees/{$employee->id}")->assertSee('Contract of Service (COS)')->assertSee('Regular Employee');
+});
+
+it('keeps one stint when nobody changed classification and ignores future promotions', function () {
+    $this->travelTo('2026-11-15');
+    $employee = worker(['date_hired' => '2024-08-19']);
+
+    $this->post("/employees/{$employee->id}/positions", ['change_type' => 'Promotion', 'effective_on' => '2027-01-05', 'to_position' => 'Clerk', 'to_classification' => 'Regular']);
+
+    expect(app(EmploymentHistoryService::class)->summary($employee->fresh())['stints'])->toHaveCount(1);
+});
