@@ -111,7 +111,7 @@ it('queues the email once when an applicant is hired', function () {
 
     expect($recipient->email)->toBe('ana@example.test')
         ->and($recipient->status)->toBe(RecipientStatus::Queued)
-        ->and($recipient->body)->toContain('Dear Ana,')->toContain('• PDS')->toContain('Revised CS Form 212')
+        ->and($recipient->body)->toContain('Dear Ana,')->toContain('• PDS')->toContain('Revised Form 2025 CS Form 212')
         ->and($recipient->message->automatic)->toBeTrue()
         ->and($application->fresh()->requirements_email_sent_at)->not->toBeNull()
         ->and($application->fresh()->requirements_email_to)->toBe('ana@example.test');
@@ -268,11 +268,12 @@ it('sends a formal email with the full list of employment requirements', functio
     $recipient = MessageRecipient::query()->firstOrFail();
 
     expect($recipient->subject)->toContain('Documentary requirements for employment')
-        ->and($recipient->body)->toContain('• Three (3) sets of notarized')
-        ->toContain('• Police Clearance')
-        ->toContain('Landbank account details')
-        ->toContain('within ten (10) days upon assumption')
-        ->toContain('Additional requirements for COS Letter Carriers only')
+        ->and($recipient->body)->toContain('REQUIREMENTS FOR COS EMPLOYMENT')
+        ->toContain('1. 3 Sets of Computerized Personal Data Sheet (PDS) - Notarized')
+        ->toContain('5. Police Clearance')
+        ->toContain('9. Landbank Account Details')
+        ->toContain('BIR Requirements - to be submitted within 10 days upon assumption')
+        ->toContain('ADDITIONAL REQUIREMENTS FOR COS LETTER CARRIER')
         ->toContain("Professional Driver's License")
         ->toContain('OR/CR')
         ->toContain('Our records show that the following are still outstanding:');
@@ -285,9 +286,23 @@ it('updates the saved email only when HR has not edited it', function () {
 
     $template->update(['subject' => $old[0], 'body' => $old[1]]);
     $migration->up();
-    expect($template->fresh()->body)->toContain('Revised CS Form 212');
+    expect($template->fresh()->body)->toContain('Revised Form 2025 CS Form 212');
 
     $template->update(['subject' => $old[0], 'body' => $old[1].' Edited by HR.']);
     $migration->up();
-    expect($template->fresh()->body)->toEndWith('Edited by HR.')->not->toContain('Revised CS Form 212');
+    expect($template->fresh()->body)->toEndWith('Edited by HR.')->not->toContain('Revised Form 2025 CS Form 212');
+});
+
+it('lays the saved email out like the requirements sheet only when HR has not edited it', function () {
+    $migration = require database_path('migrations/2026_11_17_181508_format_hired_requirements_email_like_requirements_sheet.php');
+    $old = (fn () => [self::OLD_SUBJECT, self::OLD_BODY])->call($migration);
+    $template = EmailTemplate::query()->where('key', 'hired-requirements')->firstOrFail();
+
+    $template->update(['subject' => $old[0], 'body' => $old[1]]);
+    $migration->up();
+    expect($template->fresh()->body)->toContain('REQUIREMENTS FOR COS EMPLOYMENT')->toContain('{{requirementsList}}');
+
+    $template->update(['subject' => $old[0], 'body' => $old[1].' Edited by HR.']);
+    $migration->up();
+    expect($template->fresh()->body)->toEndWith('Edited by HR.')->not->toContain('REQUIREMENTS FOR COS EMPLOYMENT');
 });
