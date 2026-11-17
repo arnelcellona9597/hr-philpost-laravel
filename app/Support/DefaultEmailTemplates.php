@@ -67,29 +67,36 @@ class DefaultEmailTemplates
                 'body' => <<<'TEXT'
                     Dear {{firstName}},
 
-                    Congratulations on your selection as {{position}} at {{station}}. To process your Contract of Service (COS) engagement, please submit the following documentary requirements to the HR office:
+                    Congratulations on your selection as {{position}} at {{station}}. To process your Contract of Service (COS) engagement, please submit the following requirements to the HR office:
 
-                    • Three (3) sets of notarized, computerized Personal Data Sheet (PDS), Revised CS Form 212 (2025), downloadable at csc.gov.ph
-                    • Three (3) passport-size ID pictures with white background, attached to the PDS
-                    • Three (3) copies of handwriting specimen
-                    • Laboratory tests evaluated by a government physician, with a duly signed Medical Certificate: photocopy of vaccination card, CBC and blood typing, urinalysis, chest X-ray and drug test
-                    • Police Clearance
-                    • Documentary stamps (₱30.00), attached to the Medical Certificate
-                    • Government-issued ID, to be presented with the PDS
-                    • Landbank account details
+                    REQUIREMENTS FOR COS EMPLOYMENT
 
-                    BIR requirements, to be submitted within ten (10) days upon assumption of duty:
-                    • TIN number or TIN verification
-                    • Notarized Sworn Declaration (Annex B-2), two (2) original copies with documentary stamps
+                    1. 3 Sets of Computerized Personal Data Sheet (PDS) - Notarized
+                       Revised Form 2025 CS Form 212, downloadable at csc.gov.ph
+                    2. 3 pieces passport-size ID picture in white background, attached to the PDS
+                    3. Handwriting specimen, 3 copies (attached)
+                    4. Lab Test evaluated by Government Physician and duly signed Medical Certificate
+                       - Photocopy of Vaccination Card
+                       - CBC and Blood Typing
+                       - Urinalysis
+                       - Chest X-ray
+                       - Drug Test
+                    5. Police Clearance
+                    6. Documentary stamps (attach to Medical Certificate - ₱30.00 doc stamps)
+                    7. BIR Requirements - to be submitted within 10 days upon assumption
+                       - TIN Number or TIN Verification
+                       - Notarized Sworn Declaration Form Annex B-2 (submit 2 original copies with doc stamps)
+                    8. Government-issued ID, to be presented with the PDS
+                       Attachments for 1st Salary:
+                       - Assumption to Duty
+                       - Sworn Declaration (Notarized)
+                       - DTR print-out (Biometrics), duly signed by Supervisor/Management, with Accomplishment Report
+                    9. Landbank Account Details
 
-                    Attachments for your first salary:
-                    • Assumption to Duty
-                    • Notarized Sworn Declaration
-                    • DTR print-out (biometrics), duly signed by your supervisor, with Accomplishment Report
+                    ADDITIONAL REQUIREMENTS FOR COS LETTER CARRIER
 
-                    Additional requirements for COS Letter Carriers only:
-                    • Photocopy of updated and valid Professional Driver's License
-                    • Photocopy of updated and valid OR/CR of your owned motorcycle
+                    1. Photocopy of updated/valid Professional Driver's License
+                    2. Photocopy of updated/valid OR/CR of owned Motorcycle
 
                     Our records show that the following are still outstanding:
                     {{requirementsList}}
