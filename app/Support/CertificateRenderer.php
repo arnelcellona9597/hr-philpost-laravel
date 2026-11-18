@@ -108,7 +108,7 @@ class CertificateRenderer
 
         $section = trim((string) ($block['section'] ?? '')) === '' ? '' : '<table style="width:100%;border-collapse:collapse"><tr><td></td><td style="width:1%;white-space:nowrap;background:#111418;color:#fff;font-size:9.5pt;font-weight:bold;font-family:Helvetica,Arial,sans-serif;padding:2pt 16pt;-webkit-print-color-adjust:exact;print-color-adjust:exact">'.e($block['section']).'</td></tr></table>';
 
-        return '<table style="width:100%;border-collapse:collapse"><tr><td style="vertical-align:middle;padding:0 0 4pt">'.$text.'</td><td style="vertical-align:middle;text-align:right;padding:0 0 4pt 12pt">'.$logo.'</td></tr></table>'
+        return '<table style="width:100%;border-collapse:collapse"><tr><td style="vertical-align:top;padding:0 0 4pt">'.$text.'</td><td style="vertical-align:top;text-align:right;padding:4pt 0 4pt 12pt">'.$logo.'</td></tr></table>'
             .'<div style="border-top:2.5pt solid #111418"></div>'.$section;
     }
 
