@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * A station, division, section or unit under a branch. It may have no branch until HR places it.
  */
-#[Fillable(['branch_id', 'name'])]
+#[Fillable(['branch_id', 'name', 'wage_area'])]
 class BranchUnit extends Model
 {
     /** @use HasFactory<BranchUnitFactory> */

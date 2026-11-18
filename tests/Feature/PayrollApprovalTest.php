@@ -5,6 +5,7 @@ use App\Enums\EmploymentStatus;
 use App\Enums\PayrollStatus;
 use App\Enums\Region;
 use App\Models\Branch;
+use App\Models\BranchUnit;
 use App\Models\ContractSetting;
 use App\Models\Employee;
 use App\Models\PayChange;
@@ -52,6 +53,26 @@ it('pays the regional minimum of the station region, with the configured premium
         ->and($before->cosPay()['total_daily_rate'])->toBe(52_900)
         ->and($after->wage_order_id)->toBe(WageOrder::query()->where('order_number', 'RB XII-25')->value('id'))
         ->and($worker->payChanges()->count())->toBe(0);
+});
+
+it('pays BARMM workers by the wage area of their unit or branch and reviews each area apart', function () {
+    $cotabato = Branch::factory()->create(['name' => 'Cotabato City Post Office', 'region' => Region::Barmm, 'wage_area' => 'Cotabato City']);
+    $datuPiang = BranchUnit::factory()->create(['branch_id' => $cotabato->id, 'name' => 'Datu Piang Post Office', 'wage_area' => 'Maguindanao del Sur']);
+    WageOrder::factory()->create(['region' => 'BARMM', 'area' => 'Cotabato City', 'order_number' => 'BARMM-05', 'daily_rate_centavos' => 43_600, 'effective_on' => '2026-08-06']);
+    WageOrder::factory()->create(['region' => 'BARMM', 'area' => 'Maguindanao del Sur', 'order_number' => 'BARMM-05', 'daily_rate_centavos' => 41_100, 'effective_on' => '2026-08-06']);
+    gensanWorker(['station_id' => $cotabato->id]);
+    gensanWorker(['station_id' => $cotabato->id, 'unit_id' => $datuPiang->id]);
+    $period = semiMonthly(1);
+
+    app(PayrollService::class)->generate($period);
+
+    expect(Payslip::query()->orderBy('daily_rate_centavos')->get(['wage_area', 'daily_rate_centavos', 'rate_source'])->toArray())->toBe([
+        ['wage_area' => 'Maguindanao del Sur', 'daily_rate_centavos' => 41_100, 'rate_source' => 'regional'],
+        ['wage_area' => 'Cotabato City', 'daily_rate_centavos' => 43_600, 'rate_source' => 'regional'],
+    ]);
+
+    signIn($this->staff);
+    $this->get("/payroll/{$period->id}")->assertOk()->assertSee('BARMM · Cotabato City')->assertSee('BARMM · Maguindanao del Sur')->assertSee('₱411.00');
 });
 
 it('uses an older wage order for a period that ended before the new one took effect', function () {

@@ -13,9 +13,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * A minimum wage set for a region and sector from a given date.
+ * A minimum wage set for a region and sector from a given date. A blank area covers the whole region;
+ * a named area (e.g. Cotabato City) covers only the branches and units placed in that area.
  */
-#[Fillable(['region', 'order_number', 'sector', 'daily_rate_centavos', 'effective_on', 'remarks'])]
+#[Fillable(['region', 'area', 'order_number', 'sector', 'daily_rate_centavos', 'effective_on', 'remarks'])]
 class WageOrder extends Model
 {
     /** @use HasFactory<WageOrderFactory> */
@@ -36,11 +37,31 @@ class WageOrder extends Model
     }
 
     /**
+     * Blank means the whole region, stored as ''.
+     *
+     * @return Attribute<string, string|null>
+     */
+    protected function area(): Attribute
+    {
+        return Attribute::make(get: fn (?string $value): string => (string) $value, set: fn (?string $value): string => trim((string) $value));
+    }
+
+    /**
      * @return Attribute<string, never>
      */
     protected function label(): Attribute
     {
-        return Attribute::get(fn (): string => "{$this->display_name} ({$this->region?->value})");
+        return Attribute::get(fn (): string => "{$this->display_name} ({$this->coverage})");
+    }
+
+    /**
+     * "BARMM · Cotabato City", or the region alone for a region-wide order.
+     *
+     * @return Attribute<string, never>
+     */
+    protected function coverage(): Attribute
+    {
+        return Attribute::get(fn (): string => $this->region?->value.($this->area !== '' && $this->area !== null ? ' · '.$this->area : ''));
     }
 
     /**

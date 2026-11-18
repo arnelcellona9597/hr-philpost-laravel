@@ -262,7 +262,7 @@
                                         @endif
                                     </td>
                                     <td>{{ $slip->station }}</td>
-                                    <td>{{ $slip->region ?: '—' }}</td>
+                                    <td>{{ $slip->region ?: '—' }}@if ($slip->wage_area)<span class="block text-[11px] text-muted">{{ $slip->wage_area }}</span>@endif</td>
                                     <td>
                                         <span @class(['text-muted' => $slip->rate_source === 'contract', 'text-primary-ink' => $slip->rate_source === 'regional', 'text-danger' => ! $slip->rate_source])>{{ $slip->rateSourceLabel() }}</span>
                                         @if ($slip->isBelowMinimum())

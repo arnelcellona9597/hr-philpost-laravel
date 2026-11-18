@@ -51,7 +51,7 @@ class PayHistoryService
             $current = $upcoming ? $current : $change;
         }
 
-        $minimum = $this->minimumFor($this->regionOf($employee), $today);
+        $minimum = $this->minimumFor($this->regionOf($employee), $today, $this->wageAreaOf($employee));
 
         return [
             'rows' => $rows,
@@ -74,34 +74,42 @@ class PayHistoryService
     }
 
     /**
-     * The highest minimum in force for a region on a date, when a region has several sectors.
+     * The minimum in force on a date for a region, or for a wage area inside it. An area with its own
+     * wage orders follows those; anyone else gets the region-wide order (blank area). Where several
+     * sectors apply, the highest rate wins.
      */
-    public function minimumFor(?Region $region, ?string $date = null): ?WageOrder
+    public function minimumFor(?Region $region, ?string $date = null, ?string $area = null): ?WageOrder
     {
         if ($region === null) {
             return null;
         }
 
-        return WageOrder::query()
+        $inForce = fn (string $area): ?WageOrder => WageOrder::query()
             ->where('region', $region->value)
+            ->where('area', $area)
             ->where('effective_on', '<=', $date ?? HrDate::today())
             ->orderByDesc('effective_on')
             ->orderByDesc('daily_rate_centavos')
             ->first();
+
+        $area = trim((string) $area);
+
+        return ($area !== '' ? $inForce($area) : null) ?? $inForce('');
     }
 
     /**
      * The daily rate a COS worker is paid in a payroll period ending on $date: their own contract rate
-     * from pay history when they have a daily one, otherwise the regional minimum for their work
-     * location's region, with the premium set in Officials and wages. The regional minimum in force
+     * from pay history when they have a daily one, otherwise the minimum for their work
+     * location (the wage area of their station/unit or branch, else their region), with the premium set in Officials and wages. The regional minimum in force
      * is always returned too, so payroll can flag a contract rate below it.
      *
-     * @return array{amount_centavos: int, premium_percent: float, source: string|null, wage_order_id: int|null, region: string|null, minimum_centavos: int|null}
+     * @return array{amount_centavos: int, premium_percent: float, source: string|null, wage_order_id: int|null, region: string|null, wage_area: string|null, minimum_centavos: int|null}
      */
     public function payrollRate(Employee $employee, string $date): array
     {
         $region = $this->regionOf($employee);
-        $minimum = $this->minimumFor($region, $date);
+        $area = $this->wageAreaOf($employee);
+        $minimum = $this->minimumFor($region, $date, $area);
         $contract = $this->rateOn($employee, $date);
 
         if ($contract !== null && $contract->rate_type === RateType::Daily) {
@@ -111,6 +119,7 @@ class PayHistoryService
                 'source' => 'contract',
                 'wage_order_id' => $contract->wage_order_id,
                 'region' => $region?->value,
+                'wage_area' => $area,
                 'minimum_centavos' => $minimum?->daily_rate_centavos,
             ];
         }
@@ -121,6 +130,7 @@ class PayHistoryService
             'source' => $minimum ? 'regional' : null,
             'wage_order_id' => $minimum?->id,
             'region' => $region?->value,
+            'wage_area' => $area,
             'minimum_centavos' => $minimum?->daily_rate_centavos,
         ];
     }
@@ -128,6 +138,24 @@ class PayHistoryService
     public function regionOf(Employee $employee): ?Region
     {
         return $employee->region ?? $employee->station?->region;
+    }
+
+    /**
+     * The minimum wage area of the employee's station/unit, else of their branch, e.g. "Cotabato City".
+     */
+    public function wageAreaOf(Employee $employee): ?string
+    {
+        $area = trim((string) ($employee->unit?->wage_area ?: $employee->station?->wage_area));
+
+        return $area === '' ? null : $area;
+    }
+
+    /**
+     * The SQL for an employee's wage area, for queries joining employees e, branches b and branch_units u.
+     */
+    public static function wageAreaSql(): string
+    {
+        return "COALESCE(NULLIF(TRIM(u.wage_area), ''), NULLIF(TRIM(b.wage_area), ''), '')";
     }
 
     /**
@@ -177,14 +205,20 @@ class PayHistoryService
     public function impact(WageOrder $order): array
     {
         $date = $order->effective_on->toDateString();
-        $next = WageOrder::query()->where('region', $order->region->value)->where('sector', $order->sector)->where('effective_on', '>', $date)->min('effective_on');
+        $next = WageOrder::query()->where('region', $order->region->value)->where('area', (string) $order->area)->where('sector', $order->sector)->where('effective_on', '>', $date)->min('effective_on');
+        $areaSql = self::wageAreaSql();
+        // A region-wide order skips people whose area has wage orders of its own.
+        $ownAreas = WageOrder::query()->where('region', $order->region->value)->where('area', '<>', '')->distinct()->pluck('area')->all();
         $applied = PayChange::query()->where('wage_order_id', $order->id)->pluck('employee_id')->flip();
         $impact = ['pending' => [], 'applied' => $applied->count(), 'atOrAbove' => 0, 'monthly' => 0, 'noRate' => 0];
 
         $periods = DB::table('employment_periods as p')
             ->join('employees as e', 'e.id', '=', 'p.employee_id')
             ->leftJoin('branches as b', 'b.id', '=', 'e.station_id')
+            ->leftJoin('branch_units as u', 'u.id', '=', 'e.unit_id')
             ->whereRaw('COALESCE(e.region, b.region) = ?', [$order->region->value])
+            ->when((string) $order->area !== '', fn ($query) => $query->whereRaw("{$areaSql} = ?", [$order->area]))
+            ->when((string) $order->area === '' && $ownAreas !== [], fn ($query) => $query->whereRaw("{$areaSql} NOT IN (".implode(',', array_fill(0, count($ownAreas), '?')).')', $ownAreas))
             ->where(fn ($query) => $query->whereNull('p.separated_on')->orWhere('p.separated_on', '>=', $date))
             ->when($next, fn ($query) => $query->where('p.hired_on', '<', $next))
             ->orderBy('p.hired_on')

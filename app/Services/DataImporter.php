@@ -271,7 +271,7 @@ class DataImporter
         }
 
         $missing = array_filter($module['fields'], fn (array $field): bool => ! ($field['computed'] ?? false)
-            && (($field['required'] ?? false) || in_array(RecordForm::column($field), $module['key'], true))
+            && (($field['required'] ?? false) || (in_array(RecordForm::column($field), $module['key'], true) && ! ($field['optional_key'] ?? false)))
             && ! isset($seen[$field['name']]));
 
         if ($missing !== []) {

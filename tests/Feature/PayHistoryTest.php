@@ -8,6 +8,7 @@ use App\Enums\Region;
 use App\Exceptions\UserFacingException;
 use App\Models\AuditLog;
 use App\Models\Branch;
+use App\Models\BranchUnit;
 use App\Models\Contract;
 use App\Models\ContractSetting;
 use App\Models\Employee;
@@ -365,15 +366,65 @@ it('records the Caraga rates under Region XIII and is safe to run twice', functi
     expect($page->viewData('inForce')->get('Region XI')->daily_rate_centavos)->toBe(52_500);
 });
 
-it('records the Region XII and BARMM wage orders so their workers fall back to a regional minimum', function () {
+it('records the Region XII wage orders and the BARMM ones by area', function () {
     app(RegionalWageSeeder::class)->run();
     $service = app(PayHistoryService::class);
 
     expect($service->minimumFor(Region::RegionXii, '2026-11-15')->daily_rate_centavos)->toBe(46_000)
         ->and($service->minimumFor(Region::RegionXii, '2026-11-30')->order_number)->toBe('XII-26 (1st tranche)')
         ->and($service->minimumFor(Region::RegionXii, '2027-01-01')->daily_rate_centavos)->toBe(50_100)
-        ->and($service->minimumFor(Region::Barmm, '2026-11-15')->daily_rate_centavos)->toBe(43_600)
-        ->and($service->minimumFor(Region::Barmm, '2026-12-15')->daily_rate_centavos)->toBe(46_100);
+        ->and($service->minimumFor(Region::Barmm, '2026-11-15', 'Cotabato City')->daily_rate_centavos)->toBe(43_600)
+        ->and($service->minimumFor(Region::Barmm, '2026-12-15', 'Cotabato City')->daily_rate_centavos)->toBe(46_100)
+        ->and($service->minimumFor(Region::Barmm, '2026-11-15', 'Maguindanao del Norte')->daily_rate_centavos)->toBe(41_100)
+        ->and($service->minimumFor(Region::Barmm, '2026-12-15', 'Maguindanao del Sur')->daily_rate_centavos)->toBe(43_600)
+        ->and($service->minimumFor(Region::Barmm, '2026-11-15'))->toBeNull();
+});
+
+it('pays each worker the minimum of their unit\'s wage area, else their branch\'s, else the region\'s', function () {
+    app(RegionalWageSeeder::class)->run();
+    $cotabato = Branch::factory()->create(['name' => 'Cotabato City Post Office', 'region' => Region::Barmm, 'wage_area' => 'Cotabato City']);
+    $parang = Branch::factory()->create(['name' => 'Parang Post Office', 'region' => Region::Barmm, 'wage_area' => 'Maguindanao del Norte']);
+    $datuPiang = BranchUnit::factory()->create(['branch_id' => $cotabato->id, 'name' => 'Datu Piang Post Office', 'wage_area' => 'Maguindanao del Sur']);
+    $plainUnit = BranchUnit::factory()->create(['branch_id' => $cotabato->id, 'name' => 'Mail Sorting']);
+    $davao = Branch::factory()->create(['region' => Region::RegionXi]);
+    WageOrder::factory()->create(['region' => Region::RegionXi, 'daily_rate_centavos' => 54_000, 'effective_on' => '2026-09-01']);
+    $service = app(PayHistoryService::class);
+
+    $rate = fn (array $attributes): array => $service->payrollRate(worker(['region' => null, ...$attributes])->load(['station', 'unit']), '2026-11-15');
+
+    expect($rate(['station_id' => $cotabato->id]))->toMatchArray(['amount_centavos' => 43_600, 'source' => 'regional', 'region' => 'BARMM', 'wage_area' => 'Cotabato City'])
+        ->and($rate(['station_id' => $cotabato->id, 'unit_id' => $plainUnit->id])['amount_centavos'])->toBe(43_600)
+        ->and($rate(['station_id' => $cotabato->id, 'unit_id' => $datuPiang->id]))->toMatchArray(['amount_centavos' => 41_100, 'wage_area' => 'Maguindanao del Sur'])
+        ->and($rate(['station_id' => $parang->id])['amount_centavos'])->toBe(41_100)
+        ->and($rate(['station_id' => $davao->id]))->toMatchArray(['amount_centavos' => 54_000, 'wage_area' => null]);
+});
+
+it('applies an area\'s wage order only to the people placed in that area', function () {
+    $cotabato = Branch::factory()->create(['region' => Region::Barmm, 'wage_area' => 'Cotabato City']);
+    $parang = Branch::factory()->create(['region' => Region::Barmm, 'wage_area' => 'Maguindanao del Norte']);
+    $city = worker(['region' => null, 'station_id' => $cotabato->id]);
+    $province = worker(['region' => null, 'station_id' => $parang->id]);
+    $cityOrder = WageOrder::factory()->create(['region' => Region::Barmm, 'area' => 'Cotabato City', 'daily_rate_centavos' => 43_600, 'effective_on' => '2026-05-01']);
+    $regionWide = WageOrder::factory()->create(['region' => Region::Barmm, 'daily_rate_centavos' => 40_000, 'effective_on' => '2026-05-01', 'sector' => 'Agriculture']);
+
+    expect(app(PayHistoryService::class)->apply($cityOrder))->toBe(1)
+        ->and($city->payChanges()->sole()->amount_centavos)->toBe(43_600)
+        ->and($province->payChanges()->count())->toBe(0)
+        ->and(app(PayHistoryService::class)->impact($regionWide)['pending'])->toBe([['employee_id' => $province->id, 'effective_on' => '2026-05-01', 'premium' => null]]);
+
+    $this->get('/wage-orders')->assertOk()->assertSee('Cotabato City')->assertSee('Whole region');
+    $this->get("/wage-orders/{$cityOrder->id}")->assertOk()->assertSee('BARMM · Cotabato City');
+});
+
+it('keeps one wage order per region, area, sector and date', function () {
+    $form = ['region' => 'BARMM', 'order_number' => 'BARMM-05', 'sector' => 'Non-agriculture', 'daily_rate_centavos' => '436.00', 'effective_on' => '2026-08-06'];
+
+    $this->post('/wage-orders', [...$form, 'area' => ' Cotabato City '])->assertRedirect();
+    $this->post('/wage-orders', [...$form, 'area' => 'Maguindanao del Norte', 'daily_rate_centavos' => '411.00'])->assertRedirect();
+    $this->post('/wage-orders', $form)->assertRedirect();
+    $this->post('/wage-orders', [...$form, 'area' => 'Cotabato City'])->assertSessionHasErrors('effective_on');
+
+    expect(WageOrder::query()->orderBy('area')->pluck('area')->all())->toBe(['', 'Cotabato City', 'Maguindanao del Norte']);
 });
 
 it('keeps each person\'s premium unless a new one is given', function () {

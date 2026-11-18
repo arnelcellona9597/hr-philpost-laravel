@@ -10,7 +10,7 @@ use App\Services\PayHistoryService;
 use Illuminate\Support\Collection;
 
 /**
- * What a reviewer checks before a payroll period is approved: per region, the wage order in force,
+ * What a reviewer checks before a payroll period is approved: per region (and wage area inside it), the wage order in force,
  * the minimum, the premium and the adjusted daily rate, how many workers fall back to the regional
  * minimum and how many are paid below it, plus workers with no rate at all.
  *
@@ -27,18 +27,20 @@ class PayrollReview
         $regions = [];
         $pay = app(PayHistoryService::class);
 
-        // Payslips made before regions were recorded fall back to the worker's current station region.
+        // Payslips made before regions were recorded fall back to the worker's current station region and area.
         $regionOf = fn (Payslip $slip): string => $slip->region ?: ($slip->employee ? $pay->regionOf($slip->employee)?->value : null) ?: 'No region';
+        $areaOf = fn (Payslip $slip): string => (string) ($slip->wage_area ?: ($slip->employee && ! $slip->region ? $pay->wageAreaOf($slip->employee) : null));
 
-        foreach ($slips->groupBy($regionOf) as $region => $group) {
+        foreach ($slips->groupBy(fn (Payslip $slip): string => $regionOf($slip).'|'.$areaOf($slip)) as $key => $group) {
+            [$region, $area] = explode('|', (string) $key, 2);
             $regional = $group->firstWhere('rate_source', 'regional');
-            $order = $pay->minimumFor(Region::tryFrom((string) $region), $periodEnd);
+            $order = $pay->minimumFor(Region::tryFrom($region), $periodEnd, $area);
             $minimum = $order?->daily_rate_centavos;
             $premiums = $group->map(fn (Payslip $slip): string => rtrim(rtrim((string) $slip->premium_percent, '0'), '.').'%')->unique()->sort()->values()->all();
             $defaultPremium = (float) ($regional?->premium_percent ?? ContractSetting::current()->premium_percent);
 
             $regions[] = [
-                'region' => (string) $region,
+                'region' => $area !== '' ? "{$region} · {$area}" : $region,
                 'order' => $order,
                 'minimum' => $minimum,
                 'premiums' => $premiums,

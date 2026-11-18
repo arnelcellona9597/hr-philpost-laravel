@@ -1,7 +1,7 @@
 <x-layouts.app
     title="Units"
     heading="Stations, divisions and units"
-    description="The sections under each branch. An employee's branch follows the unit they are placed in."
+    description="The sections under each branch. An employee's branch follows the unit they are placed in. A unit's minimum wage area, when set, decides the regional minimum for the people in it instead of the branch's area."
     :back="['href' => route('branches.index'), 'label' => 'Branches']"
 >
     @if ($unplaced > 0)
@@ -26,8 +26,18 @@
                 @endforeach
             </select>
         </div>
+        <div class="w-60">
+            <label class="label" for="new-area">Minimum wage area</label>
+            <input class="input" id="new-area" name="wage_area" maxlength="60" list="wage-areas" value="{{ old('wage_area') }}" placeholder="Same as branch" />
+        </div>
         <button class="btn-primary"><x-icon name="plus" /> Add unit</button>
     </form>
+
+    <datalist id="wage-areas">
+        @foreach ($areas as $area)
+            <option value="{{ $area }}"></option>
+        @endforeach
+    </datalist>
 
     <form method="get" class="card mb-4 flex flex-wrap items-end gap-3 p-4">
         <div class="min-w-64 flex-1">
@@ -57,6 +67,7 @@
                         <tr>
                             <th scope="col">Unit</th>
                             <th scope="col">Branch</th>
+                            <th scope="col">Minimum wage area</th>
                             <th scope="col" class="text-right">Employees</th>
                             <th scope="col"><span class="sr-only">Actions</span></th>
                         </tr>
@@ -76,6 +87,10 @@
                                             <option value="{{ $branch->id }}" @selected($unit->branch_id === $branch->id)>{{ $branch->name }}</option>
                                         @endforeach
                                     </select>
+                                </td>
+                                <td class="min-w-48">
+                                    <label class="sr-only" for="area-{{ $unit->id }}">Minimum wage area</label>
+                                    <input class="input py-1" id="area-{{ $unit->id }}" name="wage_area" form="unit-{{ $unit->id }}" maxlength="60" list="wage-areas" value="{{ $unit->wage_area }}" placeholder="Same as branch" />
                                 </td>
                                 <td class="text-right tabular">{{ number_format($unit->employees_count) }}</td>
                                 <td class="whitespace-nowrap text-right">

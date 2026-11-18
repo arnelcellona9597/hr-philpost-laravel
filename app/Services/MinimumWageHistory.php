@@ -48,7 +48,7 @@ class MinimumWageHistory
         $regions = [];
 
         $employees = Employee::query()
-            ->with('station')
+            ->with(['station', 'unit'])
             ->withCount('payChanges')
             ->where('employment_status', EmploymentStatus::Active)
             ->where('classification', Classification::Cos)
@@ -65,7 +65,7 @@ class MinimumWageHistory
                 $skipped['no date hired'][] = $label;
             } elseif ($region === null) {
                 $skipped['no region'][] = $label;
-            } elseif (($rates = $this->rates($region)) === []) {
+            } elseif (($rates = $this->rates($region, $this->pay->wageAreaOf($employee))) === []) {
                 $skipped['no rates for the region'][] = "{$label}, {$region->value}";
             } else {
                 $people[] = ['employee' => $employee, 'steps' => $this->steps($employee->date_hired->toDateString(), $rates, $region)];
@@ -90,9 +90,10 @@ class MinimumWageHistory
         DB::transaction(function () use ($plan, &$records): void {
             foreach ($plan['people'] as ['employee' => $employee, 'steps' => $steps]) {
                 $region = $this->pay->regionOf($employee);
+                $area = $this->areaWithOrders($region, $this->pay->wageAreaOf($employee));
 
                 foreach ($steps as $step) {
-                    $order = WageOrder::query()->where('region', $region?->value)->whereDate('effective_on', $step['effective_on'])->orderByDesc('daily_rate_centavos')->first();
+                    $order = WageOrder::query()->where('region', $region?->value)->where('area', $area)->whereDate('effective_on', $step['effective_on'])->orderByDesc('daily_rate_centavos')->first();
 
                     $this->pay->record($employee, [
                         'effective_on' => $step['effective_on'],
@@ -112,13 +113,14 @@ class MinimumWageHistory
     }
 
     /**
-     * The region's minimum daily rates by date: saved wage orders, else the rates from the office's COS record.
+     * The minimum daily rates by date for a region, or for a wage area in it when the area has wage orders of
+     * its own: saved wage orders, else the rates from the office's COS record.
      *
      * @return array<string, int> effective date => centavos, oldest first
      */
-    public function rates(Region $region): array
+    public function rates(Region $region, ?string $area = null): array
     {
-        $saved = WageOrder::query()->where('region', $region->value)->orderBy('effective_on')->get()
+        $saved = WageOrder::query()->where('region', $region->value)->where('area', $this->areaWithOrders($region, $area))->orderBy('effective_on')->get()
             ->groupBy(fn (WageOrder $order): string => $order->effective_on->toDateString())
             ->map(fn ($orders): int => (int) $orders->max('daily_rate_centavos'))
             ->all();
@@ -127,6 +129,16 @@ class MinimumWageHistory
         ksort($rates);
 
         return $rates;
+    }
+
+    /**
+     * The area whose wage orders apply: the given area when it has any, else '' (the region-wide orders).
+     */
+    private function areaWithOrders(?Region $region, ?string $area): string
+    {
+        $area = trim((string) $area);
+
+        return $area !== '' && WageOrder::query()->where('region', $region?->value)->where('area', $area)->exists() ? $area : '';
     }
 
     public function premiumOn(Region $region, string $date): int
