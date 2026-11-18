@@ -36,6 +36,7 @@
             .cert-gap { height: 12.2pt; }
             .cert-sig-wide { width: 314pt; }
             .cert-sig-plain .cert-sig-name, .cert-sig-plain .cert-sig-title { font-size: 10pt; }
+            .cert-sig-plain .cert-sig-cell { width: 1%; white-space: nowrap; }
             .cert-side-pdf { position: fixed; left: -59pt; width: 160pt; height: 24pt; transform: rotate(-90deg); transform-origin: 0 0; border-top: 0.75pt solid #111; padding-top: 3pt; text-align: center; font-size: 9pt; line-height: 1.2; }
             .cert-s-sm { font-size: 10.5pt; }
             .cert-s-md { font-size: {{ $compact ? 11 : 12 }}pt; }
