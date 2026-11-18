@@ -12,6 +12,7 @@ use App\Models\Remittance;
 use App\Models\SiteSetting;
 use App\Support\CertificateBlocks;
 use App\Support\CertificateRenderer;
+use App\Support\PayrollMonthly;
 use App\Support\PayrollRegister;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Dompdf\Dompdf;
@@ -109,6 +110,21 @@ class PdfRenderer
         return $this->render('pdf.payroll-register', [
             'period' => $period,
             'register' => PayrollRegister::build($period),
+            'letterhead' => PayrollRegister::letterhead($logo['src'] ?? null, $logo['size'] ?? null, true),
+        ], [1008, 612]);
+    }
+
+    /**
+     * The month's consolidated COS payroll (both halves), Legal landscape.
+     *
+     * @param  array<string, mixed>  $summary  from {@see PayrollMonthly::build()}
+     */
+    public function payrollMonthly(array $summary): string
+    {
+        $logo = $this->logo(SiteSetting::current()->letterhead()['logoId'], CertificateRenderer::LETTERHEAD_LOGO_WIDTH, CertificateRenderer::LETTERHEAD_LOGO_HEIGHT);
+
+        return $this->render('pdf.payroll-monthly', [
+            'summary' => $summary,
             'letterhead' => PayrollRegister::letterhead($logo['src'] ?? null, $logo['size'] ?? null, true),
         ], [1008, 612]);
     }

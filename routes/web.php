@@ -237,6 +237,12 @@ Route::middleware(RequireActiveSession::class)->group(function () {
             Route::post('/', 'store')->name('store');
             Route::get('/new', 'create')->name('create');
 
+            Route::prefix('monthly/{year}/{month}')->name('monthly')->whereNumber(['year', 'month'])->group(function () {
+                Route::get('/', 'monthly');
+                Route::get('/pdf', 'monthlyPdf')->name('.pdf');
+                Route::get('/export', 'monthlyExport')->name('.export');
+            });
+
             Route::prefix('{period}')->whereNumber('period')->group(function () {
                 Route::get('/', 'show')->name('show');
                 Route::put('/', 'update')->name('update');
@@ -245,6 +251,9 @@ Route::middleware(RequireActiveSession::class)->group(function () {
                 Route::post('/generate', 'generate')->name('generate');
                 Route::post('/refresh-rates', 'refreshRates')->name('refresh-rates');
                 Route::put('/grid', 'saveGrid')->name('grid');
+                Route::post('/review', 'review')->name('review');
+                Route::post('/approve', 'approve')->name('approve');
+                Route::post('/return-to-draft', 'returnToDraft')->name('return-to-draft');
                 Route::post('/release', 'release')->name('release');
                 Route::delete('/payslips', 'destroyPayslips')->name('payslips.destroy-all');
                 Route::get('/print', 'print')->name('print');

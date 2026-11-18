@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\PayrollStatus;
 use App\Enums\ThemeMode;
 use App\Mail\SystemMessage;
 use App\Models\AuditLog;
@@ -139,6 +140,7 @@ it('uses the keyed wording for automatic mail', function () {
     $period = PayrollPeriod::factory()->create(['name' => 'Oct A']);
     Payslip::factory()->create(['period_id' => $period->id, 'employee_id' => $employee->id]);
 
+    $period->forceFill(['status' => PayrollStatus::Approved])->save();
     app(PayrollService::class)->release($period, $this->hr, true);
 
     expect(MessageRecipient::query()->sole()->body)->toContain('Net pay: ₱23,749.50');

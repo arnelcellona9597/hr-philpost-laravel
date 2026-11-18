@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['period_id', 'employee_id', 'full_name', 'employee_code', 'position', 'station', 'classification', 'tin', 'sss', 'philhealth', 'pagibig', 'earnings', 'deductions', 'remarks', 'batch_label', 'specific_station', 'period_covered', 'daily_rate_centavos', 'premium_percent', 'days_worked', 'late_minutes', 'ot_hours', 'ot_rest_hours', 'sss_centavos', 'hdmf_centavos', 'cmpeai_centavos', 'absences', 'tardiness'])]
+#[Fillable(['period_id', 'employee_id', 'full_name', 'employee_code', 'position', 'station', 'classification', 'tin', 'sss', 'philhealth', 'pagibig', 'earnings', 'deductions', 'remarks', 'batch_label', 'specific_station', 'period_covered', 'daily_rate_centavos', 'premium_percent', 'days_worked', 'late_minutes', 'ot_hours', 'ot_rest_hours', 'sss_centavos', 'hdmf_centavos', 'cmpeai_centavos', 'absences', 'tardiness', 'rate_source', 'wage_order_id', 'region', 'regional_minimum_centavos'])]
 class Payslip extends Model
 {
     /** @use HasFactory<PayslipFactory> */
@@ -68,8 +68,38 @@ class Payslip extends Model
             'cmpeai_centavos' => 'integer',
             'absences' => 'decimal:2',
             'tardiness' => 'integer',
+            'wage_order_id' => 'integer',
+            'regional_minimum_centavos' => 'integer',
             'corrected_after_release' => 'boolean',
         ];
+    }
+
+    /**
+     * Whether the daily rate is below the regional minimum that was in force for the period.
+     */
+    public function isBelowMinimum(): bool
+    {
+        return $this->regional_minimum_centavos !== null && (int) $this->daily_rate_centavos > 0 && (int) $this->daily_rate_centavos < (int) $this->regional_minimum_centavos;
+    }
+
+    /**
+     * Where the daily rate came from, for people: the worker's contract rate or the regional minimum.
+     */
+    public function rateSourceLabel(): string
+    {
+        return match ($this->rate_source) {
+            'regional' => 'Regional minimum',
+            'contract' => 'Contract rate',
+            default => (int) $this->daily_rate_centavos > 0 ? 'Pay history' : 'No rate',
+        };
+    }
+
+    /**
+     * @return BelongsTo<WageOrder, $this>
+     */
+    public function wageOrder(): BelongsTo
+    {
+        return $this->belongsTo(WageOrder::class);
     }
 
     /**
@@ -107,7 +137,9 @@ class Payslip extends Model
 
         $pay = $this->cosPay();
         $number = fn ($value): string => rtrim(rtrim(number_format((float) $value, 2), '0'), '.');
+        $basis = $this->rate_source === 'regional' ? 'Regional minimum'.($this->region ? ' ('.$this->region.')' : '') : 'Contract rate';
         $lines = [
+            ['Rate basis', $basis],
             ['Total daily rate', Money::format((int) $this->daily_rate_centavos, $symbol).' + '.$number($this->premium_percent).'% premium = '.Money::format($pay['total_daily_rate'], $symbol)],
             ['Days worked', $number($this->days_worked).' day(s)'.($this->period_covered ? ' ('.$this->period_covered.')' : '')],
         ];

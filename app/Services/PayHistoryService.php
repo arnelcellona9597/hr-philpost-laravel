@@ -90,6 +90,41 @@ class PayHistoryService
             ->first();
     }
 
+    /**
+     * The daily rate a COS worker is paid in a payroll period ending on $date: their own contract rate
+     * from pay history when they have a daily one, otherwise the regional minimum for their work
+     * location's region, with the premium set in Officials and wages. The regional minimum in force
+     * is always returned too, so payroll can flag a contract rate below it.
+     *
+     * @return array{amount_centavos: int, premium_percent: float, source: string|null, wage_order_id: int|null, region: string|null, minimum_centavos: int|null}
+     */
+    public function payrollRate(Employee $employee, string $date): array
+    {
+        $region = $this->regionOf($employee);
+        $minimum = $this->minimumFor($region, $date);
+        $contract = $this->rateOn($employee, $date);
+
+        if ($contract !== null && $contract->rate_type === RateType::Daily) {
+            return [
+                'amount_centavos' => (int) $contract->amount_centavos,
+                'premium_percent' => (float) $contract->premium_percent,
+                'source' => 'contract',
+                'wage_order_id' => $contract->wage_order_id,
+                'region' => $region?->value,
+                'minimum_centavos' => $minimum?->daily_rate_centavos,
+            ];
+        }
+
+        return [
+            'amount_centavos' => (int) ($minimum?->daily_rate_centavos ?? 0),
+            'premium_percent' => (float) ContractSetting::current()->premium_percent,
+            'source' => $minimum ? 'regional' : null,
+            'wage_order_id' => $minimum?->id,
+            'region' => $region?->value,
+            'minimum_centavos' => $minimum?->daily_rate_centavos,
+        ];
+    }
+
     public function regionOf(Employee $employee): ?Region
     {
         return $employee->region ?? $employee->station?->region;

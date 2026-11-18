@@ -77,9 +77,9 @@ class PayrollService
      * the worker's standing SSS / HDMF / CMPEAI deductions. Days, lates and overtime start empty.
      *
      * @param  list<int>  $branchIds
-     * @return array{created: int, existing: int, without_rate: int}
+     * @return array{created: int, existing: int, without_rate: int, regional: int}
      *
-     * @throws UserFacingException when the period was released
+     * @throws UserFacingException when the period is not a draft
      */
     public function generate(PayrollPeriod $period, array $branchIds = []): array
     {
@@ -97,16 +97,17 @@ class PayrollService
                 ->get();
 
             $withoutRate = 0;
+            $regional = 0;
 
             foreach ($employees as $employee) {
-                $rate = $this->payHistory->rateOn($employee, $locked->period_end->format('Y-m-d'));
-                $withoutRate += $rate === null ? 1 : 0;
+                $rate = $this->payHistory->payrollRate($employee, $locked->period_end->format('Y-m-d'));
+                $withoutRate += $rate['amount_centavos'] === 0 ? 1 : 0;
+                $regional += $rate['source'] === 'regional' ? 1 : 0;
 
                 $slip = new Payslip([
                     'batch_label' => $locked->batch,
                     'period_covered' => $locked->coveredLabel(),
-                    'daily_rate_centavos' => $rate?->amount_centavos ?? 0,
-                    'premium_percent' => $rate?->premium_percent ?? self::DEFAULT_PREMIUM,
+                    ...$this->rateAttributes($rate),
                     'sss_centavos' => (int) $employee->sss_deduction_centavos,
                     'hdmf_centavos' => (int) $employee->hdmf_deduction_centavos,
                     'cmpeai_centavos' => (int) $employee->cmpeai_deduction_centavos,
@@ -115,13 +116,13 @@ class PayrollService
                 $this->createPayslip($locked, $employee, [...$slip->getAttributes(), ...$this->items($slip)]);
             }
 
-            return ['created' => $employees->count(), 'existing' => count($existing), 'without_rate' => $withoutRate];
+            return ['created' => $employees->count(), 'existing' => count($existing), 'without_rate' => $withoutRate, 'regional' => $regional];
         });
     }
 
     /**
-     * Read each payslip's daily rate and premium again from pay history, such as after a wage order,
-     * and recompute. Only a draft period can be refreshed.
+     * Read each payslip's daily rate and premium again (contract rate, else the regional minimum), such
+     * as after a wage order or a pay-history fix, and recompute. Only a draft period can be refreshed.
      *
      * @return array{updated: int, without_rate: int}
      *
@@ -135,15 +136,13 @@ class PayrollService
             $withoutRate = 0;
 
             foreach ($locked->payslips()->with('employee')->get() as $slip) {
-                $rate = $slip->employee ? $this->payHistory->rateOn($slip->employee, $locked->period_end->format('Y-m-d')) : null;
-
-                if ($rate === null) {
-                    $withoutRate++;
-
+                if ($slip->employee === null) {
                     continue;
                 }
 
-                $slip->fill(['daily_rate_centavos' => $rate->amount_centavos, 'premium_percent' => $rate->premium_percent ?? self::DEFAULT_PREMIUM]);
+                $rate = $this->payHistory->payrollRate($slip->employee->loadMissing('station'), $locked->period_end->format('Y-m-d'));
+                $withoutRate += $rate['amount_centavos'] === 0 ? 1 : 0;
+                $slip->fill($this->rateAttributes($rate));
 
                 if ($slip->isDirty()) {
                     $slip->fill($this->items($slip))->save();
@@ -167,6 +166,11 @@ class PayrollService
     {
         return DB::transaction(function () use ($period, $rows): array {
             $locked = PayrollPeriod::query()->whereKey($period->id)->lockForUpdate()->firstOrFail();
+
+            if (! $locked->isDraft() && ! $locked->isReleased()) {
+                return ['errors' => [['row' => null, 'message' => "This payroll is {$locked->status->value}. Return it to draft to change it."]], 'updated' => 0];
+            }
+
             $byId = $locked->payslips()->get()->keyBy('id');
             $errors = [];
             $writes = [];
@@ -282,6 +286,76 @@ class PayrollService
     }
 
     /**
+     * Draft to Reviewed: a reviewer has checked the rates, premium and attendance.
+     *
+     * @throws UserFacingException when the period is not a draft or is empty
+     */
+    public function review(PayrollPeriod $period, User $user): void
+    {
+        DB::transaction(function () use ($period, $user): void {
+            $locked = $this->lockDraft($period);
+
+            if (! $locked->payslips()->exists()) {
+                throw new UserFacingException('There are no payslips in this period yet.');
+            }
+
+            $locked->forceFill(['status' => PayrollStatus::Reviewed, 'reviewed_at' => now(), 'reviewed_by' => $user->id])->save();
+        });
+    }
+
+    /**
+     * Reviewed to Approved. Refused while a worker has no daily rate or no days; a contract rate below
+     * the regional minimum needs the approver's confirmation.
+     *
+     * @throws UserFacingException when the period cannot be approved
+     */
+    public function approve(PayrollPeriod $period, User $user, bool $confirmBelowMinimum = false): void
+    {
+        DB::transaction(function () use ($period, $user, $confirmBelowMinimum): void {
+            $locked = $this->lockStatus($period, PayrollStatus::Reviewed, 'Only a reviewed payroll can be approved.');
+            $slips = $locked->payslips()->get();
+
+            $noRate = $slips->where('daily_rate_centavos', 0)->count();
+
+            if ($noRate > 0) {
+                throw new UserFacingException("{$noRate} worker(s) have no daily rate. Return the payroll to draft, add their rate or regional wage order, then refresh rates.");
+            }
+
+            $unpaid = $slips->where('gross_pay_centavos', 0)->count();
+
+            if ($unpaid > 0) {
+                throw new UserFacingException("{$unpaid} payslip(s) have no pay (no days entered). Return the payroll to draft and fill them in or remove them.");
+            }
+
+            $below = $slips->filter(fn (Payslip $slip): bool => $slip->isBelowMinimum())->count();
+
+            if ($below > 0 && ! $confirmBelowMinimum) {
+                throw new UserFacingException("{$below} worker(s) are paid below the regional minimum. Tick the confirmation that their contract rates are correct, or return the payroll to draft.");
+            }
+
+            $locked->forceFill(['status' => PayrollStatus::Approved, 'approved_at' => now(), 'approved_by' => $user->id])->save();
+        });
+    }
+
+    /**
+     * Back to Draft from Reviewed or Approved, so it can be changed. Released payroll stays released.
+     *
+     * @throws UserFacingException when the period was released or already is a draft
+     */
+    public function returnToDraft(PayrollPeriod $period): void
+    {
+        DB::transaction(function () use ($period): void {
+            $locked = PayrollPeriod::query()->whereKey($period->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->isReleased() || $locked->isDraft()) {
+                throw new UserFacingException($locked->isReleased() ? 'Released payroll cannot go back to draft.' : 'This payroll is already a draft.');
+            }
+
+            $locked->forceFill(['status' => PayrollStatus::Draft, 'reviewed_at' => null, 'reviewed_by' => null, 'approved_at' => null, 'approved_by' => null])->save();
+        });
+    }
+
+    /**
      * Mark the period Released and, when asked and enabled, queue every employee's payslip email.
      * There is no way back from this.
      *
@@ -292,7 +366,7 @@ class PayrollService
     public function release(PayrollPeriod $period, User $user, bool $notify): array
     {
         return DB::transaction(function () use ($period, $user, $notify): array {
-            $locked = $this->lockDraft($period);
+            $locked = $this->lockStatus($period, PayrollStatus::Approved, 'Only an approved payroll can be released.');
             $slips = $locked->payslips()->with('employee.station')->get();
 
             if ($slips->isEmpty()) {
@@ -416,7 +490,49 @@ class PayrollService
             throw new UserFacingException($refusal);
         }
 
+        if (! $locked->isDraft()) {
+            throw new UserFacingException("This payroll is {$locked->status->value}. Return it to draft to change it.");
+        }
+
         return $locked;
+    }
+
+    /**
+     * Lock the period row and check it is at the expected step.
+     *
+     * @throws UserFacingException when it is not
+     */
+    private function lockStatus(PayrollPeriod $period, PayrollStatus $expected, string $refusal): PayrollPeriod
+    {
+        $locked = PayrollPeriod::query()->whereKey($period->id)->lockForUpdate()->firstOrFail();
+
+        if ($locked->isReleased()) {
+            throw new UserFacingException('This payroll period has already been released.');
+        }
+
+        if ($locked->status !== $expected) {
+            throw new UserFacingException($refusal);
+        }
+
+        return $locked;
+    }
+
+    /**
+     * The payslip columns that record the rate, its source and the regional minimum it was checked against.
+     *
+     * @param  array{amount_centavos: int, premium_percent: float, source: string|null, wage_order_id: int|null, region: string|null, minimum_centavos: int|null}  $rate
+     * @return array<string, mixed>
+     */
+    private function rateAttributes(array $rate): array
+    {
+        return [
+            'daily_rate_centavos' => $rate['amount_centavos'],
+            'premium_percent' => $rate['premium_percent'],
+            'rate_source' => $rate['source'],
+            'wage_order_id' => $rate['wage_order_id'],
+            'region' => $rate['region'],
+            'regional_minimum_centavos' => $rate['minimum_centavos'],
+        ];
     }
 
     /**
