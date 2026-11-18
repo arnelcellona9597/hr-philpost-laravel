@@ -365,6 +365,17 @@ it('records the Caraga rates under Region XIII and is safe to run twice', functi
     expect($page->viewData('inForce')->get('Region XI')->daily_rate_centavos)->toBe(52_500);
 });
 
+it('records the Region XII and BARMM wage orders so their workers fall back to a regional minimum', function () {
+    app(RegionalWageSeeder::class)->run();
+    $service = app(PayHistoryService::class);
+
+    expect($service->minimumFor(Region::RegionXii, '2026-11-15')->daily_rate_centavos)->toBe(46_000)
+        ->and($service->minimumFor(Region::RegionXii, '2026-11-30')->order_number)->toBe('XII-26 (1st tranche)')
+        ->and($service->minimumFor(Region::RegionXii, '2027-01-01')->daily_rate_centavos)->toBe(50_100)
+        ->and($service->minimumFor(Region::Barmm, '2026-11-15')->daily_rate_centavos)->toBe(43_600)
+        ->and($service->minimumFor(Region::Barmm, '2026-12-15')->daily_rate_centavos)->toBe(46_100);
+});
+
 it('keeps each person\'s premium unless a new one is given', function () {
     $keeps = worker();
     PayChange::factory()->create(['employee_id' => $keeps->id, 'premium_percent' => 2]);
