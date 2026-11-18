@@ -69,9 +69,13 @@ it('creates the 1st and 2nd half of a month and refuses the same half twice', fu
         ->and($second->name)->toBe('October 2026 — 2nd half (16–31)');
 
     $this->post('/payroll', ['year' => '2026', 'month' => '10', 'half' => '1', 'pay_date' => '2026-10-20'])->assertSessionHasErrors('half');
+
+    // A period made before semi-monthly periods, with other wording, still counts as that half.
+    PayrollPeriod::factory()->create(['name' => 'November 1-15,2026', 'code' => '1ST', 'period_start' => '2026-11-01', 'period_end' => '2026-11-15']);
+    $this->post('/payroll', ['year' => '2026', 'month' => '11', 'half' => '1', 'pay_date' => '2026-11-20'])->assertSessionHasErrors('half');
     $this->post('/payroll', ['year' => '2026', 'month' => '13', 'half' => '3', 'pay_date' => ''])->assertSessionHasErrors(['month', 'half', 'pay_date']);
 
-    expect(PayrollPeriod::query()->count())->toBe(2);
+    expect(PayrollPeriod::query()->count())->toBe(3);
 });
 
 it('ends the 2nd half on the last day of every month', function (int $year, int $month, string $end) {

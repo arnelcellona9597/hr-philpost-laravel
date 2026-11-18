@@ -90,7 +90,7 @@ class Payslip extends Model
         return match ($this->rate_source) {
             'regional' => 'Regional minimum',
             'contract' => 'Contract rate',
-            default => 'No rate',
+            default => (int) $this->daily_rate_centavos > 0 ? 'Pay history' : 'No rate',
         };
     }
 

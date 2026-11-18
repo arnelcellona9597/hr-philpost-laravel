@@ -92,7 +92,7 @@ class PayrollController extends Controller
     {
         Gate::authorize('view', $period);
 
-        $slips = $period->payslips()->with('wageOrder')->orderBy('station')->orderBy('full_name')->get();
+        $slips = $period->payslips()->with(['wageOrder', 'employee.station'])->orderBy('station')->orderBy('full_name')->get();
 
         return view('payroll.show', [
             'period' => $period->load(['reviewedBy', 'approvedBy', 'releasedBy']),
@@ -397,7 +397,9 @@ class PayrollController extends Controller
                 $data = PayrollPeriod::forHalf($year, $month, $half);
 
                 $taken = PayrollPeriod::query()
-                    ->where(fn ($query) => $query->where(['year' => $year, 'month' => $month, 'half' => $half])->orWhere('code', $data['code']))
+                    ->where(fn ($query) => $query->where(['year' => $year, 'month' => $month, 'half' => $half])
+                        ->orWhere('code', $data['code'])
+                        ->orWhere(fn ($query) => $query->whereDate('period_start', $data['period_start'])->whereDate('period_end', $data['period_end'])))
                     ->when($period, fn ($query) => $query->whereKeyNot($period->id))
                     ->exists();
 

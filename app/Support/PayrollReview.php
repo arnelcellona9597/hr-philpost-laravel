@@ -27,7 +27,10 @@ class PayrollReview
         $regions = [];
         $pay = app(PayHistoryService::class);
 
-        foreach ($slips->groupBy(fn (Payslip $slip): string => $slip->region ?: 'No region') as $region => $group) {
+        // Payslips made before regions were recorded fall back to the worker's current station region.
+        $regionOf = fn (Payslip $slip): string => $slip->region ?: ($slip->employee ? $pay->regionOf($slip->employee)?->value : null) ?: 'No region';
+
+        foreach ($slips->groupBy($regionOf) as $region => $group) {
             $regional = $group->firstWhere('rate_source', 'regional');
             $order = $pay->minimumFor(Region::tryFrom((string) $region), $periodEnd);
             $minimum = $order?->daily_rate_centavos;
