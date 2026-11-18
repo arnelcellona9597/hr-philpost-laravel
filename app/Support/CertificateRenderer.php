@@ -102,13 +102,13 @@ class CertificateRenderer
         $logo = '';
 
         if ($options['letterheadLogoUrl'] ?? null) {
-            $size = ($options['letterheadLogoSize'] ?? null) ? 'width:'.$options['letterheadLogoSize'][0].'pt;height:'.$options['letterheadLogoSize'][1].'pt' : 'width:200pt;height:45pt;object-fit:contain;object-position:right bottom';
+            $size = ($options['letterheadLogoSize'] ?? null) ? 'width:'.$options['letterheadLogoSize'][0].'pt;height:'.$options['letterheadLogoSize'][1].'pt' : 'width:200pt;height:45pt;object-fit:contain;object-position:right center';
             $logo = '<img src="'.e($options['letterheadLogoUrl']).'" alt="" style="'.$size.'">';
         }
 
         $section = trim((string) ($block['section'] ?? '')) === '' ? '' : '<table style="width:100%;border-collapse:collapse"><tr><td></td><td style="width:1%;white-space:nowrap;background:#111418;color:#fff;font-size:9.5pt;font-weight:bold;font-family:Helvetica,Arial,sans-serif;padding:2pt 16pt;-webkit-print-color-adjust:exact;print-color-adjust:exact">'.e($block['section']).'</td></tr></table>';
 
-        return '<table style="width:100%;border-collapse:collapse"><tr><td style="vertical-align:bottom;padding:0 0 4pt">'.$text.'</td><td style="vertical-align:bottom;text-align:right;padding:0 0 6pt 12pt">'.$logo.'</td></tr></table>'
+        return '<table style="width:100%;border-collapse:collapse"><tr><td style="vertical-align:middle;padding:0 0 4pt">'.$text.'</td><td style="vertical-align:middle;text-align:right;padding:0 0 4pt 12pt">'.$logo.'</td></tr></table>'
             .'<div style="border-top:2.5pt solid #111418"></div>'.$section;
     }
 
