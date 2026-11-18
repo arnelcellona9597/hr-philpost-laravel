@@ -35,6 +35,10 @@ class PayslipController extends Controller
     {
         Gate::authorize('update', $payslip);
 
+        if ($payslip->period->isReleased()) {
+            Gate::authorize('correctReleased', $payslip->period);
+        }
+
         $values = [];
 
         foreach (array_keys(PayrollService::INPUTS) as $key) {

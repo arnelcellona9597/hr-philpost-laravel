@@ -30,11 +30,18 @@ function paidSlip(PayrollPeriod $period, array $attributes = []): Payslip
     return Payslip::factory()->create(['period_id' => $period->id, ...$attributes]);
 }
 
+function approved(PayrollPeriod $period): PayrollPeriod
+{
+    $period->forceFill(['status' => PayrollStatus::Approved])->save();
+
+    return $period;
+}
+
 function releasedPeriod(): PayrollPeriod
 {
     $period = PayrollPeriod::factory()->create();
     paidSlip($period);
-    payrollService()->release($period, User::factory()->create(), false);
+    payrollService()->release(approved($period), User::factory()->create(), false);
 
     return $period->fresh();
 }
@@ -45,28 +52,44 @@ function grid(array $rows): array
 }
 
 beforeEach(function () {
-    $this->hr = User::factory()->create();
+    $this->hr = User::factory()->systemAdmin()->create();
     signIn($this->hr);
 });
 
-it('creates a period and rejects bad dates and duplicate codes', function () {
-    $this->post('/payroll', ['name' => 'Oct A', 'code' => '2026-10-A', 'period_start' => '2026-10-01', 'period_end' => '2026-10-15', 'pay_date' => '2026-10-20'])->assertRedirect();
+it('creates the 1st and 2nd half of a month and refuses the same half twice', function () {
+    $this->post('/payroll', ['year' => '2026', 'month' => '10', 'half' => '1', 'pay_date' => '2026-10-20'])->assertRedirect();
+    $this->post('/payroll', ['year' => '2026', 'month' => '10', 'half' => '2', 'pay_date' => '2026-11-05'])->assertRedirect();
 
-    $period = PayrollPeriod::query()->sole();
-    expect($period->status)->toBe(PayrollStatus::Draft);
+    [$first, $second] = PayrollPeriod::query()->orderBy('period_start')->get()->all();
 
-    $this->post('/payroll', ['name' => 'Bad', 'code' => '2026-10-B', 'period_start' => '2026-10-15', 'period_end' => '2026-10-01', 'pay_date' => '2026-10-20'])
-        ->assertSessionHasErrors(['period_end' => 'Period end is before period start']);
-    $this->post('/payroll', ['name' => 'Dup', 'code' => '2026-10-A', 'period_start' => '2026-10-01', 'period_end' => '2026-10-15', 'pay_date' => '2026-10-20'])
-        ->assertSessionHasErrors(['code' => 'That code is already used by another period.']);
+    expect($first->status)->toBe(PayrollStatus::Draft)
+        ->and([$first->period_start->toDateString(), $first->period_end->toDateString(), $first->code])->toBe(['2026-10-01', '2026-10-15', '2026-10-1'])
+        ->and([$second->period_start->toDateString(), $second->period_end->toDateString(), $second->code])->toBe(['2026-10-16', '2026-10-31', '2026-10-2'])
+        ->and($first->name)->toBe('October 2026 — 1st half (1–15)')
+        ->and($second->name)->toBe('October 2026 — 2nd half (16–31)');
+
+    $this->post('/payroll', ['year' => '2026', 'month' => '10', 'half' => '1', 'pay_date' => '2026-10-20'])->assertSessionHasErrors('half');
+    $this->post('/payroll', ['year' => '2026', 'month' => '13', 'half' => '3', 'pay_date' => ''])->assertSessionHasErrors(['month', 'half', 'pay_date']);
+
+    expect(PayrollPeriod::query()->count())->toBe(2);
 });
+
+it('ends the 2nd half on the last day of every month', function (int $year, int $month, string $end) {
+    expect(PayrollPeriod::forHalf($year, $month, 2)['period_end'])->toBe($end)
+        ->and(PayrollPeriod::forHalf($year, $month, 2)['period_start'])->toBe(sprintf('%04d-%02d-16', $year, $month));
+})->with([
+    'February' => [2027, 2, '2027-02-28'],
+    'February, leap year' => [2028, 2, '2028-02-29'],
+    'April' => [2026, 4, '2026-04-30'],
+    'October' => [2026, 10, '2026-10-31'],
+]);
 
 it('ignores a status sent with the period form', function () {
     $period = PayrollPeriod::factory()->create();
 
-    $this->put("/payroll/{$period->id}", ['name' => 'Renamed', 'status' => 'Released', 'released_at' => '2026-01-01']);
+    $this->put("/payroll/{$period->id}", ['year' => '2026', 'month' => '3', 'half' => '2', 'pay_date' => '2026-04-05', 'status' => 'Released', 'released_at' => '2026-01-01']);
 
-    expect($period->fresh()->name)->toBe('Renamed')
+    expect($period->fresh()->name)->toBe('March 2026 — 2nd half (16–31)')
         ->and($period->fresh()->isReleased())->toBeFalse();
 });
 
@@ -129,7 +152,7 @@ it('adds the active COS workers with their rate, premium and standing deductions
         ->and($slip->batch_label)->toBe('7')
         ->and($slip->gross_pay_centavos)->toBe(0)
         ->and(Payslip::query()->where('employee_id', $noRate->id)->sole()->daily_rate_centavos)->toBe(0)
-        ->and(payrollService()->generate($period))->toBe(['created' => 0, 'existing' => 2, 'without_rate' => 0]);
+        ->and(payrollService()->generate($period))->toBe(['created' => 0, 'existing' => 2, 'without_rate' => 0, 'regional' => 0]);
 });
 
 it('adds only the chosen branches', function () {
@@ -224,6 +247,8 @@ it('refuses a grid with no amounts and a payslip from another period', function 
 it('refuses to release an empty period or one with zero gross, and never twice', function () {
     $period = PayrollPeriod::factory()->create();
 
+    expect(fn () => payrollService()->release($period, $this->hr, false))->toThrow(UserFacingException::class, 'Only an approved payroll can be released.');
+    approved($period);
     expect(fn () => payrollService()->release($period, $this->hr, false))->toThrow(UserFacingException::class, 'There are no payslips in this period yet.');
 
     $zero = paidSlip($period, ['earnings' => [], 'deductions' => []]);
@@ -232,7 +257,7 @@ it('refuses to release an empty period or one with zero gross, and never twice',
 
     $zero->delete();
     paidSlip($period);
-    payrollService()->release($period, $this->hr, false);
+    payrollService()->release(approved($period), $this->hr, false);
 
     expect($period->fresh()->isReleased())->toBeTrue()
         ->and($period->fresh()->released_by)->toBe($this->hr->id)
@@ -246,6 +271,7 @@ it('queues one frozen payslip email per employee on release and records those wi
     $slip = paidSlip($period, ['employee_id' => $withEmail->id]);
     paidSlip($period, ['employee_id' => $noEmail->id]);
 
+    approved($period);
     $this->post("/payroll/{$period->id}/release", ['notify' => '1'])->assertRedirect();
 
     $message = Message::query()->sole();
@@ -263,11 +289,11 @@ it('queues one frozen payslip email per employee on release and records those wi
 
 it('sends no email when the box is unticked or the setting is off', function () {
     $period = PayrollPeriod::factory()->create();
-    paidSlip($period);
+    paidSlip(approved($period));
     $this->post("/payroll/{$period->id}/release");
 
     $second = PayrollPeriod::factory()->create();
-    paidSlip($second);
+    paidSlip(approved($second));
     NotificationSetting::current()->update(['payroll_released_to_employee' => false]);
     $this->post("/payroll/{$second->id}/release", ['notify' => '1']);
 
@@ -280,7 +306,7 @@ it('flags only real changes after release and resends with a Corrected subject',
     $employee = Employee::factory()->create(['email' => 'ana@example.test']);
     $slip = paidSlip($period, ['employee_id' => $employee->id, 'daily_rate_centavos' => 54_000, 'premium_percent' => 15, 'days_worked' => 11]);
     $slip->update(['earnings' => [['label' => 'Gross', 'amount_centavos' => 683_100], ['label' => 'Overtime Pay', 'amount_centavos' => 0]], 'deductions' => [['label' => 'Late', 'amount_centavos' => 0], ['label' => 'SSS', 'amount_centavos' => 0], ['label' => 'HDMF', 'amount_centavos' => 0], ['label' => 'CMPEAI', 'amount_centavos' => 0]]]);
-    payrollService()->release($period, $this->hr, false);
+    payrollService()->release(approved($period), $this->hr, false);
 
     $this->put("/payroll/{$period->id}/grid", grid([['id' => $slip->id, 'values' => ['days' => '11']]]))->assertSessionHasNoErrors();
     expect($slip->fresh()->corrected_after_release)->toBeFalse();
@@ -297,7 +323,7 @@ it('flags only real changes after release and resends with a Corrected subject',
 it('keeps the correction flag when the employee has no address', function () {
     $period = PayrollPeriod::factory()->create();
     $slip = paidSlip($period, ['employee_id' => Employee::factory()->create(['email' => null])->id]);
-    payrollService()->release($period, $this->hr, false);
+    payrollService()->release(approved($period), $this->hr, false);
     $slip->forceFill(['corrected_after_release' => true])->save();
 
     $this->post("/payroll/payslips/{$slip->id}/resend")->assertSessionHas('flash.type', 'error');

@@ -4,6 +4,7 @@
     $symbol = $settings->currency_symbol ?: '₱';
     $period = $slip->period;
     $released = $period->isReleased();
+    $editable = $period->isDraft() || ($released && Gate::allows('correctReleased', $period));
     $quantity = fn ($value): string => (float) $value == 0.0 ? '' : rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.');
     $peso = fn (int $centavos): string => $centavos === 0 ? '' : number_format($centavos / 100, 2, '.', '');
     $saved = [
@@ -67,7 +68,7 @@
                 @foreach ($keys as $key)
                     <div class="flex items-center gap-3">
                         <label class="flex-1 text-sm" for="{{ $key }}">{{ $inputs[$key][2] }}</label>
-                        <input @class(['input max-w-44', 'text-right tabular' => ! in_array($inputs[$key][1], ['text', 'short'], true)]) id="{{ $key }}" name="{{ $key }}" value="{{ old($key, $saved[$key]) }}" />
+                        <input @class(['input max-w-44', 'text-right tabular' => ! in_array($inputs[$key][1], ['text', 'short'], true)]) id="{{ $key }}" name="{{ $key }}" value="{{ old($key, $saved[$key]) }}" @disabled(! $editable) />
                     </div>
                 @endforeach
             </fieldset>
@@ -86,18 +87,23 @@
                 <label class="label" for="remarks">Remarks</label>
                 <textarea class="input" id="remarks" name="remarks">{{ old('remarks', $slip->remarks) }}</textarea>
             </div>
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <button class="btn-primary">Save payslip</button>
-                <p class="text-xs text-muted">Computed amounts update after saving. Deductions changed here apply to this period only.</p>
-            </div>
+            <p class="text-xs text-muted">Rate basis: {{ $slip->rateSourceLabel() }}{{ $slip->region ? ' · '.$slip->region : '' }}{{ $slip->regional_minimum_centavos !== null ? ' · regional minimum '.Money::format((int) $slip->regional_minimum_centavos, $symbol) : '' }}{{ $slip->isBelowMinimum() ? ' (contract rate is below it)' : '' }}</p>
+            @if ($editable)
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <button class="btn-primary">Save payslip</button>
+                    <p class="text-xs text-muted">Computed amounts update after saving. Deductions changed here apply to this period only.</p>
+                </div>
+            @else
+                <p class="text-xs text-muted">This payroll is {{ $period->status->value }}, so this payslip can't be changed.</p>
+            @endif
         </div>
     </form>
 
-    @unless ($released)
+    @if ($period->isDraft())
         <form method="post" action="{{ route('payroll.payslips.destroy', $slip) }}" class="mt-6" data-confirm="Remove this worker from the payroll?">
             @csrf
             @method('DELETE')
             <button class="btn-danger btn-sm"><x-icon name="trash" class="size-3.5" /> Remove from payroll</button>
         </form>
-    @endunless
+    @endif
 </x-layouts.app>

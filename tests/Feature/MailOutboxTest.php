@@ -2,6 +2,7 @@
 
 use App\Enums\MessageCategory;
 use App\Enums\MessageStatus;
+use App\Enums\PayrollStatus;
 use App\Enums\RecipientStatus;
 use App\Mail\SystemMessage;
 use App\Models\Employee;
@@ -171,6 +172,7 @@ it('attaches the payslip PDF at send time', function () {
     $employee = Employee::factory()->create(['email' => 'ana@example.test']);
     $period = PayrollPeriod::factory()->create(['name' => 'Oct A']);
     Payslip::factory()->create(['period_id' => $period->id, 'employee_id' => $employee->id, 'employee_code' => 'EMP-1']);
+    $period->forceFill(['status' => PayrollStatus::Approved])->save();
     app(PayrollService::class)->release($period, User::factory()->create(), true);
 
     app(MailOutbox::class)->drain();
