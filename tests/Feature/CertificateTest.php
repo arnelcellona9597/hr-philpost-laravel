@@ -268,7 +268,7 @@ it('freezes the office letterhead on an issued certificate and shows it in the P
     SiteSetting::current()->update(['letterhead_name' => "SAMPLE POSTAL CORPORATION\nSAMPLE AREA", 'letterhead_details' => '1 Sample Avenue', 'letterhead_section' => 'Human Resource Management Section']);
     $certificate = app(CertificateService::class)->issue($this->hr, certificateTemplate()->id, certificateEmployee()->id, null, '2026-10-04');
 
-    $this->get("/certificates/{$certificate->id}")->assertOk()->assertSee('SAMPLE AREA')->assertSee('1 Sample Avenue')->assertSee('Human Resource Management Section');
+    $this->get("/certificates/{$certificate->id}")->assertOk()->assertSee('SAMPLE AREA')->assertSee('1 Sample Avenue')->assertSee('Human Resource Management Section')->assertSee('font-size:10.5pt;font-weight:bold', false);
 
     SiteSetting::current()->update(['letterhead_name' => 'CHANGED LATER']);
 

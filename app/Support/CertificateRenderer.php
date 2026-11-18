@@ -92,7 +92,7 @@ class CertificateRenderer
         $text = '<div style="font-size:10pt;font-family:Helvetica,Arial,sans-serif">'.e($block['top'] ?? '').'</div>';
 
         foreach ($block['name'] ?? [] as $line) {
-            $text .= '<div style="font-size:12pt;font-weight:bold;line-height:1.2;font-family:Helvetica,Arial,sans-serif">'.e($line).'</div>';
+            $text .= '<div style="font-size:10.5pt;font-weight:bold;line-height:1.2;font-family:Helvetica,Arial,sans-serif">'.e($line).'</div>';
         }
 
         foreach ($block['details'] ?? [] as $line) {
