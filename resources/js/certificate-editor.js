@@ -78,7 +78,7 @@ function renderLetterhead() {
   ].join('')
   const logo = letterhead.logoUrl ? `<img src="${esc(letterhead.logoUrl)}" alt="" style="width:200pt;height:45pt;object-fit:contain;object-position:right center">` : ''
   const section = letterhead.section ? `<table style="width:100%;border-collapse:collapse"><tr><td></td><td style="width:1%;white-space:nowrap;background:#111418;color:#fff;font-size:9.5pt;font-weight:bold;font-family:Helvetica,Arial,sans-serif;padding:2pt 16pt">${esc(letterhead.section)}</td></tr></table>` : ''
-  return `<table style="width:100%;border-collapse:collapse"><tr><td style="vertical-align:middle;padding:0 0 4pt">${text}</td><td style="vertical-align:middle;text-align:right;padding:0 0 4pt 12pt">${logo}</td></tr></table><div style="border-top:2.5pt solid #111418"></div>${section}`
+  return `<table style="width:100%;border-collapse:collapse"><tr><td style="vertical-align:top;padding:0 0 4pt">${text}</td><td style="vertical-align:top;text-align:right;padding:4pt 0 4pt 12pt">${logo}</td></tr></table><div style="border-top:2.5pt solid #111418"></div>${section}`
 }
 
 function renderBlock(block, options) {
