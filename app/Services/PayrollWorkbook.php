@@ -2,94 +2,87 @@
 
 namespace App\Services;
 
-use App\Models\Employee;
 use App\Models\PayrollPeriod;
 use App\Models\Payslip;
-use App\Support\ExcelCells;
-use App\Support\ZipGuard;
-use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
-use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
-use Throwable;
 
 /**
- * Excel export and import of one payroll period. Columns follow the payslip template's pay items.
- *
- * @phpstan-import-type GridRow from PayrollService
- *
- * @phpstan-type ImportProblem array{row?: int, column?: string, message: string}
- * @phpstan-type ImportPlan array{rows: list<GridRow>, labels: array<int, string>, actions: array<int, string>, errors: list<ImportProblem>, warnings: list<string>}
+ * The payroll as an Excel workbook in the office's PAYROLL FORMAT layout: the same title rows, the
+ * same 28 columns and the same live formulas, so HR can keep working with it as before.
  */
 class PayrollWorkbook
 {
-    private const ID_COLUMN = 'Employee ID';
-
-    private const REMARKS_COLUMN = 'Remarks';
-
     private const MONEY_FORMAT = '#,##0.00';
 
-    private const COMPUTED_NOTE = 'Calculated by the system. Ignored when importing.';
+    private const FIRST_ROW = 6;
 
-    public function __construct(private PayrollService $payroll) {}
+    /**
+     * Column letter => [header, width, money?]. Formulas and values are filled in per row.
+     *
+     * @var array<string, array{0: string, 1: float, 2: bool}>
+     */
+    private const COLUMNS = [
+        'A' => ['SPECIFIC STATION', 14, false],
+        'B' => ['Period', 6, false],
+        'C' => ['Batch', 6, false],
+        'D' => ['No.', 5, false],
+        'E' => ['Name', 30, false],
+        'F' => ['Official Station', 16, false],
+        'G' => ['Daily Rate', 10, true],
+        'H' => ['15% Premium ', 10, true],
+        'I' => ['Total Daily Rate', 10, true],
+        'J' => ['Date Period  Covered', 13, false],
+        'K' => ['No. of Days', 7, false],
+        'L' => ['Gross', 12, true],
+        'M' => ['No. of Late (mins)', 8, false],
+        'N' => ['Rate/min', 8, true],
+        'O' => ['Total Late', 10, true],
+        'P' => ['OT Hours', 7, false],
+        'Q' => ['Hourly rate', 9, true],
+        'R' => ['OT Hours RD/SH', 8, false],
+        'S' => ['Hourly rate RD/SH', 9, true],
+        'T' => ['Overtime Pay', 10, true],
+        'U' => ['Gross after Deduction of Late ', 13, true],
+        'V' => ['SSS', 10, true],
+        'W' => ['HDMF', 10, true],
+        'X' => ['CMPEAI', 10, true],
+        'Y' => ['Net Pay', 12, true],
+        'Z' => ['Absences', 8, false],
+        'AA' => ['tardiness', 8, false],
+        'AB' => ['Excess', 10, true],
+    ];
+
+    /** Columns added up on the total row. */
+    private const TOTALS = ['L', 'O', 'T', 'U', 'V', 'W', 'X', 'Y', 'AB'];
 
     public function export(PayrollPeriod $period): Spreadsheet
     {
-        $labels = $this->payroll->itemLabels();
-        $slips = $period->payslips()->orderBy('full_name')->get();
-
-        $columns = [
-            ['header' => self::ID_COLUMN, 'width' => 14, 'text' => true, 'value' => fn (Payslip $slip): string => $slip->employee_code],
-            ['header' => 'Name', 'width' => 28, 'text' => true, 'computed' => true, 'value' => fn (Payslip $slip): string => $slip->full_name],
-        ];
-
-        foreach ($labels['earnings'] as $label) {
-            $columns[] = ['header' => $label, 'width' => 14, 'value' => fn (Payslip $slip): float => $this->amount($slip->earnings, $label)];
-        }
-
-        $columns[] = ['header' => 'Gross Pay', 'width' => 14, 'computed' => true, 'value' => fn (Payslip $slip): float => $slip->gross_pay_centavos / 100];
-
-        foreach ($labels['deductions'] as $label) {
-            $columns[] = ['header' => $label, 'width' => 14, 'value' => fn (Payslip $slip): float => $this->amount($slip->deductions, $label)];
-        }
-
-        $columns[] = ['header' => 'Total Deductions', 'width' => 16, 'computed' => true, 'value' => fn (Payslip $slip): float => $slip->total_deductions_centavos / 100];
-        $columns[] = ['header' => 'Net Pay', 'width' => 14, 'computed' => true, 'value' => fn (Payslip $slip): float => $slip->net_pay_centavos / 100];
-        $columns[] = ['header' => self::REMARKS_COLUMN, 'width' => 30, 'text' => true, 'value' => fn (Payslip $slip): string => (string) $slip->remarks];
+        $slips = $period->payslips()->orderBy('station')->orderBy('full_name')->get();
 
         $spreadsheet = new Spreadsheet;
-        $sheet = $spreadsheet->getActiveSheet()->setTitle('Payroll');
+        $sheet = $spreadsheet->getActiveSheet()->setTitle(mb_substr(strtoupper($period->period_start->format('F Y')), 0, 31));
 
-        foreach ($columns as $index => $column) {
-            $letter = Coordinate::stringFromColumnIndex($index + 1);
-            $computed = $column['computed'] ?? false;
-            $text = $column['text'] ?? false;
+        $this->titles($sheet, $period);
+        $this->headers($sheet);
 
-            $sheet->getColumnDimension($letter)->setWidth($column['width']);
-            $sheet->getCell("{$letter}1")->setValueExplicit($column['header'], DataType::TYPE_STRING);
-            $sheet->getStyle("{$letter}1")->getFont()->setBold(true);
-            $sheet->getStyle("{$letter}1")->getAlignment()->setWrapText(true);
-            $sheet->getStyle("{$letter}1")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($computed ? 'FFF1F1F1' : 'FFE8EEF8');
+        $row = self::FIRST_ROW;
 
-            if ($computed) {
-                $sheet->getComment("{$letter}1")->getText()->createTextRun(self::COMPUTED_NOTE);
-            }
-
-            foreach ($slips as $rowIndex => $slip) {
-                $row = $rowIndex + 2;
-                $value = $column['value']($slip);
-
-                // Text stays text, so a value starting with "=" can never become a formula.
-                $sheet->getCell("{$letter}{$row}")->setValueExplicit($value, $text ? DataType::TYPE_STRING : DataType::TYPE_NUMERIC);
-                $sheet->getStyle("{$letter}{$row}")->getNumberFormat()->setFormatCode($text ? NumberFormat::FORMAT_TEXT : self::MONEY_FORMAT);
-            }
+        foreach ($slips as $index => $slip) {
+            $this->workerRow($sheet, $row, $index + 1, $slip, $period);
+            $row++;
         }
 
-        $sheet->getRowDimension(1)->setRowHeight(30);
-        $sheet->freezePane('C2');
+        $this->totalRow($sheet, $row, $slips->isEmpty() ? null : $row - 1);
+
+        $sheet->freezePane('F'.self::FIRST_ROW);
+        $sheet->getPageSetup()->setOrientation(PageSetup::ORIENTATION_LANDSCAPE)->setPaperSize(PageSetup::PAPERSIZE_LEGAL)->setFitToWidth(1)->setFitToHeight(0);
+        $sheet->getPageSetup()->setRowsToRepeatAtTopByStartAndEnd(4, 5);
 
         return $spreadsheet;
     }
@@ -100,190 +93,121 @@ class PayrollWorkbook
     }
 
     /**
-     * Read a workbook against a period. Nothing is written.
-     *
-     * @return ImportPlan
+     * Rows 1-3: the payroll title, the period and the batch, centred across E:Y.
      */
-    public function analyze(PayrollPeriod $period, string $path): array
+    private function titles(Worksheet $sheet, PayrollPeriod $period): void
     {
-        $plan = ['rows' => [], 'labels' => [], 'actions' => [], 'errors' => [], 'warnings' => []];
-        $failed = fn (string $message): array => [...$plan, 'errors' => [['message' => $message]]];
+        $lines = [1 => 'PAYROLL OF CONTRACT OF SERVICE (COS)', 2 => $period->titleRange(), 3 => $period->batch ? 'BATCH '.$period->batch : ''];
 
-        $zipError = ZipGuard::check((string) file_get_contents($path));
-
-        if ($zipError !== null) {
-            return $failed($zipError);
+        foreach ($lines as $row => $text) {
+            $sheet->mergeCells("E{$row}:Y{$row}");
+            $sheet->getCell("E{$row}")->setValueExplicit($text, DataType::TYPE_STRING);
+            $sheet->getStyle("E{$row}")->getFont()->setBold(true)->setSize($row === 1 ? 14 : 12);
+            $sheet->getStyle("E{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         }
-
-        try {
-            $reader = IOFactory::createReader('Xlsx');
-            $reader->setReadDataOnly(true);
-            $spreadsheet = $reader->load($path);
-        } catch (Throwable) {
-            return $failed('This file could not be read. Upload an .xlsx Excel workbook.');
-        }
-
-        $sheet = $this->firstUsedSheet($spreadsheet);
-
-        if ($sheet === null) {
-            return $failed('The workbook is empty.');
-        }
-
-        $columnOf = $this->headerColumns($sheet);
-        $idColumn = $columnOf[ExcelCells::headerKey(self::ID_COLUMN)] ?? null;
-
-        if ($idColumn === null) {
-            return $failed('Missing the "'.self::ID_COLUMN.'" column.');
-        }
-
-        $labels = $this->payroll->itemLabels();
-        $itemColumns = [];
-        $missing = [];
-
-        foreach (['e' => $labels['earnings'], 'd' => $labels['deductions']] as $kind => $list) {
-            foreach ($list as $label) {
-                $column = $columnOf[ExcelCells::headerKey($label)] ?? null;
-
-                if ($column === null) {
-                    $missing[] = $label;
-                } else {
-                    $itemColumns["{$kind}:{$label}"] = $column;
-                }
-            }
-        }
-
-        if ($missing !== []) {
-            $plan['warnings'][] = 'Columns not in the file (left unchanged): '.implode(', ', $missing).'.';
-        }
-
-        $remarksColumn = $columnOf[ExcelCells::headerKey(self::REMARKS_COLUMN)] ?? null;
-        $employees = Employee::query()->get(['id', 'employee_id', 'full_name'])->keyBy(fn (Employee $employee): string => mb_strtolower($employee->employee_id));
-        $withSlip = array_flip($period->payslips()->pluck('employee_id')->all());
-        $seen = [];
-
-        for ($row = 2, $last = $sheet->getHighestDataRow(); $row <= $last; $row++) {
-            $code = ExcelCells::text(ExcelCells::plain($sheet->getCell([$idColumn, $row])));
-            $values = [];
-
-            foreach ($itemColumns as $key => $column) {
-                $value = ExcelCells::plain($sheet->getCell([$column, $row]));
-
-                if (! ExcelCells::isBlank($value)) {
-                    $values[$key] = trim((string) $value);
-                }
-            }
-
-            if ($code === null && $values === []) {
-                continue;
-            }
-
-            if ($code === null) {
-                $plan['errors'][] = ['row' => $row, 'column' => self::ID_COLUMN, 'message' => 'is required'];
-
-                continue;
-            }
-
-            $employee = $employees->get(mb_strtolower($code));
-
-            if ($employee === null) {
-                $plan['errors'][] = ['row' => $row, 'column' => self::ID_COLUMN, 'message' => "no employee with Employee ID \"{$code}\""];
-
-                continue;
-            }
-
-            if (isset($seen[$employee->id])) {
-                $plan['errors'][] = ['row' => $row, 'message' => "Duplicate of row {$seen[$employee->id]} (same employee)."];
-
-                continue;
-            }
-
-            $seen[$employee->id] = $row;
-            $hasSlip = isset($withSlip[$employee->id]);
-
-            if (! $hasSlip && $period->isReleased()) {
-                $plan['errors'][] = ['row' => $row, 'message' => 'This period was already released, so no new payslip can be added.'];
-
-                continue;
-            }
-
-            $gridRow = ['employee_id' => $employee->id, 'values' => $values + array_fill_keys(array_keys($itemColumns), '0'), 'line' => $row];
-
-            if ($remarksColumn !== null) {
-                $gridRow['remarks'] = (string) ExcelCells::text(ExcelCells::plain($sheet->getCell([$remarksColumn, $row])));
-            }
-
-            $index = count($plan['rows']);
-            $plan['rows'][] = $gridRow;
-            $plan['labels'][$index] = $employee->full_name;
-            $plan['actions'][$index] = $hasSlip ? 'update' : 'create';
-        }
-
-        if ($period->isReleased()) {
-            $plan['warnings'][] = 'This period was already released: changed payslips will be marked "corrected after release".';
-        }
-
-        if ($plan['rows'] === [] && $plan['errors'] === []) {
-            $plan['errors'][] = ['message' => 'No rows to import.'];
-        }
-
-        return $plan;
     }
 
     /**
-     * Save a checked plan with the same rules and transaction as the grid.
-     *
-     * @param  ImportPlan  $plan
-     * @return array{errors: list<ImportProblem>, updated: int, created: int}
+     * Row 4 groups the two overtime pairs; row 5 holds the column headers.
      */
-    public function commit(PayrollPeriod $period, array $plan): array
+    private function headers(Worksheet $sheet): void
     {
-        $result = $this->payroll->saveRows($period, $plan['rows']);
+        foreach (['P4:Q4' => 'Regular OT', 'R4:S4' => 'OT during RD/SH'] as $range => $text) {
+            $sheet->mergeCells($range);
+            $sheet->getCell(explode(':', $range)[0])->setValueExplicit($text, DataType::TYPE_STRING);
+        }
 
-        $result['errors'] = array_map(fn (array $error): array => [
-            'row' => $plan['rows'][$error['row']]['line'] ?? null,
-            'message' => $error['message'],
-        ], $result['errors']);
+        foreach (self::COLUMNS as $letter => [$header, $width]) {
+            $sheet->getColumnDimension($letter)->setWidth($width);
+            $sheet->getCell("{$letter}5")->setValueExplicit($header, DataType::TYPE_STRING);
+        }
 
-        return $result;
+        $style = $sheet->getStyle('A4:AB5');
+        $style->getFont()->setBold(true);
+        $style->getAlignment()->setWrapText(true)->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
+        $style->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFE8EEF8');
+        $sheet->getStyle('A5:AB5')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+        $sheet->getRowDimension(5)->setRowHeight(42);
     }
 
     /**
-     * @param  list<array{label: string, amount_centavos: int}>|null  $items
+     * One worker, with the workbook's own formulas for every computed column. Text is written as text,
+     * so a name starting with "=" can never become a formula.
      */
-    private function amount(?array $items, string $label): float
+    private function workerRow(Worksheet $sheet, int $row, int $number, Payslip $slip, PayrollPeriod $period): void
     {
-        return (array_column($items ?? [], 'amount_centavos', 'label')[$label] ?? 0) / 100;
-    }
+        $premium = rtrim(rtrim(number_format((float) $slip->premium_percent / 100, 4, '.', ''), '0'), '.');
 
-    private function firstUsedSheet(Spreadsheet $spreadsheet): ?Worksheet
-    {
-        foreach ($spreadsheet->getAllSheets() as $sheet) {
-            if ($this->headerColumns($sheet) !== []) {
-                return $sheet;
+        $text = [
+            'A' => (string) $slip->specific_station,
+            'C' => (string) $slip->batch_label,
+            'E' => mb_strtoupper($slip->full_name),
+            'F' => (string) $slip->station,
+            'J' => (string) $slip->period_covered,
+        ];
+        $numbers = [
+            'B' => (int) $period->period_start->format('j') <= 15 ? 1 : 2,
+            'D' => $number,
+            'G' => $slip->daily_rate_centavos / 100,
+            'K' => (float) $slip->days_worked,
+            'M' => (int) $slip->late_minutes,
+            'P' => (float) $slip->ot_hours,
+            'R' => (float) $slip->ot_rest_hours,
+            'V' => $slip->sss_centavos / 100,
+            'W' => $slip->hdmf_centavos / 100,
+            'X' => $slip->cmpeai_centavos / 100,
+            'Z' => (float) $slip->absences,
+            'AA' => (int) $slip->tardiness,
+        ];
+        $formulas = [
+            'H' => "=ROUND(G{$row}*{$premium}, 2)",
+            'I' => "=IF(AND(G{$row}=\"\",H{$row}=\"\"),\"\",G{$row}+H{$row})",
+            'L' => "=IF(AND(I{$row}=\"\",K{$row}=\"\"),\"\",I{$row}*K{$row})",
+            'N' => "=ROUND(I{$row}/(8*60),2)",
+            'O' => "=IF(AND(M{$row}=\"\",N{$row}=\"\"),\"\",M{$row}*N{$row})",
+            'Q' => "=ROUND((I{$row}/8)*1.25, 2)",
+            'S' => "=ROUND((I{$row}/8)*1.5, 2)",
+            'T' => "=IF(E{$row}=\"\",\"\",(P{$row}*Q{$row})+(R{$row}*S{$row}))",
+            'U' => "=IF(AND(L{$row}=\"\",O{$row}=\"\",T{$row}=\"\"),\"\",L{$row}-O{$row}+T{$row})",
+            'Y' => "=IF(E{$row}=\"\",\"\",ROUND(U{$row}-V{$row}-W{$row}-X{$row},2))",
+            'AB' => "=Z{$row}*I{$row}",
+        ];
+
+        foreach ($text as $letter => $value) {
+            $sheet->getCell("{$letter}{$row}")->setValueExplicit($value, DataType::TYPE_STRING);
+        }
+
+        foreach ($numbers as $letter => $value) {
+            $sheet->getCell("{$letter}{$row}")->setValueExplicit($value, DataType::TYPE_NUMERIC);
+        }
+
+        foreach ($formulas as $letter => $formula) {
+            $sheet->getCell("{$letter}{$row}")->setValueExplicit($formula, DataType::TYPE_FORMULA);
+        }
+
+        foreach (self::COLUMNS as $letter => [, , $money]) {
+            if ($money) {
+                $sheet->getStyle("{$letter}{$row}")->getNumberFormat()->setFormatCode(self::MONEY_FORMAT);
             }
         }
 
-        return null;
+        $sheet->getStyle("A{$row}:AB{$row}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
     }
 
     /**
-     * Column numbers by normalised header text.
-     *
-     * @return array<string, int>
+     * The grand total under the last worker.
      */
-    private function headerColumns(Worksheet $sheet): array
+    private function totalRow(Worksheet $sheet, int $row, ?int $lastRow): void
     {
-        $columns = [];
-        $last = Coordinate::columnIndexFromString($sheet->getHighestDataColumn());
+        $sheet->getCell("E{$row}")->setValueExplicit('TOTAL', DataType::TYPE_STRING);
 
-        for ($column = 1; $column <= $last; $column++) {
-            $header = ExcelCells::headerKey(ExcelCells::plain($sheet->getCell([$column, 1])));
-
-            if ($header !== '') {
-                $columns[$header] = $column;
-            }
+        foreach (self::TOTALS as $letter) {
+            $formula = $lastRow === null ? '=0' : "=SUM({$letter}".self::FIRST_ROW.":{$letter}{$lastRow})";
+            $sheet->getCell("{$letter}{$row}")->setValueExplicit($formula, DataType::TYPE_FORMULA);
+            $sheet->getStyle("{$letter}{$row}")->getNumberFormat()->setFormatCode(self::MONEY_FORMAT);
         }
 
-        return $columns;
+        $sheet->getStyle("A{$row}:AB{$row}")->getFont()->setBold(true);
+        $sheet->getStyle("A{$row}:AB{$row}")->getBorders()->getTop()->setBorderStyle(Border::BORDER_DOUBLE);
     }
 }

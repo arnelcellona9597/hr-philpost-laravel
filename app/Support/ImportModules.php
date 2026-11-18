@@ -169,6 +169,7 @@ class ImportModules
         $governmentIds = ['section' => 'Government IDs'];
         $bank = ['section' => 'Bank Account'];
         $emergency = ['section' => 'Emergency Contact'];
+        $payroll = ['section' => 'Payroll Deductions', 'width' => 14, 'help' => 'Deducted every COS payroll period unless changed for that period.'];
 
         return self::module('employees', 'Employees', 'Employees', ['employee_id'], [
             self::field('last_name', 'Last Name', 'text', ['required' => true] + $personal),
@@ -209,6 +210,9 @@ class ImportModules
             self::field('bank_branch', 'Bank Branch', 'text', ['width' => 24] + $bank),
             self::field('bank_account_name', 'Bank Account Name', 'text', ['width' => 28] + $bank),
             self::field('bank_account_number', 'Bank Account Number', 'text', ['width' => 22, 'help' => 'Digits, spaces and hyphens only.'] + $bank),
+            self::field('sss_deduction_centavos', 'SSS Deduction', 'money', $payroll),
+            self::field('hdmf_deduction_centavos', 'HDMF Deduction', 'money', $payroll),
+            self::field('cmpeai_deduction_centavos', 'CMPEAI Deduction', 'money', $payroll),
             self::field('emergency_contact_name', 'Emergency Contact Person', 'text', ['width' => 24] + $emergency),
             self::field('emergency_relationship', 'Relationship', 'text', $emergency),
             self::field('emergency_contact_number', 'Emergency Contact Number', 'phone', $emergency),

@@ -7,6 +7,7 @@
         'Folio' => '8.5in 13in',
         'Half-Letter' => '5.5in 8.5in',
         'A4 landscape' => 'A4 landscape',
+        'Legal landscape' => 'legal landscape',
         default => 'A4',
     };
 @endphp

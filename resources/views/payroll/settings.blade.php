@@ -28,14 +28,16 @@
             <fieldset class="card grid gap-4 p-5 sm:grid-cols-2">
                 <legend class="px-1 text-sm font-semibold">Pay items</legend>
                 <div>
-                    <label class="label" for="earning_items">Earnings (one per line)</label>
-                    <textarea class="input min-h-36" id="earning_items" name="earning_items">{{ old('earning_items', implode("\n", $settings->earning_items ?? [])) }}</textarea>
+                    <p class="label">Earnings</p>
+                    <p class="text-sm">Gross, Overtime Pay</p>
+                    <input type="hidden" name="earning_items" value="{{ implode("\n", $settings->earning_items ?? []) }}" />
                 </div>
                 <div>
-                    <label class="label" for="deduction_items">Deductions (one per line)</label>
-                    <textarea class="input min-h-36" id="deduction_items" name="deduction_items">{{ old('deduction_items', implode("\n", $settings->deduction_items ?? [])) }}</textarea>
+                    <p class="label">Deductions</p>
+                    <p class="text-sm">Late, SSS, HDMF, CMPEAI</p>
+                    <input type="hidden" name="deduction_items" value="{{ implode("\n", $settings->deduction_items ?? []) }}" />
                 </div>
-                <p class="field-help sm:col-span-2">These are the columns of the payroll grid and Excel sheet. Renaming an item doesn't change saved payslips; their old item stays on them as an extra line.</p>
+                <p class="field-help sm:col-span-2">The COS payroll computes these from the days, lates, overtime and deductions in the payroll grid, as in the office's payroll workbook.</p>
             </fieldset>
             <fieldset class="card p-5">
                 <legend class="px-1 text-sm font-semibold">Employee details shown</legend>

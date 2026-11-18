@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'code', 'period_start', 'period_end', 'pay_date', 'notes'])]
+#[Fillable(['name', 'code', 'period_start', 'period_end', 'pay_date', 'batch', 'notes'])]
 class PayrollPeriod extends Model
 {
     /** @use HasFactory<PayrollPeriodFactory> */
@@ -31,6 +31,36 @@ class PayrollPeriod extends Model
             'status' => PayrollStatus::class,
             'released_at' => 'datetime',
         ];
+    }
+
+    /**
+     * The period as the payroll title prints it, such as "OCTOBER 16-31, 2026".
+     */
+    public function titleRange(): string
+    {
+        $start = $this->period_start;
+        $end = $this->period_end;
+
+        if ($start->format('Y-m') === $end->format('Y-m')) {
+            return strtoupper($start->format('F')).' '.$start->format('j').'-'.$end->format('j, Y');
+        }
+
+        return strtoupper($start->format('F j').' - '.$end->format('F j, Y'));
+    }
+
+    /**
+     * The "Date Period Covered" column, such as "10/16-31/2026".
+     */
+    public function coveredLabel(): string
+    {
+        $start = $this->period_start;
+        $end = $this->period_end;
+
+        if ($start->format('Y-m') === $end->format('Y-m')) {
+            return $start->format('n/j').'-'.$end->format('j/Y');
+        }
+
+        return $start->format('n/j').'-'.$end->format('n/j/Y');
     }
 
     public function isReleased(): bool

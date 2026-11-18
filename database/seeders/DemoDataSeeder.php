@@ -161,6 +161,7 @@ class DemoDataSeeder extends Seeder
             $this->wellnessLeave($active);
             $this->requirements($active);
             $this->applications($branches);
+            $this->wagesAndCareers($employees->values());
             $released = $this->payrollPeriods($staff[0]);
             $this->certificatesFor($active, $employees, $staff[0]);
             $this->messageHistory($active, $released, $staff[0]);
@@ -168,7 +169,6 @@ class DemoDataSeeder extends Seeder
             $this->activity($staff[0], $active, $released);
             $this->importHistory($staff[0]);
             $this->receivedMails($branches, $staff[0]);
-            $this->wagesAndCareers($employees->values());
             $this->remittances($staff[0]);
             $this->contracts($staff[0]);
         }));
@@ -475,33 +475,26 @@ class DemoDataSeeder extends Seeder
             }
         }
 
+        if ($filledRate >= 1.0) {
+            $period->payslips()->where('gross_pay_centavos', 0)->delete();
+        }
+
         return $period;
     }
 
+    /**
+     * Days, lates, overtime and deductions typed as HR would in the payroll grid.
+     */
     private function fillPayslip(Payslip $slip): void
     {
-        $basic = match ($slip->classification) {
-            'Regular' => mt_rand(22, 45) * 1000,
-            'Contractual' => mt_rand(16, 25) * 1000,
-            default => mt_rand(12, 18) * 1000,
-        };
-
-        $earnings = [
-            'Basic Pay' => $basic * 100,
-            'PERA' => $slip->classification === 'Regular' ? 200_000 : 0,
-            'Overtime' => $this->chance(0.2) ? mt_rand(5, 30) * 10_000 + 50 : 0,
-            'Allowances' => $this->chance(0.4) ? 150_000 : 0,
-        ];
-        $deductions = [
-            'Withholding Tax' => $basic * 8,
-            'GSIS / SSS' => (int) round($basic * 4.5),
-            'PhilHealth' => (int) round($basic * 2.5),
-            'Pag-IBIG' => 20_000,
-            'Loans' => $this->chance(0.15) ? mt_rand(5, 20) * 10_000 : 0,
-        ];
-        $items = fn (array $amounts): array => array_map(fn (string $label, int $amount): array => ['label' => $label, 'amount_centavos' => $amount], array_keys($amounts), $amounts);
-
-        $slip->update(['earnings' => $items($earnings), 'deductions' => $items($deductions)]);
+        $this->payroll->saveRows($slip->period, [['id' => $slip->id, 'values' => [
+            'days' => (string) mt_rand(9, 11),
+            'late' => $this->chance(0.3) ? (string) mt_rand(1, 60) : '',
+            'ot' => $this->chance(0.2) ? (string) mt_rand(1, 6) : '',
+            'ot_rest' => $this->chance(0.05) ? '8' : '',
+            'sss' => $this->chance(0.5) ? '750' : '',
+            'hdmf' => '400',
+        ]]]);
     }
 
     /**

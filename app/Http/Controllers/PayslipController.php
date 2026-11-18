@@ -19,18 +19,15 @@ class PayslipController extends Controller
 {
     use RespondsToForms;
 
-    public function show(Payslip $payslip, PayrollService $payroll): View
+    public function show(Payslip $payslip): View
     {
         Gate::authorize('view', $payslip);
-
-        $labels = $payroll->itemLabels();
-        $notInTemplate = fn (array $items, array $list): array => array_values(array_filter($items, fn (array $item): bool => ! in_array($item['label'], $list, true)));
 
         return view('payroll.payslip', [
             'slip' => $payslip->load(['period', 'employee']),
             'settings' => PayslipSetting::current(),
-            'labels' => $labels,
-            'extra' => [...$notInTemplate($payslip->earnings, $labels['earnings']), ...$notInTemplate($payslip->deductions, $labels['deductions'])],
+            'inputs' => PayrollService::INPUTS,
+            'pay' => $payslip->cosPay(),
         ]);
     }
 
@@ -38,13 +35,10 @@ class PayslipController extends Controller
     {
         Gate::authorize('update', $payslip);
 
-        $labels = $payroll->itemLabels();
         $values = [];
 
-        foreach (['e' => $labels['earnings'], 'd' => $labels['deductions']] as $kind => $list) {
-            foreach ($list as $index => $label) {
-                $values["{$kind}:{$label}"] = (string) $request->input("{$kind}_{$index}");
-            }
+        foreach (array_keys(PayrollService::INPUTS) as $key) {
+            $values[$key] = (string) $request->input($key);
         }
 
         $result = $payroll->saveRows($payslip->period, [['id' => $payslip->id, 'values' => $values, 'remarks' => trim((string) $request->input('remarks'))]]);
