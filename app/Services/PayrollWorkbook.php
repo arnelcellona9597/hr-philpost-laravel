@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\PayrollPeriod;
 use App\Models\Payslip;
+use App\Support\PayrollMonthly;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -85,6 +87,97 @@ class PayrollWorkbook
         $sheet->getPageSetup()->setRowsToRepeatAtTopByStartAndEnd(4, 5);
 
         return $spreadsheet;
+    }
+
+    /**
+     * The month's consolidated COS payroll: each worker's 1-15 and 16-end amounts side by side.
+     *
+     * @param  array<string, mixed>  $summary  from {@see PayrollMonthly::build()}
+     */
+    public function monthly(array $summary): Spreadsheet
+    {
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet()->setTitle(mb_substr('SUMMARY '.$summary['title'], 0, 31));
+        $parts = ['days' => 'Days', 'gross' => 'Gross', 'late' => 'Late', 'overtime' => 'Overtime', 'deductions' => 'Deductions', 'net' => 'Net Pay'];
+        $groups = [1 => '1st half (1-15)', 2 => '2nd half (16-end)', 'total' => 'Month total'];
+
+        $sheet->mergeCells('A1:V1');
+        $sheet->getCell('A1')->setValueExplicit('MONTHLY PAYROLL SUMMARY OF CONTRACT OF SERVICE (COS)', DataType::TYPE_STRING);
+        $sheet->mergeCells('A2:V2');
+        $sheet->getCell('A2')->setValueExplicit($summary['title'], DataType::TYPE_STRING);
+        $sheet->getStyle('A1:A2')->getFont()->setBold(true)->setSize(12);
+        $sheet->getStyle('A1:A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        foreach (['A' => 'No.', 'B' => 'Name', 'C' => 'Employee ID', 'D' => 'Official Station'] as $letter => $header) {
+            $sheet->mergeCells("{$letter}4:{$letter}5");
+            $sheet->getCell("{$letter}4")->setValueExplicit($header, DataType::TYPE_STRING);
+        }
+
+        $column = 5;
+
+        foreach ($groups as $group => $label) {
+            $start = Coordinate::stringFromColumnIndex($column);
+            $end = Coordinate::stringFromColumnIndex($column + count($parts) - 1);
+            $sheet->mergeCells("{$start}4:{$end}4");
+            $sheet->getCell("{$start}4")->setValueExplicit($label, DataType::TYPE_STRING);
+
+            foreach (array_values($parts) as $offset => $header) {
+                $sheet->getCell(Coordinate::stringFromColumnIndex($column + $offset).'5')->setValueExplicit($header, DataType::TYPE_STRING);
+            }
+
+            $column += count($parts);
+        }
+
+        $row = 6;
+
+        foreach ($summary['rows'] as $index => $worker) {
+            $sheet->getCell("A{$row}")->setValueExplicit($index + 1, DataType::TYPE_NUMERIC);
+            $sheet->getCell("B{$row}")->setValueExplicit(mb_strtoupper($worker['name']), DataType::TYPE_STRING);
+            $sheet->getCell("C{$row}")->setValueExplicit($worker['code'], DataType::TYPE_STRING);
+            $sheet->getCell("D{$row}")->setValueExplicit($worker['station'], DataType::TYPE_STRING);
+            $this->monthlyAmounts($sheet, $row, [$worker['halves'][1], $worker['halves'][2], $worker['total']], $parts);
+            $row++;
+        }
+
+        $sheet->getCell("B{$row}")->setValueExplicit('TOTAL', DataType::TYPE_STRING);
+        $this->monthlyAmounts($sheet, $row, [$summary['totals'][1], $summary['totals'][2], $summary['totals']['month']], $parts);
+        $sheet->getStyle("A{$row}:V{$row}")->getFont()->setBold(true);
+
+        $style = $sheet->getStyle('A4:V5');
+        $style->getFont()->setBold(true);
+        $style->getAlignment()->setWrapText(true)->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
+        $style->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFE8EEF8');
+        $sheet->getStyle("A4:V{$row}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+        $sheet->getColumnDimension('B')->setWidth(30);
+        $sheet->getColumnDimension('D')->setWidth(16);
+        $sheet->freezePane('E6');
+        $sheet->getPageSetup()->setOrientation(PageSetup::ORIENTATION_LANDSCAPE)->setPaperSize(PageSetup::PAPERSIZE_LEGAL)->setFitToWidth(1)->setFitToHeight(0);
+
+        return $spreadsheet;
+    }
+
+    /**
+     * The three groups of amounts (1st half, 2nd half, month) from column E. A half without a payslip stays blank.
+     *
+     * @param  list<array<string, int|float>|null>  $groups
+     * @param  array<string, string>  $parts
+     */
+    private function monthlyAmounts(Worksheet $sheet, int $row, array $groups, array $parts): void
+    {
+        $column = 5;
+
+        foreach ($groups as $amounts) {
+            foreach (array_keys($parts) as $offset => $key) {
+                $cell = Coordinate::stringFromColumnIndex($column + $offset).$row;
+
+                if ($amounts !== null) {
+                    $sheet->getCell($cell)->setValueExplicit($key === 'days' ? (float) $amounts[$key] : $amounts[$key] / 100, DataType::TYPE_NUMERIC);
+                    $sheet->getStyle($cell)->getNumberFormat()->setFormatCode($key === 'days' ? '0.##' : self::MONEY_FORMAT);
+                }
+            }
+
+            $column += count($parts);
+        }
     }
 
     public function filename(PayrollPeriod $period): string
