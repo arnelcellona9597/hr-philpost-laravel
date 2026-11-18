@@ -92,6 +92,15 @@
             @endforeach
         </table>
 
+        @if ($attendance = $slip->attendanceLines($symbol))
+            <table class="items">
+                <tr><th colspan="2">Attendance</th></tr>
+                @foreach ($attendance as [$label, $value])
+                    <tr><td class="label-cell">{{ $label }}</td><td>{{ $value }}</td></tr>
+                @endforeach
+            </table>
+        @endif
+
         @foreach ($sections as [$title, $items, $totalLabel, $total])
             <table class="items">
                 <tr><th>{{ $title }}</th><th class="right">Amount</th></tr>

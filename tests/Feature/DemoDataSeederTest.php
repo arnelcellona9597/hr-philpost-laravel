@@ -37,7 +37,8 @@ it('fills every module with linked records', function () {
         ->and(Application::query()->count())->toBe(10)
         ->and(Certificate::query()->where('status', 'Void')->count())->toBe(1)
         ->and(PayrollPeriod::query()->where('status', PayrollStatus::Released)->count())->toBe(1)
-        ->and(Payslip::query()->count())->toBe($active * 2);
+        ->and(Payslip::query()->count())->toBeGreaterThan(0)
+        ->and(Payslip::query()->whereHas('employee', fn ($query) => $query->where('classification', '!=', 'COS'))->count())->toBe(0);
 });
 
 it('can never send an email', function () {

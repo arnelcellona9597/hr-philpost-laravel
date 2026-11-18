@@ -163,7 +163,7 @@ it('creates each settings group once with defaults', function (string $settings)
 it('ships usable defaults on a fresh install', function () {
     expect(SiteSetting::current()->palette['primary'])->toBe('#00539b')
         ->and(LeaveSetting::current()->allowanceForYear(2026))->toBe(5)
-        ->and(PayslipSetting::current()->earning_items)->toContain('Basic Pay')
+        ->and(PayslipSetting::current()->earning_items)->toContain('Gross')
         ->and(NotificationSetting::current()->hourly_limit)->toBe(100)
         ->and(NotificationSetting::current()->footer)->not->toBeEmpty()
         ->and(RequirementDeadlineSetting::current()->itr)->toEqual(['month' => 4, 'day' => 30, 'next_year' => false])

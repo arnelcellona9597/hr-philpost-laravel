@@ -45,6 +45,16 @@
             <div class="flex gap-2"><dt class="w-28 shrink-0 text-xs text-[#6b7280]">{{ $label }}</dt><dd class="font-medium">{{ $value ?: '—' }}</dd></div>
         @endforeach
     </dl>
+    @if ($attendance = $slip->attendanceLines($symbol))
+        <table class="mt-5 w-full">
+            <thead><tr class="bg-[#f2f4f7]"><th class="px-2 py-1.5 text-left" colspan="2">Attendance</th></tr></thead>
+            <tbody>
+                @foreach ($attendance as [$label, $value])
+                    <tr><td class="w-36 px-2 py-1 text-xs text-[#6b7280]">{{ $label }}</td><td class="px-2 py-1">{{ $value }}</td></tr>
+                @endforeach
+            </tbody>
+        </table>
+    @endif
     @foreach ($tables as [$title, $items, $totalLabel, $total])
         <table class="mt-5 w-full">
             <thead><tr class="bg-[#f2f4f7]"><th class="px-2 py-1.5 text-left">{{ $title }}</th><th class="px-2 py-1.5 text-right">Amount</th></tr></thead>
