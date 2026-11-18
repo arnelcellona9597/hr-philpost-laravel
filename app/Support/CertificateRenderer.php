@@ -92,7 +92,7 @@ class CertificateRenderer
         $text = '<div style="font-size:10pt;font-family:Helvetica,Arial,sans-serif">'.e($block['top'] ?? '').'</div>';
 
         foreach ($block['name'] ?? [] as $line) {
-            $text .= '<div style="font-size:10.5pt;font-weight:bold;line-height:1.2;font-family:Helvetica,Arial,sans-serif">'.e($line).'</div>';
+            $text .= '<div style="font-size:12pt;font-weight:bold;line-height:1.2;font-family:Helvetica,Arial,sans-serif">'.e($line).'</div>';
         }
 
         foreach ($block['details'] ?? [] as $line) {
@@ -102,7 +102,7 @@ class CertificateRenderer
         $logo = '';
 
         if ($options['letterheadLogoUrl'] ?? null) {
-            $size = ($options['letterheadLogoSize'] ?? null) ? 'width:'.$options['letterheadLogoSize'][0].'pt;height:'.$options['letterheadLogoSize'][1].'pt' : 'width:225pt;height:48pt;object-fit:contain;object-position:right bottom';
+            $size = ($options['letterheadLogoSize'] ?? null) ? 'width:'.$options['letterheadLogoSize'][0].'pt;height:'.$options['letterheadLogoSize'][1].'pt' : 'width:195pt;height:42pt;object-fit:contain;object-position:right bottom';
             $logo = '<img src="'.e($options['letterheadLogoUrl']).'" alt="" style="'.$size.'">';
         }
 
