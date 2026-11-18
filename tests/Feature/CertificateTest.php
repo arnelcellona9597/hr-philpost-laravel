@@ -305,7 +305,15 @@ it('fills in the office letterhead wording only where it is blank', function () 
 it('prints the letterhead logo large enough to match the office letterhead', function () {
     $html = CertificateRenderer::html([['type' => 'letterhead', 'top' => 'Republic of the Philippines', 'name' => ['PHILIPPINE POSTAL CORPORATION'], 'details' => [], 'section' => '']], ['companyName' => 'x', 'font' => 'calibri', 'letterheadLogoUrl' => '/files/1']);
 
-    expect($html)->toContain('width:200pt;height:45pt');
+    expect($html)->toContain('width:205pt;height:52pt');
+});
+
+it('links the letterhead email and sets the section bar under the logo', function () {
+    $html = CertificateRenderer::html([['type' => 'letterhead', 'top' => 'Republic of the Philippines', 'name' => ['PHILIPPINE POSTAL CORPORATION'], 'details' => ['8000 Davao City', 'area7.hr@phlpost.gov.ph'], 'section' => 'Human Resource Management Section']], ['companyName' => 'x', 'font' => 'calibri']);
+
+    expect($html)->toContain('<a href="mailto:area7.hr@phlpost.gov.ph" style="color:#0563C1;text-decoration:underline">area7.hr@phlpost.gov.ph</a>')
+        ->not->toContain('mailto:8000')
+        ->toContain('width:185pt;white-space:nowrap;background:#111418');
 });
 
 it('uses the wide PHLPOST logo as the letterhead logo and keeps the previous file', function () {

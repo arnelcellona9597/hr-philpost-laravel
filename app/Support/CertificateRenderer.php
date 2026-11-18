@@ -12,6 +12,11 @@ namespace App\Support;
  */
 class CertificateRenderer
 {
+    /** The box the letterhead logo is fitted into, in points, matching the office's Word letterhead. */
+    public const LETTERHEAD_LOGO_WIDTH = 205;
+
+    public const LETTERHEAD_LOGO_HEIGHT = 52;
+
     /**
      * The full certificate body. Omit `values` when the blocks are already merged.
      *
@@ -89,27 +94,34 @@ class CertificateRenderer
      */
     private static function letterhead(array $block, array $options): string
     {
-        $text = '<div style="font-size:10pt;font-family:Helvetica,Arial,sans-serif">'.e($block['top'] ?? '').'</div>';
+        $font = 'font-family:Helvetica,Arial,sans-serif';
+        $text = '<div style="font-size:10pt;'.$font.'">'.e($block['top'] ?? '').'</div>';
 
         foreach ($block['name'] ?? [] as $line) {
-            $text .= '<div style="font-size:12pt;font-weight:bold;line-height:1.2;font-family:Helvetica,Arial,sans-serif">'.e($line).'</div>';
+            $text .= '<div style="font-size:12pt;font-weight:bold;line-height:1.2;'.$font.'">'.e($line).'</div>';
         }
 
         foreach ($block['details'] ?? [] as $line) {
-            $text .= '<div style="font-size:8.5pt;font-family:Helvetica,Arial,sans-serif">'.e($line).'</div>';
+            $content = filter_var(trim($line), FILTER_VALIDATE_EMAIL)
+                ? '<a href="mailto:'.e(trim($line)).'" style="color:#0563C1;text-decoration:underline">'.e($line).'</a>'
+                : e($line);
+            $text .= '<div style="font-size:8.5pt;'.$font.'">'.$content.'</div>';
         }
 
         $logo = '';
+        $logoTop = 0;
 
         if ($options['letterheadLogoUrl'] ?? null) {
-            $size = ($options['letterheadLogoSize'] ?? null) ? 'width:'.$options['letterheadLogoSize'][0].'pt;height:'.$options['letterheadLogoSize'][1].'pt' : 'width:200pt;height:45pt;object-fit:contain;object-position:right center';
+            $logoSize = $options['letterheadLogoSize'] ?? null;
+            $size = $logoSize ? 'width:'.$logoSize[0].'pt;height:'.$logoSize[1].'pt' : 'width:'.self::LETTERHEAD_LOGO_WIDTH.'pt;height:'.self::LETTERHEAD_LOGO_HEIGHT.'pt;object-fit:contain;object-position:right center';
+            $logoTop = $logoSize ? round(max(0, self::LETTERHEAD_LOGO_HEIGHT - $logoSize[1]) / 2, 2) : 0;
             $logo = '<img src="'.e($options['letterheadLogoUrl']).'" alt="" style="'.$size.'">';
         }
 
-        $section = trim((string) ($block['section'] ?? '')) === '' ? '' : '<table style="width:100%;border-collapse:collapse"><tr><td></td><td style="width:1%;white-space:nowrap;background:#111418;color:#fff;font-size:9.5pt;font-weight:bold;font-family:Helvetica,Arial,sans-serif;padding:2pt 16pt;-webkit-print-color-adjust:exact;print-color-adjust:exact">'.e($block['section']).'</td></tr></table>';
+        $section = trim((string) ($block['section'] ?? '')) === '' ? '' : '<table style="width:100%;border-collapse:collapse"><tr><td></td><td style="width:'.(self::LETTERHEAD_LOGO_WIDTH - 20).'pt;white-space:nowrap;background:#111418;color:#fff;font-size:9.5pt;font-weight:bold;'.$font.';padding:2pt 10pt;text-align:left;-webkit-print-color-adjust:exact;print-color-adjust:exact">'.e($block['section']).'</td></tr></table>';
 
-        return '<table style="width:100%;border-collapse:collapse"><tr><td style="vertical-align:top;padding:0 0 4pt">'.$text.'</td><td style="vertical-align:top;text-align:right;padding:4pt 0 4pt 12pt">'.$logo.'</td></tr></table>'
-            .'<div style="border-top:2.5pt solid #111418"></div>'.$section;
+        return '<table style="width:100%;border-collapse:collapse"><tr><td style="vertical-align:top;padding:0 0 4pt">'.$text.'</td><td style="vertical-align:top;text-align:right;padding:'.$logoTop.'pt 0 4pt 12pt">'.$logo.'</td></tr></table>'
+            .'<div style="border-top:1.5pt solid #111418"></div>'.$section;
     }
 
     /**

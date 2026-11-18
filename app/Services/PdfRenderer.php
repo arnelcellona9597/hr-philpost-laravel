@@ -28,7 +28,7 @@ class PdfRenderer
     {
         $content = $certificate->content;
         $logo = $this->logo($content['logoId'] ?? null, 120, 56);
-        $letterheadLogo = $this->logo(CertificateRenderer::letterheadLogoId($content['blocks']), 200, 45);
+        $letterheadLogo = $this->logo(CertificateRenderer::letterheadLogoId($content['blocks']), CertificateRenderer::LETTERHEAD_LOGO_WIDTH, CertificateRenderer::LETTERHEAD_LOGO_HEIGHT);
         $paper = CertificateBlocks::PAPER_POINTS[$content['paperSize']] ?? CertificateBlocks::PAPER_POINTS['A4'];
 
         return $this->render('pdf.certificate', [
