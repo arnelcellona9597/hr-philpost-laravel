@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\RespondsToForms;
 use App\Models\Branch;
 use App\Models\BranchUnit;
+use App\Models\WageOrder;
 use App\Support\PageSize;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -41,6 +42,7 @@ class BranchUnitController extends Controller
             'units' => $units,
             'branches' => Branch::query()->orderBy('name')->get(['id', 'name']),
             'unplaced' => BranchUnit::query()->whereNull('branch_id')->count(),
+            'areas' => WageOrder::query()->where('area', '<>', '')->distinct()->orderBy('area')->pluck('area'),
             'search' => $search,
             'filter' => $filter,
         ]);
@@ -50,13 +52,13 @@ class BranchUnitController extends Controller
     {
         Gate::authorize('create', BranchUnit::class);
 
-        [$name, $branchId, $problem] = $this->input($request);
+        [$name, $branchId, $area, $problem] = $this->input($request);
 
         if ($problem !== null) {
             return $this->refused($problem);
         }
 
-        BranchUnit::query()->create(['name' => $name, 'branch_id' => $branchId]);
+        BranchUnit::query()->create(['name' => $name, 'branch_id' => $branchId, 'wage_area' => $area]);
 
         return $this->flash(redirect()->route('branches.units.index'), "Unit {$name} was added.");
     }
@@ -65,13 +67,13 @@ class BranchUnitController extends Controller
     {
         Gate::authorize('update', $unit);
 
-        [$name, $branchId, $problem] = $this->input($request, $unit);
+        [$name, $branchId, $area, $problem] = $this->input($request, $unit);
 
         if ($problem !== null) {
             return $this->refused($problem);
         }
 
-        $unit->update(['name' => $name, 'branch_id' => $branchId]);
+        $unit->update(['name' => $name, 'branch_id' => $branchId, 'wage_area' => $area]);
 
         return $this->flash(back(), "Unit {$name} was saved.");
     }
@@ -92,19 +94,25 @@ class BranchUnitController extends Controller
     }
 
     /**
-     * @return array{0: string, 1: int|null, 2: string|null} name, branch id, and why it cannot be saved
+     * @return array{0: string, 1: int|null, 2: string|null, 3: string|null} name, branch id, wage area, and why it cannot be saved
      */
     private function input(Request $request, ?BranchUnit $unit = null): array
     {
         $name = trim(preg_replace('/\s+/u', ' ', (string) $request->input('name')));
         $branchId = $request->filled('branch_id') ? (int) $request->input('branch_id') : null;
+        $area = trim(preg_replace('/\s+/u', ' ', (string) $request->input('wage_area')));
+        $area = $area === '' ? null : $area;
 
         if ($name === '' || mb_strlen($name) > 255) {
-            return [$name, $branchId, 'Enter a unit name of up to 255 characters.'];
+            return [$name, $branchId, $area, 'Enter a unit name of up to 255 characters.'];
+        }
+
+        if ($area !== null && mb_strlen($area) > 60) {
+            return [$name, $branchId, $area, 'Enter a minimum wage area of up to 60 characters.'];
         }
 
         if ($branchId !== null && ! Branch::query()->whereKey($branchId)->exists()) {
-            return [$name, $branchId, 'Choose a branch from the list.'];
+            return [$name, $branchId, $area, 'Choose a branch from the list.'];
         }
 
         $taken = BranchUnit::query()
@@ -113,6 +121,6 @@ class BranchUnitController extends Controller
             ->when($unit, fn ($query) => $query->whereKeyNot($unit->id))
             ->exists();
 
-        return [$name, $branchId, $taken ? 'That unit already exists under this branch.' : null];
+        return [$name, $branchId, $area, $taken ? 'That unit already exists under this branch.' : null];
     }
 }

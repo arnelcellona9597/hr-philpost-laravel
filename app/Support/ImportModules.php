@@ -247,8 +247,9 @@ class ImportModules
      */
     private static function wageOrders(): array
     {
-        return self::module('wage-orders', 'Wage Orders', 'Wage Orders', ['region', 'sector', 'effective_on'], [
+        return self::module('wage-orders', 'Wage Orders', 'Wage Orders', ['region', 'area', 'sector', 'effective_on'], [
             self::select('region', 'Region', Region::class, ['required' => true]),
+            self::field('area', 'Area', 'text', ['width' => 24, 'optional_key' => true, 'help' => 'Leave blank for the whole region. For a rate that covers only part of it, e.g. Cotabato City or Maguindanao del Norte; branches and units placed in that area get this rate.']),
             self::field('order_number', 'Wage Order No.', 'text', ['width' => 20]),
             self::field('sector', 'Sector', 'text', ['required' => true, 'width' => 22, 'help' => 'For example Non-agriculture, Agriculture, or Retail and service.']),
             self::field('daily_rate_centavos', 'Daily Minimum Wage', 'money', ['required' => true, 'width' => 16]),
@@ -304,6 +305,7 @@ class ImportModules
             self::field('code', 'Code', 'text'),
             self::field('address', 'Address', 'text', ['width' => 40]),
             self::select('region', 'Region', Region::class),
+            self::field('wage_area', 'Minimum Wage Area', 'text', ['width' => 24, 'help' => 'Only where the region has rates by area, e.g. Cotabato City. Must match the Area on the wage orders. Blank uses the region-wide rate.']),
             self::field('contact_number', 'Contact Number', 'phone'),
             self::field('notes', 'Notes', 'textarea', ['width' => 30]),
         ]);
