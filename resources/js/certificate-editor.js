@@ -71,14 +71,16 @@ function footerText(text, options) {
 // The browser twin of CertificateRenderer::letterhead, using the current Branding settings.
 function renderLetterhead() {
   const letterhead = data.letterhead
+  const font = 'font-family:Helvetica,Arial,sans-serif'
+  const isEmail = (line) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(line.trim())
   const text = [
-    `<div style="font-size:10pt;font-family:Helvetica,Arial,sans-serif">${esc(letterhead.top)}</div>`,
-    ...letterhead.name.map((line) => `<div style="font-size:12pt;font-weight:bold;line-height:1.2;font-family:Helvetica,Arial,sans-serif">${esc(line)}</div>`),
-    ...letterhead.details.map((line) => `<div style="font-size:8.5pt;font-family:Helvetica,Arial,sans-serif">${esc(line)}</div>`),
+    `<div style="font-size:10pt;${font}">${esc(letterhead.top)}</div>`,
+    ...letterhead.name.map((line) => `<div style="font-size:12pt;font-weight:bold;line-height:1.2;${font}">${esc(line)}</div>`),
+    ...letterhead.details.map((line) => `<div style="font-size:8.5pt;${font}">${isEmail(line) ? `<a href="mailto:${esc(line.trim())}" style="color:#0563C1;text-decoration:underline">${esc(line)}</a>` : esc(line)}</div>`),
   ].join('')
-  const logo = letterhead.logoUrl ? `<img src="${esc(letterhead.logoUrl)}" alt="" style="width:200pt;height:45pt;object-fit:contain;object-position:right center">` : ''
-  const section = letterhead.section ? `<table style="width:100%;border-collapse:collapse"><tr><td></td><td style="width:1%;white-space:nowrap;background:#111418;color:#fff;font-size:9.5pt;font-weight:bold;font-family:Helvetica,Arial,sans-serif;padding:2pt 16pt">${esc(letterhead.section)}</td></tr></table>` : ''
-  return `<table style="width:100%;border-collapse:collapse"><tr><td style="vertical-align:top;padding:0 0 4pt">${text}</td><td style="vertical-align:top;text-align:right;padding:4pt 0 4pt 12pt">${logo}</td></tr></table><div style="border-top:2.5pt solid #111418"></div>${section}`
+  const logo = letterhead.logoUrl ? `<img src="${esc(letterhead.logoUrl)}" alt="" style="width:205pt;height:52pt;object-fit:contain;object-position:right center">` : ''
+  const section = letterhead.section ? `<table style="width:100%;border-collapse:collapse"><tr><td></td><td style="width:185pt;white-space:nowrap;background:#111418;color:#fff;font-size:9.5pt;font-weight:bold;${font};padding:2pt 10pt;text-align:left">${esc(letterhead.section)}</td></tr></table>` : ''
+  return `<table style="width:100%;border-collapse:collapse"><tr><td style="vertical-align:top;padding:0 0 4pt">${text}</td><td style="vertical-align:top;text-align:right;padding:0 0 4pt 12pt">${logo}</td></tr></table><div style="border-top:1.5pt solid #111418"></div>${section}`
 }
 
 function renderBlock(block, options) {
