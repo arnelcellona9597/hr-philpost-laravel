@@ -73,7 +73,7 @@ function renderLetterhead() {
   const letterhead = data.letterhead
   const text = [
     `<div style="font-size:10pt;font-family:Helvetica,Arial,sans-serif">${esc(letterhead.top)}</div>`,
-    ...letterhead.name.map((line) => `<div style="font-size:12pt;font-weight:bold;line-height:1.2;font-family:Helvetica,Arial,sans-serif">${esc(line)}</div>`),
+    ...letterhead.name.map((line) => `<div style="font-size:10.5pt;font-weight:bold;line-height:1.2;font-family:Helvetica,Arial,sans-serif">${esc(line)}</div>`),
     ...letterhead.details.map((line) => `<div style="font-size:8.5pt;font-family:Helvetica,Arial,sans-serif">${esc(line)}</div>`),
   ].join('')
   const logo = letterhead.logoUrl ? `<img src="${esc(letterhead.logoUrl)}" alt="" style="width:225pt;height:48pt;object-fit:contain;object-position:right bottom">` : ''
