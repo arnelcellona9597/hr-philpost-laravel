@@ -647,6 +647,7 @@
 .cert .cert-sig-plain .cert-sig-line { display: none; }
 .cert .cert-sig-wide .cert-signer { width: 314pt; }
 .cert .cert-sig-plain .cert-sig-name, .cert .cert-sig-plain .cert-sig-title { font-size: 10pt; }
+.cert .cert-sig-plain .cert-signer { width: auto; white-space: nowrap; }
 .cert .cert-sidenames { position: absolute; top: 135pt; left: 46pt; display: flex; flex-direction: column; gap: 45pt; height: 650pt; }
 .cert .cert-side-item { display: flex; height: 130pt; border-left: 0.75pt solid #111; padding-left: 3pt; }
 .cert .cert-side-text { writing-mode: vertical-rl; transform: rotate(180deg); text-align: center; font-size: 9pt; line-height: 1.2; height: 100%; }
