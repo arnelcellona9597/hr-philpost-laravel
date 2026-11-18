@@ -28,7 +28,6 @@ use App\Http\Controllers\MessageController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PayChangeController;
 use App\Http\Controllers\PayrollController;
-use App\Http\Controllers\PayrollImportController;
 use App\Http\Controllers\PayslipController;
 use App\Http\Controllers\PayslipSettingsController;
 use App\Http\Controllers\PositionChangeController;
@@ -244,17 +243,15 @@ Route::middleware(RequireActiveSession::class)->group(function () {
                 Route::delete('/', 'destroy')->name('destroy');
                 Route::get('/edit', 'edit')->name('edit');
                 Route::post('/generate', 'generate')->name('generate');
+                Route::post('/refresh-rates', 'refreshRates')->name('refresh-rates');
                 Route::put('/grid', 'saveGrid')->name('grid');
                 Route::post('/release', 'release')->name('release');
                 Route::delete('/payslips', 'destroyPayslips')->name('payslips.destroy-all');
                 Route::get('/print', 'print')->name('print');
+                Route::get('/register', 'register')->name('register');
+                Route::get('/register/pdf', 'registerPdf')->name('register.pdf');
                 Route::get('/export', 'export')->name('export');
             });
-        });
-
-        Route::prefix('{period}/import')->name('import.')->whereNumber('period')->controller(PayrollImportController::class)->group(function () {
-            Route::post('/', 'store')->name('store');
-            Route::post('/commit', 'commit')->name('commit');
         });
     });
 

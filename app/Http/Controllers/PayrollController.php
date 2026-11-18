@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\Classification;
 use App\Exceptions\UserFacingException;
 use App\Http\Controllers\Concerns\RespondsToForms;
 use App\Models\PayrollPeriod;
@@ -10,11 +9,14 @@ use App\Models\PayslipSetting;
 use App\Models\SiteSetting;
 use App\Services\PayrollService;
 use App\Services\PayrollWorkbook;
+use App\Services\PdfRenderer;
 use App\Support\Choices;
 use App\Support\HrDate;
+use App\Support\PayrollRegister;
 use App\Support\RecordForm;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -32,6 +34,7 @@ class PayrollController extends Controller
         ['name' => 'period_start', 'label' => 'Period start', 'kind' => 'date', 'required' => true],
         ['name' => 'period_end', 'label' => 'Period end', 'kind' => 'date', 'required' => true],
         ['name' => 'pay_date', 'label' => 'Pay date', 'kind' => 'date', 'required' => true],
+        ['name' => 'batch', 'label' => 'Batch', 'kind' => 'text', 'help' => 'Printed under the title, e.g. 7 for "BATCH 7"'],
         ['name' => 'notes', 'label' => 'Notes', 'kind' => 'textarea'],
     ];
 
@@ -72,17 +75,15 @@ class PayrollController extends Controller
         return $this->flash(redirect()->route('payroll.show', $period), "Payroll period {$period->name} created. Next: generate the payslips.");
     }
 
-    public function show(PayrollPeriod $period, PayrollService $payroll): View
+    public function show(PayrollPeriod $period): View
     {
         Gate::authorize('view', $period);
 
         return view('payroll.show', [
             'period' => $period,
             'settings' => PayslipSetting::current(),
-            'labels' => $payroll->itemLabels(),
-            'slips' => $period->payslips()->orderBy('full_name')->get(),
+            'slips' => $period->payslips()->orderBy('station')->orderBy('full_name')->get(),
             'branches' => Choices::branches(),
-            'classifications' => array_column(Classification::cases(), 'value'),
         ]);
     }
 
@@ -125,17 +126,34 @@ class PayrollController extends Controller
     {
         Gate::authorize('update', $period);
 
-        $classifications = array_values(array_intersect((array) $request->input('classification'), array_column(Classification::cases(), 'value')));
-
         try {
-            $result = $payroll->generate($period, array_values(array_filter(array_map('intval', (array) $request->input('branch')))), $classifications);
+            $result = $payroll->generate($period, array_values(array_filter(array_map('intval', (array) $request->input('branch')))));
         } catch (UserFacingException $exception) {
             return $this->flash(redirect()->route('payroll.show', $period), $exception->getMessage(), 'error');
         }
 
-        $existing = $result['existing'] > 0 ? "; {$result['existing']} employee(s) already had one" : '';
+        $message = array_filter([
+            "{$result['created']} COS payslip(s) created.",
+            $result['existing'] > 0 ? "{$result['existing']} worker(s) already had one." : null,
+            $result['without_rate'] > 0 ? "{$result['without_rate']} worker(s) have no daily rate in their pay history: add it, then use Refresh rates." : null,
+        ]);
 
-        return $this->flash(redirect()->route('payroll.show', $period), "{$result['created']} payslip(s) created{$existing}.");
+        return $this->flash(redirect()->route('payroll.show', $period), implode(' ', $message), $result['without_rate'] > 0 ? 'info' : 'success');
+    }
+
+    public function refreshRates(PayrollPeriod $period, PayrollService $payroll): RedirectResponse
+    {
+        Gate::authorize('update', $period);
+
+        try {
+            $result = $payroll->refreshRates($period);
+        } catch (UserFacingException $exception) {
+            return $this->flash(redirect()->route('payroll.show', $period), $exception->getMessage(), 'error');
+        }
+
+        $missing = $result['without_rate'] > 0 ? " {$result['without_rate']} worker(s) still have no daily rate in their pay history." : '';
+
+        return $this->flash(redirect()->route('payroll.show', $period), "Daily rates refreshed: {$result['updated']} payslip(s) changed.{$missing}");
     }
 
     /**
@@ -206,6 +224,30 @@ class PayrollController extends Controller
             'companyName' => $settings->company_name ?: $site->company_name,
             'logoUrl' => $site->logo_id ? route('files.show', $site->logo_id, false) : null,
             'slips' => $period->payslips()->orderBy('full_name')->get(),
+        ]);
+    }
+
+    public function register(PayrollPeriod $period): View
+    {
+        Gate::authorize('view', $period);
+
+        $logoId = SiteSetting::current()->letterhead()['logoId'];
+
+        return view('payroll.register', [
+            'period' => $period,
+            'register' => PayrollRegister::build($period),
+            'letterhead' => PayrollRegister::letterhead($logoId ? route('files.show', $logoId, false) : null, null, false),
+        ]);
+    }
+
+    public function registerPdf(PayrollPeriod $period, PdfRenderer $pdf): Response
+    {
+        Gate::authorize('view', $period);
+
+        return response($pdf->payrollRegister($period), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$pdf->payrollRegisterFilename($period).'"',
+            'Cache-Control' => 'no-store',
         ]);
     }
 

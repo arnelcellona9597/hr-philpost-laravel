@@ -13,6 +13,7 @@ use App\Models\Concerns\Audited;
 use App\Services\EmploymentHistoryService;
 use App\Services\LeaveService;
 use App\Support\HrDate;
+use App\Support\Money;
 use App\Support\Names;
 use BackedEnum;
 use Database\Factories\EmployeeFactory;
@@ -23,7 +24,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['employee_id', 'profile_picture_id', 'last_name', 'first_name', 'middle_name', 'extension', 'gender', 'date_of_birth', 'civil_status', 'religion', 'blood_type', 'professional_eligibility', 'contact_number', 'email', 'address', 'educational_attainment', 'courses', 'year_level_earned_units', 'academic_honors', 'classification', 'employment_status', 'station_id', 'unit_id', 'region', 'position', 'nature_of_work', 'driver_license_number', 'date_hired', 'last_day_of_service', 'remarks', 'sss', 'pagibig', 'tin', 'philhealth', 'bank_name', 'bank_branch', 'bank_account_name', 'bank_account_number', 'emergency_contact_name', 'emergency_relationship', 'emergency_contact_number', 'emergency_address'])]
+#[Fillable(['employee_id', 'profile_picture_id', 'last_name', 'first_name', 'middle_name', 'extension', 'gender', 'date_of_birth', 'civil_status', 'religion', 'blood_type', 'professional_eligibility', 'contact_number', 'email', 'address', 'educational_attainment', 'courses', 'year_level_earned_units', 'academic_honors', 'classification', 'employment_status', 'station_id', 'unit_id', 'region', 'position', 'nature_of_work', 'driver_license_number', 'date_hired', 'last_day_of_service', 'remarks', 'sss', 'pagibig', 'tin', 'philhealth', 'bank_name', 'bank_branch', 'bank_account_name', 'bank_account_number', 'sss_deduction_centavos', 'hdmf_deduction_centavos', 'cmpeai_deduction_centavos', 'emergency_contact_name', 'emergency_relationship', 'emergency_contact_number', 'emergency_address'])]
 class Employee extends Model
 {
     /** @use HasFactory<EmployeeFactory> */
@@ -276,6 +277,7 @@ class Employee extends Model
         return match (true) {
             $value === null || $value === '' => '—',
             $field['kind'] === 'date' => HrDate::format($value),
+            $field['kind'] === 'money' => Money::format((int) $value),
             $value instanceof BackedEnum => $value->value,
             in_array($field['name'], self::NAME_FIELDS, true) => Names::title($value),
             default => (string) $value,

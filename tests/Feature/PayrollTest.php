@@ -11,12 +11,14 @@ use App\Models\Employee;
 use App\Models\Message;
 use App\Models\MessageRecipient;
 use App\Models\NotificationSetting;
+use App\Models\PayChange;
 use App\Models\PayrollPeriod;
 use App\Models\Payslip;
 use App\Models\PayslipSetting;
 use App\Models\User;
 use App\Services\PayrollService;
 use App\Services\PdfRenderer;
+use App\Support\CosPay;
 
 function payrollService(): PayrollService
 {
@@ -68,43 +70,82 @@ it('ignores a status sent with the period form', function () {
         ->and($period->fresh()->isReleased())->toBeFalse();
 });
 
-it('generates one payslip per active employee with the template items and a snapshot', function () {
-    $period = PayrollPeriod::factory()->create();
-    $branch = Branch::factory()->create(['name' => 'Main']);
-    $employee = Employee::factory()->create(['station_id' => $branch->id, 'position' => 'Clerk', 'employment_status' => EmploymentStatus::Active]);
-    Employee::factory()->create(['employment_status' => EmploymentStatus::Resigned]);
+function payrollCosWorker(array $attributes = [], int $rate = 54_000, float $premium = 15): Employee
+{
+    $employee = Employee::factory()->create(['classification' => Classification::Cos, 'employment_status' => EmploymentStatus::Active, ...$attributes]);
+    PayChange::factory()->create(['employee_id' => $employee->id, 'effective_on' => '2026-01-01', 'amount_centavos' => $rate, 'premium_percent' => $premium]);
 
-    $this->post("/payroll/{$period->id}/generate")->assertRedirect();
+    return $employee;
+}
 
-    $slip = Payslip::query()->sole();
+it('computes every column exactly as the payroll workbook does', function () {
+    $base = ['daily_rate_centavos' => 54_000, 'premium_percent' => 15, 'days_worked' => 11, 'late_minutes' => 32, 'ot_hours' => 0, 'ot_rest_hours' => 0, 'sss_centavos' => 0, 'hdmf_centavos' => 0, 'cmpeai_centavos' => 0, 'absences' => 0];
 
-    expect($slip->employee_id)->toBe($employee->id)
-        ->and($slip->full_name)->toBe($employee->full_name)
-        ->and($slip->station)->toBe('Main')
-        ->and(array_column($slip->earnings, 'label'))->toBe(PayslipSetting::current()->earning_items)
-        ->and($slip->gross_pay_centavos)->toBe(0);
+    expect(CosPay::compute($base))->toMatchArray([
+        'premium' => 8_100, 'total_daily_rate' => 62_100, 'gross' => 683_100, 'rate_per_minute' => 129,
+        'late' => 4_128, 'hourly_rate' => 9_703, 'hourly_rest_rate' => 11_644, 'overtime' => 0,
+        'gross_after_late' => 678_972, 'net' => 678_972,
+    ]);
 
-    $employee->update(['position' => 'Director']);
+    // The workbook's sample: P460, 11 days, SSS 750 and HDMF 400, with overtime on both kinds of day.
+    $pay = CosPay::compute([...$base, 'daily_rate_centavos' => 46_000, 'late_minutes' => 66, 'ot_hours' => 2.5, 'ot_rest_hours' => 1, 'sss_centavos' => 75_000, 'hdmf_centavos' => 40_000, 'absences' => 1]);
 
-    expect(payrollService()->generate($period))->toBe(['created' => 0, 'existing' => 1])
-        ->and($slip->fresh()->position)->toBe('Clerk');
+    expect($pay['total_daily_rate'])->toBe(52_900)
+        ->and($pay['rate_per_minute'])->toBe(110)          // ROUND(529/480, 2) = 1.10
+        ->and($pay['hourly_rate'])->toBe(8_266)            // ROUND(529/8*1.25, 2) = 82.66
+        ->and($pay['hourly_rest_rate'])->toBe(9_919)       // ROUND(529/8*1.5, 2) = 99.19
+        ->and($pay['overtime'])->toBe(30_584)              // 2.5*82.66 + 1*99.19 = 305.84
+        ->and($pay['net'])->toBe(581_900 - 7_260 + 30_584 - 115_000)
+        ->and($pay['excess'])->toBe(52_900);
 });
 
-it('filters generation by branch and classification', function () {
+it('rounds half away from zero like Excel, only where the workbook rounds', function () {
+    // 1.25 hours at 82.66 is 103.325: the overtime column shows 103.33, net pay rounds the exact sum once.
+    $pay = CosPay::compute(['daily_rate_centavos' => 46_000, 'premium_percent' => 15, 'days_worked' => 0, 'late_minutes' => 0, 'ot_hours' => 1.25, 'ot_rest_hours' => 0, 'sss_centavos' => 0, 'hdmf_centavos' => 0, 'cmpeai_centavos' => 0]);
+
+    expect($pay['overtime'])->toBe(10_333)
+        ->and($pay['net'])->toBe(10_333);
+});
+
+it('adds the active COS workers with their rate, premium and standing deductions', function () {
+    $period = PayrollPeriod::factory()->create(['period_start' => '2026-10-16', 'period_end' => '2026-10-31', 'batch' => '7']);
+    $branch = Branch::factory()->create(['name' => 'DCCPO']);
+    $worker = payrollCosWorker(['station_id' => $branch->id, 'sss_deduction_centavos' => 75_000, 'hdmf_deduction_centavos' => 40_000], 54_000, 15);
+    payrollCosWorker(['employment_status' => EmploymentStatus::Resigned]);
+    Employee::factory()->create(['classification' => Classification::Regular, 'employment_status' => EmploymentStatus::Active]);
+    $noRate = Employee::factory()->create(['classification' => Classification::Cos, 'employment_status' => EmploymentStatus::Active]);
+
+    $this->post("/payroll/{$period->id}/generate")->assertSessionHas('flash.type', 'info');
+
+    $slip = Payslip::query()->where('employee_id', $worker->id)->sole();
+
+    expect(Payslip::query()->pluck('employee_id')->sort()->values()->all())->toBe(collect([$worker->id, $noRate->id])->sort()->values()->all())
+        ->and($slip->station)->toBe('DCCPO')
+        ->and($slip->daily_rate_centavos)->toBe(54_000)
+        ->and((float) $slip->premium_percent)->toBe(15.0)
+        ->and($slip->sss_centavos)->toBe(75_000)
+        ->and($slip->hdmf_centavos)->toBe(40_000)
+        ->and($slip->period_covered)->toBe('10/16-31/2026')
+        ->and($slip->batch_label)->toBe('7')
+        ->and($slip->gross_pay_centavos)->toBe(0)
+        ->and(Payslip::query()->where('employee_id', $noRate->id)->sole()->daily_rate_centavos)->toBe(0)
+        ->and(payrollService()->generate($period))->toBe(['created' => 0, 'existing' => 2, 'without_rate' => 0]);
+});
+
+it('adds only the chosen branches', function () {
     $period = PayrollPeriod::factory()->create();
     $branch = Branch::factory()->create();
-    $match = Employee::factory()->create(['station_id' => $branch->id, 'classification' => Classification::Regular, 'employment_status' => EmploymentStatus::Active]);
-    Employee::factory()->create(['station_id' => $branch->id, 'classification' => Classification::Cos, 'employment_status' => EmploymentStatus::Active]);
-    Employee::factory()->create(['classification' => Classification::Regular, 'employment_status' => EmploymentStatus::Active]);
+    $match = payrollCosWorker(['station_id' => $branch->id]);
+    payrollCosWorker();
 
-    $this->post("/payroll/{$period->id}/generate", ['branch' => [$branch->id], 'classification' => ['Regular']]);
+    $this->post("/payroll/{$period->id}/generate", ['branch' => [$branch->id]]);
 
     expect(Payslip::query()->sole()->employee_id)->toBe($match->id);
 });
 
 it('refuses to generate on a released period', function () {
     $period = releasedPeriod();
-    Employee::factory()->create(['employment_status' => EmploymentStatus::Active]);
+    payrollCosWorker();
     $before = Payslip::query()->count();
 
     $this->post("/payroll/{$period->id}/generate")->assertSessionHas('flash.type', 'error');
@@ -112,43 +153,65 @@ it('refuses to generate on a released period', function () {
     expect(Payslip::query()->count())->toBe($before);
 });
 
-it('saves the whole grid, keeps items outside the template and totals in centavos', function () {
+it('saves the grid, computes the pay and leaves the standing deductions alone', function () {
     $period = PayrollPeriod::factory()->create();
-    $slip = paidSlip($period, [
-        'earnings' => [['label' => 'Old Bonus', 'amount_centavos' => 500]],
-        'deductions' => [],
-    ]);
+    $worker = payrollCosWorker(['sss_deduction_centavos' => 75_000]);
+    payrollService()->generate($period);
+    $slip = Payslip::query()->sole();
 
-    $this->put("/payroll/{$period->id}/grid", grid([['id' => $slip->id, 'values' => ['e:Basic Pay' => '₱10,000.10', 'e:PERA' => '0.20', 'd:Loans' => '100']]]))
+    $this->put("/payroll/{$period->id}/grid", grid([['id' => $slip->id, 'values' => ['days' => '11', 'late' => '32', 'ot' => '', 'ot_rest' => '', 'sss' => '0', 'hdmf' => '400', 'cmpeai' => '', 'covered' => '10/1-15/2026', 'specific' => 'Tupi', 'absences' => '1', 'tardiness' => '6']]]))
         ->assertSessionHasNoErrors();
 
     $slip->refresh();
 
-    expect($slip->gross_pay_centavos)->toBe(1_000_030 + 500)
-        ->and($slip->total_deductions_centavos)->toBe(10_000)
-        ->and($slip->net_pay_centavos)->toBe(1_000_530 - 10_000)
-        ->and(array_column($slip->earnings, 'label'))->toContain('Old Bonus', 'Basic Pay');
+    expect($slip->days_worked)->toBe('11.00')
+        ->and($slip->late_minutes)->toBe(32)
+        ->and($slip->specific_station)->toBe('Tupi')
+        ->and($slip->period_covered)->toBe('10/1-15/2026')
+        ->and($slip->gross_pay_centavos)->toBe(683_100)
+        ->and($slip->total_deductions_centavos)->toBe(4_128 + 40_000)
+        ->and($slip->net_pay_centavos)->toBe(678_972 - 40_000)
+        ->and($slip->net_pay_centavos)->toBe($slip->cosPay()['net'])
+        ->and(array_column($slip->deductions, 'label'))->toBe(['Late', 'SSS', 'HDMF', 'CMPEAI'])
+        ->and($worker->fresh()->sss_deduction_centavos)->toBe(75_000);
 });
 
 it('saves nothing when one row of the grid is wrong', function (array $values, string $message) {
     $period = PayrollPeriod::factory()->create();
-    $good = paidSlip($period, ['full_name' => 'Good, Row']);
-    $bad = paidSlip($period, ['full_name' => 'Bad, Row']);
-    $before = $good->earnings;
+    payrollCosWorker(['last_name' => 'Good']);
+    payrollCosWorker(['last_name' => 'Bad']);
+    payrollService()->generate($period);
+    [$good, $bad] = [Payslip::query()->where('full_name', 'like', 'Good%')->sole(), Payslip::query()->where('full_name', 'like', 'Bad%')->sole()];
 
     $this->put("/payroll/{$period->id}/grid", grid([
-        ['id' => $good->id, 'values' => ['e:Basic Pay' => '30000']],
+        ['id' => $good->id, 'values' => ['days' => '10']],
         ['id' => $bad->id, 'values' => $values],
     ]))->assertSessionHasErrors('grid');
 
     expect(session('errors')->get('grid')[0])->toContain($message)
-        ->and($good->fresh()->earnings)->toEqual($before);
+        ->and($good->fresh()->days_worked)->toBe('0.00');
 })->with([
-    'negative' => [['e:Basic Pay' => '-5'], 'cannot be negative'],
-    'three decimals' => [['e:Basic Pay' => '1.005'], 'at most 2 decimal'],
-    'not a number' => [['e:Basic Pay' => 'abc'], 'is not an amount'],
-    'deductions over gross' => [['e:Basic Pay' => '10', 'd:Loans' => '11', 'd:PhilHealth' => '0'], 'deductions are higher than gross pay'],
+    'negative days' => [['days' => '-5'], 'is not a number from 0 to 999.99'],
+    'three decimals' => [['ot' => '1.005'], 'is not a number from 0 to 999.99'],
+    'fraction of a minute' => [['late' => '2.5'], 'is not a whole number of minutes'],
+    'bad amount' => [['sss' => 'abc'], 'is not an amount'],
+    'net below zero' => [['days' => '1', 'sss' => '5000'], 'net pay would be negative'],
 ]);
+
+it('refreshes rates from pay history after a wage change', function () {
+    $period = PayrollPeriod::factory()->create(['period_start' => '2026-10-16', 'period_end' => '2026-10-31']);
+    $worker = payrollCosWorker([], 46_000);
+    payrollService()->generate($period);
+    $slip = Payslip::query()->sole();
+    payrollService()->saveRows($period, [['id' => $slip->id, 'values' => ['days' => '10']]]);
+
+    PayChange::factory()->create(['employee_id' => $worker->id, 'effective_on' => '2026-10-20', 'amount_centavos' => 54_000, 'premium_percent' => 15]);
+
+    $this->post("/payroll/{$period->id}/refresh-rates")->assertSessionHas('flash.type', 'success');
+
+    expect($slip->fresh()->daily_rate_centavos)->toBe(54_000)
+        ->and($slip->fresh()->gross_pay_centavos)->toBe(621_000);
+});
 
 it('refuses a grid with no amounts and a payslip from another period', function () {
     $period = PayrollPeriod::factory()->create();
@@ -215,13 +278,14 @@ it('sends no email when the box is unticked or the setting is off', function () 
 it('flags only real changes after release and resends with a Corrected subject', function () {
     $period = PayrollPeriod::factory()->create(['name' => 'Oct A']);
     $employee = Employee::factory()->create(['email' => 'ana@example.test']);
-    $slip = paidSlip($period, ['employee_id' => $employee->id]);
+    $slip = paidSlip($period, ['employee_id' => $employee->id, 'daily_rate_centavos' => 54_000, 'premium_percent' => 15, 'days_worked' => 11]);
+    $slip->update(['earnings' => [['label' => 'Gross', 'amount_centavos' => 683_100], ['label' => 'Overtime Pay', 'amount_centavos' => 0]], 'deductions' => [['label' => 'Late', 'amount_centavos' => 0], ['label' => 'SSS', 'amount_centavos' => 0], ['label' => 'HDMF', 'amount_centavos' => 0], ['label' => 'CMPEAI', 'amount_centavos' => 0]]]);
     payrollService()->release($period, $this->hr, false);
 
-    $this->put("/payroll/{$period->id}/grid", grid([['id' => $slip->id, 'values' => ['e:Basic Pay' => '25000']]]))->assertSessionHasNoErrors();
+    $this->put("/payroll/{$period->id}/grid", grid([['id' => $slip->id, 'values' => ['days' => '11']]]))->assertSessionHasNoErrors();
     expect($slip->fresh()->corrected_after_release)->toBeFalse();
 
-    $this->put("/payroll/payslips/{$slip->id}", ['e_0' => '26000', 'remarks' => 'fixed'])->assertSessionHasNoErrors();
+    $this->put("/payroll/payslips/{$slip->id}", ['days' => '10', 'remarks' => 'fixed'])->assertSessionHasNoErrors();
     expect($slip->fresh()->corrected_after_release)->toBeTrue();
 
     $this->post("/payroll/payslips/{$slip->id}/resend")->assertRedirect();
@@ -297,6 +361,8 @@ it('shows the payroll pages', function () {
     $this->get("/payroll/{$period->id}")->assertOk()->assertSee('₱23,749.50')->assertDontSee('<b>Reyes', false);
     $this->get("/payroll/{$period->id}/edit")->assertOk();
     $this->get("/payroll/{$period->id}/print")->assertOk()->assertSee('NET PAY');
+    $this->get("/payroll/{$period->id}/register")->assertOk()->assertSee('PAYROLL OF CONTRACT OF SERVICE (COS)')->assertSee('GRAND TOTAL')->assertDontSee('<b>Reyes', false);
+    $this->get("/payroll/{$period->id}/register/pdf")->assertOk()->assertHeader('Content-Type', 'application/pdf');
     $this->get("/payroll/payslips/{$slip->id}")->assertOk()->assertSee('Save payslip');
     $this->get("/payroll/payslips/{$slip->id}/print")->assertOk()->assertSee('NET PAY');
     $this->get('/payroll/settings')->assertOk()->assertSee('Payslip template');

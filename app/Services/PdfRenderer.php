@@ -5,12 +5,14 @@ namespace App\Services;
 use App\Models\Certificate;
 use App\Models\Contract;
 use App\Models\Media;
+use App\Models\PayrollPeriod;
 use App\Models\Payslip;
 use App\Models\PayslipSetting;
 use App\Models\Remittance;
 use App\Models\SiteSetting;
 use App\Support\CertificateBlocks;
 use App\Support\CertificateRenderer;
+use App\Support\PayrollRegister;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Dompdf\Dompdf;
 use Illuminate\Support\Facades\File;
@@ -95,6 +97,25 @@ class PdfRenderer
             'slip' => $payslip,
             'half' => $half,
         ], self::PAYSLIP_PAPER[$settings->paper_size] ?? self::PAYSLIP_PAPER['A4']);
+    }
+
+    /**
+     * The COS payroll sheet for a period, Legal landscape.
+     */
+    public function payrollRegister(PayrollPeriod $period): string
+    {
+        $logo = $this->logo(SiteSetting::current()->letterhead()['logoId'], CertificateRenderer::LETTERHEAD_LOGO_WIDTH, CertificateRenderer::LETTERHEAD_LOGO_HEIGHT);
+
+        return $this->render('pdf.payroll-register', [
+            'period' => $period,
+            'register' => PayrollRegister::build($period),
+            'letterhead' => PayrollRegister::letterhead($logo['src'] ?? null, $logo['size'] ?? null, true),
+        ], [1008, 612]);
+    }
+
+    public function payrollRegisterFilename(PayrollPeriod $period): string
+    {
+        return $this->safeName("payroll-sheet-{$period->code}").'.pdf';
     }
 
     public function payslipFilename(Payslip $payslip): string

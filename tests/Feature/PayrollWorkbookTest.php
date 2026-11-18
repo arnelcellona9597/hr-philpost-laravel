@@ -5,158 +5,72 @@ use App\Models\PayrollPeriod;
 use App\Models\Payslip;
 use App\Models\User;
 use App\Services\PayrollService;
-use App\Services\PayrollWorkbook;
 use App\Services\PendingImports;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-
-/**
- * A workbook on disk from rows of cells, the first row being the headers.
- *
- * @param  list<list<mixed>>  $rows
- */
-function workbookFile(array $rows): string
-{
-    $spreadsheet = new Spreadsheet;
-    $spreadsheet->getActiveSheet()->fromArray($rows, null, 'A1', true);
-    $path = tempnam(sys_get_temp_dir(), 'payroll').'.xlsx';
-    (new Xlsx($spreadsheet))->save($path);
-
-    return $path;
-}
-
-/**
- * @param  list<list<mixed>>  $rows
- */
-function workbookUpload(array $rows): UploadedFile
-{
-    return new UploadedFile(workbookFile($rows), 'amounts.xlsx', test: true);
-}
 
 beforeEach(function () {
     Storage::fake('local');
     $this->hr = User::factory()->create();
     signIn($this->hr);
-    $this->period = PayrollPeriod::factory()->create(['code' => '2026-10-A']);
+    $this->period = PayrollPeriod::factory()->create(['code' => '2026-10-B', 'period_start' => '2026-10-16', 'period_end' => '2026-10-31', 'batch' => '7']);
     $this->employee = Employee::factory()->create(['employee_id' => 'EMP-0001']);
 });
 
-it('exports the template items and totals', function () {
-    Payslip::factory()->create(['period_id' => $this->period->id, 'employee_id' => $this->employee->id, 'employee_code' => 'EMP-0001', 'full_name' => '=HYPERLINK("x")']);
-
-    $response = $this->get("/payroll/{$this->period->id}/export")->assertOk();
+/**
+ * Download the period's workbook and open it.
+ */
+function payrollExportSheet(PayrollPeriod $period): array
+{
+    $response = test()->get("/payroll/{$period->id}/export")->assertOk();
     $path = tempnam(sys_get_temp_dir(), 'export').'.xlsx';
     file_put_contents($path, $response->streamedContent());
 
-    $sheet = IOFactory::load($path)->getActiveSheet();
-    $headers = $sheet->rangeToArray('A1:O1')[0];
+    return [IOFactory::load($path)->getActiveSheet(), $response];
+}
 
-    expect($response->headers->get('Content-Disposition'))->toContain('payroll-2026-10-A.xlsx')
-        ->and($headers)->toContain('Employee ID', 'Basic Pay', 'Gross Pay', 'Loans', 'Net Pay', 'Remarks')
-        ->and($sheet->getCell('A2')->getValue())->toBe('EMP-0001')
-        ->and($sheet->getCell('B2')->getDataType())->toBe(DataType::TYPE_STRING)
-        ->and($sheet->getCell('C2')->getValue())->toEqual(25000);
-});
-
-it('imports after a check: blank cells are zero, missing columns stay and new payslips are created', function () {
-    $existing = Payslip::factory()->create([
-        'period_id' => $this->period->id,
-        'employee_id' => $this->employee->id,
-        'earnings' => [['label' => 'Basic Pay', 'amount_centavos' => 100], ['label' => 'PERA', 'amount_centavos' => 200]],
-        'deductions' => [['label' => 'Loans', 'amount_centavos' => 50]],
+it('exports the payroll in the office workbook layout with its live formulas', function () {
+    $slip = Payslip::factory()->create([
+        'period_id' => $this->period->id, 'employee_id' => $this->employee->id, 'full_name' => 'Alegre, James Lie O.', 'station' => 'DCCPO',
+        'period_covered' => '10/16-31/2026', 'daily_rate_centavos' => 54_000, 'premium_percent' => 15, 'days_worked' => 11, 'late_minutes' => 32,
+        'ot_hours' => 2.5, 'ot_rest_hours' => 1, 'sss_centavos' => 75_000, 'hdmf_centavos' => 40_000, 'absences' => 1, 'tardiness' => 6,
     ]);
-    $newcomer = Employee::factory()->create(['employee_id' => 'EMP-0002']);
+    app(PayrollService::class)->saveRows($this->period, [['id' => $slip->id, 'values' => ['days' => '11']]]);
 
-    $check = $this->post("/payroll/{$this->period->id}/import", ['file' => workbookUpload([
-        ['Employee ID', 'Basic Pay', 'Remarks'],
-        ['emp-0001', '₱1,500.50', 'Paid'],
-        ['EMP-0002', null, null],
-    ])])->assertOk()->assertSee('1 payslip(s) will be updated and 1 created')->assertSee('left unchanged');
+    [$sheet, $response] = payrollExportSheet($this->period);
 
-    expect($existing->fresh()->gross_pay_centavos)->toBe(300);
-
-    $this->post("/payroll/{$this->period->id}/import/commit", ['token' => $check->viewData('token')])->assertRedirect("/payroll/{$this->period->id}");
-
-    $existing->refresh();
-
-    expect(array_column($existing->earnings, 'amount_centavos', 'label')['Basic Pay'])->toBe(150_050)
-        ->and(array_column($existing->earnings, 'amount_centavos', 'label')['PERA'])->toBe(200)
-        ->and($existing->remarks)->toBe('Paid')
-        ->and(Payslip::query()->where('employee_id', $newcomer->id)->sole()->gross_pay_centavos)->toBe(0);
-
-    $this->post("/payroll/{$this->period->id}/import/commit", ['token' => $check->viewData('token')])->assertSessionHas('flash.type', 'error');
+    expect($response->headers->get('Content-Disposition'))->toContain('payroll-2026-10-B.xlsx')
+        ->and($sheet->getTitle())->toBe('OCTOBER 2026')
+        ->and($sheet->getCell('E1')->getValue())->toBe('PAYROLL OF CONTRACT OF SERVICE (COS)')
+        ->and($sheet->getCell('E2')->getValue())->toBe('OCTOBER 16-31, 2026')
+        ->and($sheet->getCell('E3')->getValue())->toBe('BATCH 7')
+        ->and(array_keys($sheet->getMergeCells()))->toContain('E1:Y1', 'P4:Q4', 'R4:S4')
+        ->and($sheet->getCell('P4')->getValue())->toBe('Regular OT')
+        ->and($sheet->rangeToArray('A5:AB5')[0])->toBe(['SPECIFIC STATION', 'Period', 'Batch', 'No.', 'Name', 'Official Station', 'Daily Rate', '15% Premium ', 'Total Daily Rate', 'Date Period  Covered', 'No. of Days', 'Gross', 'No. of Late (mins)', 'Rate/min', 'Total Late', 'OT Hours', 'Hourly rate', 'OT Hours RD/SH', 'Hourly rate RD/SH', 'Overtime Pay', 'Gross after Deduction of Late ', 'SSS', 'HDMF', 'CMPEAI', 'Net Pay', 'Absences', 'tardiness', 'Excess'])
+        ->and($sheet->getCell('E6')->getValue())->toBe('ALEGRE, JAMES LIE O.')
+        ->and($sheet->getCell('B6')->getValue())->toEqual(2)
+        ->and($sheet->getCell('H6')->getValue())->toBe('=ROUND(G6*0.15, 2)')
+        ->and($sheet->getCell('Y6')->getValue())->toBe('=IF(E6="","",ROUND(U6-V6-W6-X6,2))')
+        ->and(round((float) $sheet->getCell('Y6')->getCalculatedValue() * 100))->toEqual($slip->fresh()->net_pay_centavos)
+        ->and(round((float) $sheet->getCell('T6')->getCalculatedValue() * 100))->toEqual($slip->fresh()->cosPay()['overtime'])
+        ->and($sheet->getCell('E7')->getValue())->toBe('TOTAL')
+        ->and($sheet->getCell('Y7')->getValue())->toBe('=SUM(Y6:Y6)');
 });
 
-it('lists every problem and saves nothing', function () {
-    $response = $this->post("/payroll/{$this->period->id}/import", ['file' => workbookUpload([
-        ['Employee ID', 'Basic Pay'],
-        ['NOPE', '1'],
-        [null, '1'],
-        ['EMP-0001', '1'],
-        ['EMP-0001', '2'],
-    ])])->assertOk();
+it('writes names as text, so a name can never become a formula', function () {
+    Payslip::factory()->create(['period_id' => $this->period->id, 'employee_id' => $this->employee->id, 'full_name' => '=HYPERLINK("x")']);
 
-    expect($response->viewData('plan')['errors'])->toHaveCount(3)
-        ->and(Payslip::query()->count())->toBe(0);
+    [$sheet] = payrollExportSheet($this->period);
 
-    $response->assertSee('no employee with Employee ID')->assertSee('Duplicate of row 4');
+    expect($sheet->getCell('E6')->getDataType())->toBe(DataType::TYPE_STRING);
 });
 
-it('reports amount errors with their Excel row when confirming, and nothing is saved', function () {
-    $check = $this->post("/payroll/{$this->period->id}/import", ['file' => workbookUpload([
-        ['Employee ID', 'Basic Pay'],
-        ['EMP-0001', 'abc'],
-    ])]);
+it('exports an empty period with a zero total', function () {
+    [$sheet] = payrollExportSheet($this->period);
 
-    $this->post("/payroll/{$this->period->id}/import/commit", ['token' => $check->viewData('token')])
-        ->assertOk()
-        ->assertSee('is not an amount');
-
-    expect($check->viewData('plan')['errors'])->toBe([])
-        ->and(Payslip::query()->count())->toBe(0);
-});
-
-it('uses the saved result of a formula without running it', function () {
-    $spreadsheet = new Spreadsheet;
-    $sheet = $spreadsheet->getActiveSheet();
-    $sheet->fromArray([['Employee ID', 'Basic Pay'], ['EMP-0001', '=100+50']]);
-    $path = tempnam(sys_get_temp_dir(), 'formula').'.xlsx';
-    (new Xlsx($spreadsheet))->save($path);
-
-    $plan = app(PayrollWorkbook::class)->analyze($this->period, $path);
-
-    expect($plan['rows'][0]['values']['e:Basic Pay'])->toEqual('150');
-});
-
-it('refuses new payslips on a released period but corrects existing ones', function () {
-    $slip = Payslip::factory()->create(['period_id' => $this->period->id, 'employee_id' => $this->employee->id, 'employee_code' => 'EMP-0001']);
-    app(PayrollService::class)->release($this->period, $this->hr, false);
-    Employee::factory()->create(['employee_id' => 'EMP-0002']);
-
-    $this->post("/payroll/{$this->period->id}/import", ['file' => workbookUpload([['Employee ID', 'Basic Pay'], ['EMP-0002', '1']])])
-        ->assertOk()
-        ->assertSee('no new payslip can be added');
-
-    $check = $this->post("/payroll/{$this->period->id}/import", ['file' => workbookUpload([['Employee ID', 'Basic Pay'], ['EMP-0001', '30000']])])
-        ->assertOk()
-        ->assertSee('corrected after release');
-
-    $this->post("/payroll/{$this->period->id}/import/commit", ['token' => $check->viewData('token')]);
-
-    expect($slip->fresh()->corrected_after_release)->toBeTrue()
-        ->and($slip->fresh()->gross_pay_centavos)->toBe(3_000_000);
-});
-
-it('refuses files that are not workbooks', function () {
-    $this->post("/payroll/{$this->period->id}/import", ['file' => UploadedFile::fake()->create('notes.pdf', 10)])->assertSessionHas('flash.type', 'error');
-
-    $this->post("/payroll/{$this->period->id}/import", ['file' => UploadedFile::fake()->createWithContent('fake.xlsx', 'not a zip file at all, just text')])
-        ->assertOk()
-        ->assertSee('not a valid Excel workbook');
+    expect($sheet->getCell('E6')->getValue())->toBe('TOTAL')
+        ->and($sheet->getCell('Y6')->getValue())->toBe('=0');
 });
 
 it('keeps a staged upload to the person and the period it belongs to', function () {

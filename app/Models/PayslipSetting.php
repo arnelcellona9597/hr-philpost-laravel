@@ -20,8 +20,8 @@ class PayslipSetting extends Model
     protected static function defaultValues(): array
     {
         return [
-            'earning_items' => ['Basic Pay', 'PERA', 'Overtime', 'Allowances'],
-            'deduction_items' => ['Withholding Tax', 'GSIS / SSS', 'PhilHealth', 'Pag-IBIG', 'Loans'],
+            'earning_items' => ['Gross', 'Overtime Pay'],
+            'deduction_items' => ['Late', 'SSS', 'HDMF', 'CMPEAI'],
             'shown_fields' => [
                 'employee_id' => true,
                 'position' => true,

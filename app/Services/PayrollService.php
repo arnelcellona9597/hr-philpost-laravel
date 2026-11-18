@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\Classification;
 use App\Enums\EmploymentStatus;
 use App\Enums\MessageCategory;
 use App\Enums\PayrollStatus;
@@ -12,6 +13,7 @@ use App\Models\PayrollPeriod;
 use App\Models\Payslip;
 use App\Models\PayslipSetting;
 use App\Models\User;
+use App\Support\CosPay;
 use App\Support\HrDate;
 use App\Support\Money;
 use Illuminate\Support\Collection;
@@ -19,19 +21,43 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
- * Payroll record-keeping: generate payslips, save the grid in one transaction and release. Amounts
- * are entered by HR; the system only adds them up. Each change locks the period row, so a release
- * cannot slip in between the check and the write.
+ * COS payroll: generate payslips with each worker's rate and standing deductions, save the grid in
+ * one transaction and release. HR types days, lates and overtime; {@see CosPay} computes the rest as
+ * the office's payroll workbook does. Each change locks the period row, so a release cannot slip in
+ * between the check and the write.
  *
  * @phpstan-type Item array{label: string, amount_centavos: int}
- * @phpstan-type GridRow array{id?: int, employee_id?: int, values: array<string, string>, remarks?: string, line?: int}
+ * @phpstan-type GridRow array{id?: int, values: array<string, string>, remarks?: string}
  * @phpstan-type GridError array{row: int|null, message: string}
  */
 class PayrollService
 {
     private const RELEASE_TEMPLATE = ['subject' => 'Your payslip for {{payPeriod}}', 'body' => "Hi {{firstName}},\n\nYour payslip for {{payPeriod}} is attached."];
 
-    public function __construct(private MessageQueue $messages) {}
+    /** The premium when a worker's pay history has none. */
+    public const DEFAULT_PREMIUM = 15;
+
+    /**
+     * What HR can type for each payslip: grid key => [column, kind, label].
+     *
+     * @var array<string, array{0: string, 1: string, 2: string}>
+     */
+    public const INPUTS = [
+        'batch' => ['batch_label', 'short', 'Batch'],
+        'specific' => ['specific_station', 'text', 'Specific station'],
+        'covered' => ['period_covered', 'text', 'Date period covered'],
+        'days' => ['days_worked', 'quantity', 'No. of days'],
+        'late' => ['late_minutes', 'minutes', 'Late (mins)'],
+        'ot' => ['ot_hours', 'quantity', 'OT hours'],
+        'ot_rest' => ['ot_rest_hours', 'quantity', 'OT hours RD/SH'],
+        'sss' => ['sss_centavos', 'money', 'SSS'],
+        'hdmf' => ['hdmf_centavos', 'money', 'HDMF'],
+        'cmpeai' => ['cmpeai_centavos', 'money', 'CMPEAI'],
+        'absences' => ['absences', 'quantity', 'Absences'],
+        'tardiness' => ['tardiness', 'minutes', 'Tardiness'],
+    ];
+
+    public function __construct(private MessageQueue $messages, private PayHistoryService $payHistory) {}
 
     /**
      * The pay items of the payslip template.
@@ -46,164 +72,213 @@ class PayrollService
     }
 
     /**
-     * Create an empty payslip for each matching active employee who has none in this period.
+     * Create a payslip for each active COS worker (in the chosen branches) who has none in this period,
+     * with the daily rate and premium in force on the last day of the period, the period covered and
+     * the worker's standing SSS / HDMF / CMPEAI deductions. Days, lates and overtime start empty.
      *
      * @param  list<int>  $branchIds
-     * @param  list<string>  $classifications
-     * @return array{created: int, existing: int}
+     * @return array{created: int, existing: int, without_rate: int}
      *
      * @throws UserFacingException when the period was released
      */
-    public function generate(PayrollPeriod $period, array $branchIds = [], array $classifications = []): array
+    public function generate(PayrollPeriod $period, array $branchIds = []): array
     {
-        $labels = $this->itemLabels();
+        return DB::transaction(function () use ($period, $branchIds): array {
+            $locked = $this->lockDraft($period);
 
-        return DB::transaction(function () use ($period, $branchIds, $classifications, $labels): array {
-            $this->lockDraft($period);
-
-            $existing = $period->payslips()->pluck('employee_id')->all();
+            $existing = $locked->payslips()->pluck('employee_id')->all();
 
             $employees = Employee::query()
                 ->with('station')
                 ->where('employment_status', EmploymentStatus::Active)
+                ->where('classification', Classification::Cos)
                 ->when($branchIds !== [], fn ($query) => $query->whereIn('station_id', $branchIds))
-                ->when($classifications !== [], fn ($query) => $query->whereIn('classification', $classifications))
                 ->whereNotIn('id', $existing)
                 ->get();
 
+            $withoutRate = 0;
+
             foreach ($employees as $employee) {
-                $this->createPayslip($period, $employee, [
-                    'earnings' => array_map(fn (string $label): array => ['label' => $label, 'amount_centavos' => 0], $labels['earnings']),
-                    'deductions' => array_map(fn (string $label): array => ['label' => $label, 'amount_centavos' => 0], $labels['deductions']),
+                $rate = $this->payHistory->rateOn($employee, $locked->period_end->format('Y-m-d'));
+                $withoutRate += $rate === null ? 1 : 0;
+
+                $slip = new Payslip([
+                    'batch_label' => $locked->batch,
+                    'period_covered' => $locked->coveredLabel(),
+                    'daily_rate_centavos' => $rate?->amount_centavos ?? 0,
+                    'premium_percent' => $rate?->premium_percent ?? self::DEFAULT_PREMIUM,
+                    'sss_centavos' => (int) $employee->sss_deduction_centavos,
+                    'hdmf_centavos' => (int) $employee->hdmf_deduction_centavos,
+                    'cmpeai_centavos' => (int) $employee->cmpeai_deduction_centavos,
                 ]);
+
+                $this->createPayslip($locked, $employee, [...$slip->getAttributes(), ...$this->items($slip)]);
             }
 
-            return ['created' => $employees->count(), 'existing' => count($existing)];
+            return ['created' => $employees->count(), 'existing' => count($existing), 'without_rate' => $withoutRate];
         });
     }
 
     /**
-     * Build a payslip's items from grid or Excel values, keyed "e:<label>" and "d:<label>". Template
-     * items come first, a value left out keeps its amount, and extra items on the payslip stay.
+     * Read each payslip's daily rate and premium again from pay history, such as after a wage order,
+     * and recompute. Only a draft period can be refreshed.
      *
-     * @param  array{earnings: list<string>, deductions: list<string>}  $labels
-     * @param  array<string, string>  $values
-     * @return array{earnings: list<Item>, deductions: list<Item>, errors: list<string>}
+     * @return array{updated: int, without_rate: int}
+     *
+     * @throws UserFacingException when the period was released
      */
-    public function buildItems(array $labels, array $values, ?Payslip $current, string $who): array
+    public function refreshRates(PayrollPeriod $period): array
     {
-        $errors = [];
+        return DB::transaction(function () use ($period): array {
+            $locked = $this->lockDraft($period);
+            $updated = 0;
+            $withoutRate = 0;
 
-        $build = function (array $list, string $kind, array $saved) use ($values, $who, &$errors): array {
-            $amounts = array_column($saved, 'amount_centavos', 'label');
-            $items = [];
+            foreach ($locked->payslips()->with('employee')->get() as $slip) {
+                $rate = $slip->employee ? $this->payHistory->rateOn($slip->employee, $locked->period_end->format('Y-m-d')) : null;
 
-            foreach ($list as $label) {
-                $raw = $values["{$kind}:{$label}"] ?? null;
-                $amount = $amounts[$label] ?? 0;
+                if ($rate === null) {
+                    $withoutRate++;
 
-                if ($raw !== null) {
-                    try {
-                        $amount = Money::toCentavos($raw);
-                    } catch (InvalidArgumentException $exception) {
-                        $errors[] = "{$who}: {$label} {$exception->getMessage()}";
-                    }
+                    continue;
                 }
 
-                $items[] = ['label' => $label, 'amount_centavos' => $amount];
+                $slip->fill(['daily_rate_centavos' => $rate->amount_centavos, 'premium_percent' => $rate->premium_percent ?? self::DEFAULT_PREMIUM]);
+
+                if ($slip->isDirty()) {
+                    $slip->fill($this->items($slip))->save();
+                    $updated++;
+                }
             }
 
-            $extra = array_filter($saved, fn (array $item): bool => ! in_array($item['label'], $list, true));
-
-            return [...$items, ...array_values($extra)];
-        };
-
-        $earnings = $build($labels['earnings'], 'e', $current?->earnings ?? []);
-        $deductions = $build($labels['deductions'], 'd', $current?->deductions ?? []);
-
-        if ($errors === [] && $this->total($deductions) > $this->total($earnings)) {
-            $errors[] = "{$who}: deductions are higher than gross pay.";
-        }
-
-        return ['earnings' => $earnings, 'deductions' => $deductions, 'errors' => $errors];
+            return ['updated' => $updated, 'without_rate' => $withoutRate];
+        });
     }
 
     /**
-     * Save payslip rows from the grid or Excel. Every value is checked first, then all rows are
-     * written in one transaction: either every payslip is saved or none is. A row with an
-     * `employee_id` and no payslip creates one, which a released period refuses.
+     * Save payslip rows from the grid or the payslip page. Each row's values are keyed as in
+     * {@see self::INPUTS}; a value left out keeps what the payslip has. Every value is checked first,
+     * then all rows are written in one transaction: either every payslip is saved or none is.
      *
      * @param  list<GridRow>  $rows
-     * @return array{errors: list<GridError>, updated: int, created: int}
+     * @return array{errors: list<GridError>, updated: int}
      */
     public function saveRows(PayrollPeriod $period, array $rows): array
     {
-        $labels = $this->itemLabels();
-
-        return DB::transaction(function () use ($period, $rows, $labels): array {
+        return DB::transaction(function () use ($period, $rows): array {
             $locked = PayrollPeriod::query()->whereKey($period->id)->lockForUpdate()->firstOrFail();
-            $slips = $locked->payslips()->get();
-            $byId = $slips->keyBy('id');
-            $byEmployee = $slips->keyBy('employee_id');
+            $byId = $locked->payslips()->get()->keyBy('id');
             $errors = [];
             $writes = [];
 
             foreach ($rows as $index => $row) {
-                $slip = isset($row['id']) ? $byId->get($row['id']) : (isset($row['employee_id']) ? $byEmployee->get($row['employee_id']) : null);
+                $slip = isset($row['id']) ? $byId->get($row['id']) : null;
 
-                if ($slip === null && isset($row['id'])) {
+                if ($slip === null) {
                     $errors[] = ['row' => $index, 'message' => 'Payslip not found in this period.'];
 
                     continue;
                 }
 
-                if ($slip === null && $locked->isReleased()) {
-                    $errors[] = ['row' => $index, 'message' => 'This period was already released, so no new payslip can be added.'];
+                $parsed = $this->parseInputs($row['values'], $slip->full_name);
+
+                if ($parsed['errors'] !== []) {
+                    foreach ($parsed['errors'] as $message) {
+                        $errors[] = ['row' => $index, 'message' => $message];
+                    }
 
                     continue;
                 }
 
-                $who = $slip?->full_name ?? 'Row '.($index + 1);
-                $built = $this->buildItems($labels, $row['values'], $slip, $who);
+                $attributes = $parsed['attributes'];
 
-                foreach ($built['errors'] as $message) {
-                    $errors[] = ['row' => $index, 'message' => $message];
+                if (array_key_exists('remarks', $row)) {
+                    $attributes['remarks'] = $row['remarks'] ?: null;
                 }
 
-                $writes[] = ['slip' => $slip, 'row' => $row, 'items' => ['earnings' => $built['earnings'], 'deductions' => $built['deductions']]];
+                $slip->fill($attributes);
+
+                if ($slip->cosPay()['net'] < 0) {
+                    $errors[] = ['row' => $index, 'message' => "{$slip->full_name}: deductions are higher than the pay, so net pay would be negative."];
+
+                    continue;
+                }
+
+                $writes[] = $slip->fill($this->items($slip));
             }
 
             if ($errors !== []) {
-                return ['errors' => $errors, 'updated' => 0, 'created' => 0];
+                return ['errors' => $errors, 'updated' => 0];
             }
 
-            $created = 0;
-            $newEmployees = Employee::query()->with('station')
-                ->whereIn('id', collect($writes)->whereNull('slip')->pluck('row.employee_id')->filter())
-                ->get()->keyBy('id');
-
-            foreach ($writes as ['slip' => $slip, 'row' => $row, 'items' => $items]) {
-                $attributes = array_key_exists('remarks', $row) ? [...$items, 'remarks' => $row['remarks'] ?: null] : $items;
-
-                if ($slip === null) {
-                    $this->createPayslip($locked, $newEmployees->get($row['employee_id']), $attributes);
-                    $created++;
-
-                    continue;
-                }
-
-                $unchanged = $this->paysTheSame($slip, $items);
-                $slip->fill($attributes);
-
-                if ($locked->isReleased() && (! $unchanged || $slip->isDirty('remarks'))) {
+            foreach ($writes as $slip) {
+                if ($locked->isReleased() && $slip->isDirty()) {
                     $slip->forceFill(['corrected_after_release' => true]);
                 }
 
                 $slip->save();
             }
 
-            return ['errors' => [], 'updated' => count($writes) - $created, 'created' => $created];
+            return ['errors' => [], 'updated' => count($writes)];
         });
+    }
+
+    /**
+     * Check one row's typed values against {@see self::INPUTS}.
+     *
+     * @param  array<string, string>  $values
+     * @return array{attributes: array<string, mixed>, errors: list<string>}
+     */
+    public function parseInputs(array $values, string $who): array
+    {
+        $attributes = [];
+        $errors = [];
+
+        foreach (self::INPUTS as $key => [$column, $kind, $label]) {
+            if (! array_key_exists($key, $values)) {
+                continue;
+            }
+
+            $raw = trim((string) $values[$key]);
+
+            try {
+                $attributes[$column] = match ($kind) {
+                    'money' => Money::toCentavos($raw),
+                    'quantity' => CosPay::quantity($raw),
+                    'minutes' => CosPay::minutes($raw),
+                    'short' => mb_substr($raw, 0, 20) ?: null,
+                    default => mb_substr($raw, 0, 120) ?: null,
+                };
+            } catch (InvalidArgumentException $exception) {
+                $errors[] = "{$who}: {$label} {$exception->getMessage()}";
+            }
+        }
+
+        return ['attributes' => $attributes, 'errors' => $errors];
+    }
+
+    /**
+     * The payslip items behind the printed payslip, release emails and totals. Overtime takes up the
+     * workbook's final rounding, so the payslip's net pay equals the workbook's net pay to the centavo.
+     *
+     * @return array{earnings: list<Item>, deductions: list<Item>}
+     */
+    private function items(Payslip $slip): array
+    {
+        $pay = $slip->cosPay();
+
+        return [
+            'earnings' => [
+                ['label' => 'Gross', 'amount_centavos' => $pay['gross']],
+                ['label' => 'Overtime Pay', 'amount_centavos' => $pay['gross_after_late'] - $pay['gross'] + $pay['late']],
+            ],
+            'deductions' => [
+                ['label' => 'Late', 'amount_centavos' => $pay['late']],
+                ['label' => 'SSS', 'amount_centavos' => (int) $slip->sss_centavos],
+                ['label' => 'HDMF', 'amount_centavos' => (int) $slip->hdmf_centavos],
+                ['label' => 'CMPEAI', 'amount_centavos' => (int) $slip->cmpeai_centavos],
+            ],
+        ];
     }
 
     /**
@@ -384,32 +459,5 @@ class PayrollService
                 'netPay' => Money::format($slip->net_pay_centavos, $symbol),
             ],
         ])->values()->all();
-    }
-
-    /**
-     * Whether new items pay the same as the payslip. Zero rows don't count, so re-saving a released
-     * grid after a pay item was added to the template corrects nothing.
-     *
-     * @param  array{earnings: list<Item>, deductions: list<Item>}  $items
-     */
-    private function paysTheSame(Payslip $slip, array $items): bool
-    {
-        $amounts = function (array $list): array {
-            $paid = array_filter(array_column($list, 'amount_centavos', 'label'));
-            ksort($paid);
-
-            return $paid;
-        };
-
-        return $amounts($slip->earnings) === $amounts($items['earnings'])
-            && $amounts($slip->deductions) === $amounts($items['deductions']);
-    }
-
-    /**
-     * @param  list<Item>  $items
-     */
-    private function total(array $items): int
-    {
-        return array_sum(array_column($items, 'amount_centavos'));
     }
 }
