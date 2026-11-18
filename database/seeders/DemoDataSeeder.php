@@ -683,9 +683,11 @@ class DemoDataSeeder extends Seeder
         $orders = [];
 
         app(RegionalWageSeeder::class)->run();
+        // BARMM's rates are by area; demo branches there follow the Cotabato City rate.
+        Branch::query()->where('region', Region::Barmm->value)->whereNull('wage_area')->update(['wage_area' => RegionalWageSeeder::COTABATO_CITY]);
 
         foreach (Region::cases() as $index => $region) {
-            if (isset(RegionalWageSeeder::RATES[$region->value])) {
+            if (in_array($region->value, RegionalWageSeeder::regions(), true)) {
                 array_push($orders, ...WageOrder::query()->where('region', $region->value)->orderBy('effective_on')->get());
 
                 continue;

@@ -89,7 +89,7 @@ class PayrollService
             $existing = $locked->payslips()->pluck('employee_id')->all();
 
             $employees = Employee::query()
-                ->with('station')
+                ->with(['station', 'unit'])
                 ->where('employment_status', EmploymentStatus::Active)
                 ->where('classification', Classification::Cos)
                 ->when($branchIds !== [], fn ($query) => $query->whereIn('station_id', $branchIds))
@@ -140,7 +140,7 @@ class PayrollService
                     continue;
                 }
 
-                $rate = $this->payHistory->payrollRate($slip->employee->loadMissing('station'), $locked->period_end->format('Y-m-d'));
+                $rate = $this->payHistory->payrollRate($slip->employee->loadMissing(['station', 'unit']), $locked->period_end->format('Y-m-d'));
                 $withoutRate += $rate['amount_centavos'] === 0 ? 1 : 0;
                 $slip->fill($this->rateAttributes($rate));
 
@@ -531,6 +531,7 @@ class PayrollService
             'rate_source' => $rate['source'],
             'wage_order_id' => $rate['wage_order_id'],
             'region' => $rate['region'],
+            'wage_area' => $rate['wage_area'],
             'regional_minimum_centavos' => $rate['minimum_centavos'],
         ];
     }

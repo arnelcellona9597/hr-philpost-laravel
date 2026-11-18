@@ -92,7 +92,7 @@ class PayrollController extends Controller
     {
         Gate::authorize('view', $period);
 
-        $slips = $period->payslips()->with(['wageOrder', 'employee.station'])->orderBy('station')->orderBy('full_name')->get();
+        $slips = $period->payslips()->with(['wageOrder', 'employee.station', 'employee.unit'])->orderBy('station')->orderBy('full_name')->get();
 
         return view('payroll.show', [
             'period' => $period->load(['reviewedBy', 'approvedBy', 'releasedBy']),

@@ -152,3 +152,16 @@ it('keeps the unit filter in the employee export and print links', function () {
 
     $this->get("/employees?unit[]={$unit->id}")->assertOk()->assertSee('unit%5B0%5D='.$unit->id, false);
 });
+
+it('saves a unit\'s minimum wage area', function () {
+    $branch = Branch::factory()->create();
+    $this->post('/branches/units', ['name' => 'Datu Piang Post Office', 'branch_id' => $branch->id, 'wage_area' => '  Maguindanao   del Sur '])->assertRedirect('/branches/units');
+    $unit = BranchUnit::query()->where('name', 'Datu Piang Post Office')->sole();
+
+    expect($unit->wage_area)->toBe('Maguindanao del Sur');
+
+    $this->put("/branches/units/{$unit->id}", ['name' => $unit->name, 'branch_id' => $branch->id, 'wage_area' => ''])->assertRedirect();
+
+    expect($unit->fresh()->wage_area)->toBeNull();
+    $this->get('/branches/units')->assertOk()->assertSee('Minimum wage area');
+});

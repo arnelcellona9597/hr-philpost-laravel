@@ -87,7 +87,7 @@
                 <label class="label" for="remarks">Remarks</label>
                 <textarea class="input" id="remarks" name="remarks">{{ old('remarks', $slip->remarks) }}</textarea>
             </div>
-            <p class="text-xs text-muted">Rate basis: {{ $slip->rateSourceLabel() }}{{ $slip->region ? ' · '.$slip->region : '' }}{{ $slip->regional_minimum_centavos !== null ? ' · regional minimum '.Money::format((int) $slip->regional_minimum_centavos, $symbol) : '' }}{{ $slip->isBelowMinimum() ? ' (contract rate is below it)' : '' }}</p>
+            <p class="text-xs text-muted">Rate basis: {{ $slip->rateSourceLabel() }}{{ $slip->region ? ' · '.$slip->region : '' }}{{ $slip->wage_area ? ' · '.$slip->wage_area : '' }}{{ $slip->regional_minimum_centavos !== null ? ' · regional minimum '.Money::format((int) $slip->regional_minimum_centavos, $symbol) : '' }}{{ $slip->isBelowMinimum() ? ' (contract rate is below it)' : '' }}</p>
             @if ($editable)
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <button class="btn-primary">Save payslip</button>

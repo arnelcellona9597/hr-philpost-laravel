@@ -27,13 +27,14 @@ class WageOrderController extends Controller
 
         $region = Region::tryFrom((string) $request->query('region'));
         $today = HrDate::today();
-        $inForce = WageOrder::query()->where('effective_on', '<=', $today)->orderByDesc('effective_on')->orderByDesc('daily_rate_centavos')->get()->unique(fn (WageOrder $order): string => $order->region->value)->keyBy(fn (WageOrder $order): string => $order->region->value);
+        $inForce = WageOrder::query()->where('effective_on', '<=', $today)->orderByDesc('effective_on')->orderByDesc('daily_rate_centavos')->get()->unique(fn (WageOrder $order): string => $order->region->value.'|'.$order->area);
 
         return view('wage-orders.index', [
             'regions' => Region::cases(),
             'region' => $region,
-            'inForce' => $inForce,
-            'orders' => WageOrder::query()->withCount('payChanges')->when($region, fn ($query) => $query->where('region', $region->value))->orderByDesc('effective_on')->orderBy('region')->orderBy('sector')->paginate(PageSize::resolve($request, self::PER_PAGE))->withQueryString(),
+            'inForce' => $inForce->where('area', '')->keyBy(fn (WageOrder $order): string => $order->region->value),
+            'areasInForce' => $inForce->where('area', '<>', '')->sortBy('area')->groupBy(fn (WageOrder $order): string => $order->region->value),
+            'orders' => WageOrder::query()->withCount('payChanges')->when($region, fn ($query) => $query->where('region', $region->value))->orderByDesc('effective_on')->orderBy('region')->orderBy('area')->orderBy('sector')->paginate(PageSize::resolve($request, self::PER_PAGE))->withQueryString(),
             'today' => $today,
         ]);
     }
@@ -135,11 +136,14 @@ class WageOrderController extends Controller
         $parsed = RecordForm::parse($request, $this->fields(), 'wage_orders');
         $data = $parsed['data'];
 
+        $data['area'] = trim((string) ($data['area'] ?? ''));
+        $parsed['data'] = $data;
+
         $taken = ($data['region'] ?? null) && ($data['sector'] ?? null) && ($data['effective_on'] ?? null) && WageOrder::query()
-            ->where(['region' => $data['region'], 'sector' => $data['sector'], 'effective_on' => $data['effective_on']])
+            ->where(['region' => $data['region'], 'area' => $data['area'], 'sector' => $data['sector'], 'effective_on' => $data['effective_on']])
             ->when($order, fn ($query) => $query->whereKeyNot($order->id))
             ->exists();
 
-        return $taken ? [...$parsed, 'errors' => [...$parsed['errors'], 'effective_on' => 'This region and sector already have a wage order on that date.']] : $parsed;
+        return $taken ? [...$parsed, 'errors' => [...$parsed['errors'], 'effective_on' => 'This region, area and sector already have a wage order on that date.']] : $parsed;
     }
 }

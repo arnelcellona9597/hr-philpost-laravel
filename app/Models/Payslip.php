@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['period_id', 'employee_id', 'full_name', 'employee_code', 'position', 'station', 'classification', 'tin', 'sss', 'philhealth', 'pagibig', 'earnings', 'deductions', 'remarks', 'batch_label', 'specific_station', 'period_covered', 'daily_rate_centavos', 'premium_percent', 'days_worked', 'late_minutes', 'ot_hours', 'ot_rest_hours', 'sss_centavos', 'hdmf_centavos', 'cmpeai_centavos', 'absences', 'tardiness', 'rate_source', 'wage_order_id', 'region', 'regional_minimum_centavos'])]
+#[Fillable(['period_id', 'employee_id', 'full_name', 'employee_code', 'position', 'station', 'classification', 'tin', 'sss', 'philhealth', 'pagibig', 'earnings', 'deductions', 'remarks', 'batch_label', 'specific_station', 'period_covered', 'daily_rate_centavos', 'premium_percent', 'days_worked', 'late_minutes', 'ot_hours', 'ot_rest_hours', 'sss_centavos', 'hdmf_centavos', 'cmpeai_centavos', 'absences', 'tardiness', 'rate_source', 'wage_order_id', 'region', 'wage_area', 'regional_minimum_centavos'])]
 class Payslip extends Model
 {
     /** @use HasFactory<PayslipFactory> */
