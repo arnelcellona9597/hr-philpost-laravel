@@ -305,7 +305,7 @@ it('fills in the office letterhead wording only where it is blank', function () 
 it('prints the letterhead logo large enough to match the office letterhead', function () {
     $html = CertificateRenderer::html([['type' => 'letterhead', 'top' => 'Republic of the Philippines', 'name' => ['PHILIPPINE POSTAL CORPORATION'], 'details' => [], 'section' => '']], ['companyName' => 'x', 'font' => 'calibri', 'letterheadLogoUrl' => '/files/1']);
 
-    expect($html)->toContain('width:195pt;height:42pt');
+    expect($html)->toContain('width:200pt;height:45pt');
 });
 
 it('uses the wide PHLPOST logo as the letterhead logo and keeps the previous file', function () {
